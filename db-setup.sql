@@ -104,6 +104,25 @@ create table if not exists health_checks (
   created_at timestamptz not null default now()
 );
 
+-- ---------- Account deletion ----------
+-- Lets a signed-in user permanently delete their own account. All of
+-- profiles, collaborators (both as owner and as an accepted
+-- collaborator elsewhere), eggs, chickens and health_checks reference
+-- auth.users(id) on delete cascade, so removing the auth.users row
+-- takes everything with it in one step.
+create or replace function public.delete_own_account()
+returns void
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  delete from auth.users where id = auth.uid();
+end;
+$$;
+
+grant execute on function public.delete_own_account() to authenticated;
+
 -- ---------- Row level security ----------
 alter table profiles enable row level security;
 alter table collaborators enable row level security;

@@ -492,6 +492,13 @@
           </div>
         </div>
       </section>
+
+      <section>
+        <p class="sec-title" style="color:var(--danger);">Danger Zone</p>
+        <p class="share-note">Permanently delete your account and everything in it &mdash; eggs, chickens, health checks, and any sharing you've set up. This cannot be undone.</p>
+        <button class="btn danger full" onclick="deleteAccountAndData()">Delete account and data</button>
+        <div class="status" id="delete-account-status"></div>
+      </section>
     </div>
 
   </div>
@@ -1732,6 +1739,32 @@ async function changePassword(){
   setStatus('account-status', 'Password updated.', false);
   document.getElementById('account-new-password').value = '';
   document.getElementById('account-confirm-password').value = '';
+}
+
+async function deleteAccountAndData(){
+  if(!confirm("This permanently deletes your account, login, and everything in it — eggs, chickens, health checks, and any sharing you've set up. This cannot be undone. Continue?")) return;
+  if(!confirm('Really sure? There is no way to undo this.')) return;
+
+  setStatus('delete-account-status', 'Deleting your account…', false);
+  const uid = currentUser.id;
+
+  // Best-effort manual cleanup first, so data is gone even if the RPC
+  // below isn't set up yet in this Supabase project.
+  await sb.from('health_checks').delete().eq('owner_id', uid);
+  await sb.from('chickens').delete().eq('owner_id', uid);
+  await sb.from('eggs').delete().eq('owner_id', uid);
+  await sb.from('collaborators').delete().eq('owner_id', uid);
+
+  const { error } = await sb.rpc('delete_own_account');
+
+  if(error){
+    await sb.from('profiles').delete().eq('id', uid);
+    alert("Your data has been deleted, but your login couldn't be fully removed — the account-deletion function may not be set up in Supabase yet. You can still sign back in to an empty account; re-run db-setup.sql to finish removing the login itself.");
+  } else {
+    alert('Your account and all its data have been permanently deleted.');
+  }
+
+  await logout();
 }
 
 // ---------- PWA ----------
