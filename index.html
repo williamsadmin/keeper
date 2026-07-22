@@ -779,26 +779,33 @@ function renderEggStats(){
   const now = new Date();
   const weekStart = startOfWeek(now);
   const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6); weekEnd.setHours(23, 59, 59, 999);
+  const runningStart = new Date(now); runningStart.setDate(runningStart.getDate() - 6); runningStart.setHours(0, 0, 0, 0);
+  const runningEnd = new Date(now); runningEnd.setHours(23, 59, 59, 999);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
   const yearStart = new Date(now.getFullYear(), 0, 1);
   const yearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
 
   const w = computePeriodStats(weekStart, weekEnd);
+  const r = computePeriodStats(runningStart, runningEnd);
   const m = computePeriodStats(monthStart, monthEnd);
   const y = computePeriodStats(yearStart, yearEnd);
 
-  const card = (label, s) => `
+  const card = (label, s, sub) => `
     <div class="stat-card">
       <div class="stat-label">${label}</div>
       <div class="stat-main">${s.total}</div>
-      <div class="stat-sub">eggs total</div>
+      <div class="stat-sub">${sub || 'eggs total'}</div>
       <div class="stat-row"><span>Good</span><strong>${s.good}</strong></div>
       <div class="stat-row"><span>Cracked</span><strong>${s.cracked}</strong></div>
       <div class="stat-row"><span>Avg / day logged</span><strong>${s.avg.toFixed(1)}</strong></div>
     </div>`;
 
-  document.getElementById('egg-stats').innerHTML = card('This Week', w) + card('This Month', m) + card('This Year', y);
+  document.getElementById('egg-stats').innerHTML =
+    card('This Week', w, 'eggs total (Mon&ndash;Sun)') +
+    card('Running Week', r, 'eggs total (last 7 days)') +
+    card('This Month', m) +
+    card('This Year', y);
 }
 
 function renderEggLog(){
