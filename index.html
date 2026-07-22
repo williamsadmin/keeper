@@ -166,9 +166,14 @@
   code{background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:12px;}
 
   /* Import preview */
-  .import-preview-row{display:flex;justify-content:space-between;gap:8px;background:var(--surface-alt);border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:6px;font-size:12px;}
-  .import-preview-row .name{font-weight:600;color:var(--text);}
-  .import-preview-row .meta{color:var(--text-dim);text-align:right;}
+  details.import-preview-item{background:var(--surface-alt);border:1px solid var(--border);border-radius:7px;margin-bottom:6px;overflow:hidden;}
+  summary.import-preview-summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;gap:8px;padding:8px 10px;font-size:12px;}
+  summary.import-preview-summary::-webkit-details-marker{display:none;}
+  summary.import-preview-summary .name{font-weight:600;color:var(--text);flex-shrink:0;}
+  summary.import-preview-summary .meta{color:var(--text-dim);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .import-preview-edit{padding:2px 10px 10px;border-top:1px solid var(--border);}
+  .import-preview-edit .row{margin:8px 0 0;}
+  .import-preview-edit label{font-size:10px;}
 </style>
 </head>
 <body>
@@ -245,6 +250,31 @@
       <section>
         <p class="sec-title">Totals &amp; Averages</p>
         <div class="stat-grid" id="egg-stats"></div>
+      </section>
+
+      <section>
+        <details>
+          <summary class="sec-title">Browse Previous Periods</summary>
+          <div class="row">
+            <div>
+              <label>View</label>
+              <select id="history-period-type" onchange="onHistoryPeriodTypeChange()">
+                <option value="month">Specific month</option>
+                <option value="year">Specific year</option>
+                <option value="lifetime">Lifetime (all-time)</option>
+              </select>
+            </div>
+            <div id="history-month-picker-wrap">
+              <label>Month</label>
+              <input type="month" id="history-month-picker" onchange="renderHistoryStats()">
+            </div>
+            <div id="history-year-picker-wrap" style="display:none;">
+              <label>Year</label>
+              <input type="number" id="history-year-picker" onchange="renderHistoryStats()" placeholder="e.g. 2025">
+            </div>
+          </div>
+          <div class="stat-grid" id="history-stats" style="margin-top:10px;"></div>
+        </details>
       </section>
 
       <section>
@@ -869,7 +899,72 @@ function renderEggLog(){
     </div>`).join('');
 }
 
-function renderEggs(){ renderEggStats(); renderEggLog(); }
+function renderEggs(){
+  renderEggStats();
+  renderEggLog();
+  initHistoryDefaults();
+  renderHistoryStats();
+}
+
+// ---------- EGG HISTORY BROWSER ----------
+function initHistoryDefaults(){
+  const monthInput = document.getElementById('history-month-picker');
+  const yearInput = document.getElementById('history-year-picker');
+  if(!monthInput.value){
+    const now = new Date();
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    monthInput.value = prevMonth.getFullYear() + '-' + pad(prevMonth.getMonth() + 1);
+  }
+  if(!yearInput.value){
+    yearInput.value = new Date().getFullYear() - 1;
+  }
+}
+
+function onHistoryPeriodTypeChange(){
+  const type = document.getElementById('history-period-type').value;
+  document.getElementById('history-month-picker-wrap').style.display = type === 'month' ? 'block' : 'none';
+  document.getElementById('history-year-picker-wrap').style.display = type === 'year' ? 'block' : 'none';
+  renderHistoryStats();
+}
+
+function renderHistoryStats(){
+  const el = document.getElementById('history-stats');
+  const type = document.getElementById('history-period-type').value;
+  let start, end, label;
+
+  if(type === 'lifetime'){
+    if(!state.eggs.length){ el.innerHTML = '<p class="empty">No entries yet.</p>'; return; }
+    const dates = state.eggs.map(e => e.date).sort();
+    start = new Date(dates[0] + 'T00:00:00');
+    end = new Date(dates[dates.length - 1] + 'T23:59:59');
+    label = 'Lifetime';
+  } else if(type === 'month'){
+    const val = document.getElementById('history-month-picker').value;
+    if(!val){ el.innerHTML = '<p class="empty">Pick a month.</p>'; return; }
+    const [y, m] = val.split('-').map(Number);
+    start = new Date(y, m - 1, 1);
+    end = new Date(y, m, 0, 23, 59, 59, 999);
+    label = start.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  } else {
+    const y = Number(document.getElementById('history-year-picker').value);
+    if(!y){ el.innerHTML = '<p class="empty">Pick a year.</p>'; return; }
+    start = new Date(y, 0, 1);
+    end = new Date(y, 11, 31, 23, 59, 59, 999);
+    label = String(y);
+  }
+
+  const s = computePeriodStats(start, end);
+  el.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-label">${escapeHtml(label)}</div>
+      <div class="stat-main">${s.good}</div>
+      <div class="stat-sub">good eggs</div>
+      <div class="stat-row"><span>Total</span><strong>${s.total}</strong></div>
+      <div class="stat-row"><span>Cracked</span><strong>${s.cracked}</strong></div>
+      <div class="stat-row"><span>Avg / day logged</span><strong>${s.avg.toFixed(1)}</strong></div>
+      <div class="stat-row"><span>Days logged</span><strong>${s.days}</strong></div>
+    </div>`;
+}
 
 // ---------- CHICKENS ----------
 const BREED_PRESETS = {
@@ -1008,15 +1103,71 @@ function previewImportList(){
     };
   });
 
-  document.getElementById('import-preview-title').textContent = `Preview (${pendingImportPayloads.length} chicken${pendingImportPayloads.length > 1 ? 's' : ''})`;
-  document.getElementById('import-preview-list').innerHTML = pendingImportPayloads.map(p => `
-    <div class="import-preview-row">
-      <span class="name">${escapeHtml(p.name)}</span>
-      <span class="meta">${[p.tag_colour, p.tag].filter(Boolean).join(' ') || '&mdash;'} &middot; ${escapeHtml(p.breed || 'Unknown breed')} &middot; ${p.gender}${p.dob ? ' &middot; ' + formatDateNice(p.dob) : ''}${p.expected_eggs_per_year ? ' &middot; ' + p.expected_eggs_per_year + '/yr' : ''}${p.egg_colour ? ' &middot; ' + escapeHtml(p.egg_colour) + ' eggs' : ''}${p.notes ? ' &middot; ' + escapeHtml(p.notes) : ''}</span>
-    </div>
-  `).join('');
+  renderImportPreview();
   document.getElementById('import-preview-section').style.display = 'block';
   setStatus('import-status', '', false);
+}
+
+function importPreviewSummary(p){
+  return `${[p.tag_colour, p.tag].filter(Boolean).join(' ') || '&mdash;'} &middot; ${escapeHtml(p.breed || 'Unknown breed')} &middot; ${p.gender}${p.dob ? ' &middot; ' + formatDateNice(p.dob) : ''}${p.expected_eggs_per_year ? ' &middot; ' + p.expected_eggs_per_year + '/yr' : ''}${p.egg_colour ? ' &middot; ' + escapeHtml(p.egg_colour) + ' eggs' : ''}${p.notes ? ' &middot; ' + escapeHtml(p.notes) : ''}`;
+}
+
+function importPreviewRowHtml(p, i){
+  return `
+  <details class="import-preview-item" data-index="${i}">
+    <summary class="import-preview-summary">
+      <span class="name" id="import-name-${i}">${escapeHtml(p.name)}</span>
+      <span class="meta" id="import-summary-${i}">${importPreviewSummary(p)}</span>
+    </summary>
+    <div class="import-preview-edit">
+      <div class="row">
+        <div><label>Name</label><input type="text" value="${escapeHtml(p.name)}" oninput="updatePendingImport(${i}, 'name', this.value)"></div>
+        <div><label>Leg / tag number</label><input type="text" value="${escapeHtml(p.tag)}" oninput="updatePendingImport(${i}, 'tag', this.value)"></div>
+      </div>
+      <div class="row">
+        <div><label>Tag colour</label><input type="text" value="${escapeHtml(p.tag_colour)}" oninput="updatePendingImport(${i}, 'tag_colour', this.value)"></div>
+        <div><label>Breed</label><input type="text" value="${escapeHtml(p.breed)}" oninput="updatePendingImport(${i}, 'breed', this.value)"></div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Gender</label>
+          <select onchange="updatePendingImport(${i}, 'gender', this.value)">
+            <option value="Hen" ${p.gender === 'Hen' ? 'selected' : ''}>Hen</option>
+            <option value="Rooster" ${p.gender === 'Rooster' ? 'selected' : ''}>Rooster</option>
+          </select>
+        </div>
+        <div><label>Date of birth</label><input type="date" value="${p.dob || ''}" oninput="updatePendingImport(${i}, 'dob', this.value)"></div>
+      </div>
+      <div class="row">
+        <div><label>Expected eggs / year</label><input type="number" min="0" value="${p.expected_eggs_per_year || ''}" oninput="updatePendingImport(${i}, 'expected_eggs_per_year', this.value === '' ? 0 : Number(this.value))"></div>
+        <div><label>Egg colour</label><input type="text" value="${escapeHtml(p.egg_colour)}" oninput="updatePendingImport(${i}, 'egg_colour', this.value)"></div>
+      </div>
+      <div class="row">
+        <div style="flex:1 1 100%;"><label>Notes</label><textarea oninput="updatePendingImport(${i}, 'notes', this.value)">${escapeHtml(p.notes)}</textarea></div>
+      </div>
+      <button class="btn danger full" style="margin-top:8px;" onclick="removePendingImportRow(${i})">Remove from import</button>
+    </div>
+  </details>`;
+}
+
+function renderImportPreview(){
+  document.getElementById('import-preview-title').textContent = `Preview (${pendingImportPayloads.length} chicken${pendingImportPayloads.length > 1 ? 's' : ''})`;
+  document.getElementById('import-preview-list').innerHTML = pendingImportPayloads.map((p, i) => importPreviewRowHtml(p, i)).join('');
+}
+
+function updatePendingImport(i, field, value){
+  pendingImportPayloads[i][field] = value;
+  const summaryEl = document.getElementById('import-summary-' + i);
+  if(summaryEl) summaryEl.innerHTML = importPreviewSummary(pendingImportPayloads[i]);
+  if(field === 'name'){
+    const nameEl = document.getElementById('import-name-' + i);
+    if(nameEl) nameEl.textContent = value || 'Unnamed';
+  }
+}
+
+function removePendingImportRow(i){
+  pendingImportPayloads.splice(i, 1);
+  renderImportPreview();
 }
 
 function cancelImportPreview(){
@@ -1026,7 +1177,8 @@ function cancelImportPreview(){
 
 async function confirmImportList(){
   if(!pendingImportPayloads.length) return;
-  const { error } = await sb.from('chickens').insert(pendingImportPayloads);
+  const payloads = pendingImportPayloads.map(p => ({ ...p, name: p.name || 'Unnamed' }));
+  const { error } = await sb.from('chickens').insert(payloads);
   if(error){ setStatus('import-status', error.message, true); return; }
 
   const count = pendingImportPayloads.length;
