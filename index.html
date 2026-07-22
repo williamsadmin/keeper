@@ -355,7 +355,19 @@
       </section>
 
       <section id="chicken-filter-section">
-        <p class="sec-title">Filter</p>
+        <p class="sec-title">Filter &amp; Sort</p>
+        <div class="row">
+          <div>
+            <label>Sort by</label>
+            <select id="filter-sort" onchange="onChickenFilterChange()">
+              <option value="tag-asc">Tag number (ascending)</option>
+              <option value="tag-desc">Tag number (descending)</option>
+              <option value="age-oldest">Oldest first</option>
+              <option value="age-youngest">Youngest first</option>
+              <option value="breed">Breed (A&ndash;Z)</option>
+            </select>
+          </div>
+        </div>
         <div class="row">
           <div><label>Gender</label><select id="filter-gender" onchange="onChickenFilterChange()"><option value="">All</option><option value="Hen">Hens</option><option value="Rooster">Roosters</option></select></div>
           <div><label>Tag colour</label><select id="filter-tag-colour" onchange="onChickenFilterChange()"><option value="">All</option></select></div>
@@ -1288,6 +1300,7 @@ function onChickenFilterChange(){
 }
 
 function clearChickenFilters(){
+  document.getElementById('filter-sort').value = 'tag-asc';
   document.getElementById('filter-gender').value = '';
   document.getElementById('filter-tag-colour').value = '';
   document.getElementById('filter-tag-from').value = '';
@@ -1295,6 +1308,48 @@ function clearChickenFilters(){
   document.getElementById('filter-age-from').value = '';
   document.getElementById('filter-age-to').value = '';
   renderChickens();
+}
+
+function hasNumericTag(c){ return c.tag !== '' && c.tag != null && !isNaN(Number(c.tag)); }
+
+function compareDob(a, b, oldestFirst){
+  if(!a.dob && !b.dob) return 0;
+  if(!a.dob) return 1;
+  if(!b.dob) return -1;
+  if(a.dob === b.dob) return 0;
+  const earlierFirst = a.dob < b.dob ? -1 : 1;
+  return oldestFirst ? earlierFirst : -earlierFirst;
+}
+
+function sortChickens(list){
+  const mode = document.getElementById('filter-sort').value;
+  const arr = list.slice();
+  if(mode === 'tag-desc'){
+    arr.sort((a, b) => {
+      const at = hasNumericTag(a), bt = hasNumericTag(b);
+      if(at && bt) return Number(b.tag) - Number(a.tag);
+      return at ? -1 : (bt ? 1 : 0);
+    });
+  } else if(mode === 'age-oldest'){
+    arr.sort((a, b) => compareDob(a, b, true));
+  } else if(mode === 'age-youngest'){
+    arr.sort((a, b) => compareDob(a, b, false));
+  } else if(mode === 'breed'){
+    arr.sort((a, b) => {
+      const ab = (a.breed || '').trim(), bb = (b.breed || '').trim();
+      if(!ab && !bb) return 0;
+      if(!ab) return 1;
+      if(!bb) return -1;
+      return ab.localeCompare(bb);
+    });
+  } else {
+    arr.sort((a, b) => {
+      const at = hasNumericTag(a), bt = hasNumericTag(b);
+      if(at && bt) return Number(a.tag) - Number(b.tag);
+      return at ? -1 : (bt ? 1 : 0);
+    });
+  }
+  return arr;
 }
 
 function editChicken(id){
@@ -1394,7 +1449,7 @@ function renderChickens(){
     listEl.innerHTML = '<p class="empty">No chickens added yet.</p>';
   } else {
     const filters = getChickenFilters();
-    const filtered = activeChickens.filter(c => chickenMatchesFilters(c, filters));
+    const filtered = sortChickens(activeChickens.filter(c => chickenMatchesFilters(c, filters)));
     listEl.innerHTML = filtered.length
       ? filtered.map(c => chickenCardHtml(c, readOnly)).join('')
       : '<p class="empty">No chickens match these filters.</p>';
@@ -1402,7 +1457,7 @@ function renderChickens(){
 
   document.getElementById('losses-summary').textContent = deceasedChickens.length;
   lossesEl.innerHTML = deceasedChickens.length
-    ? deceasedChickens.map(c => chickenCardHtml(c, readOnly)).join('')
+    ? sortChickens(deceasedChickens).map(c => chickenCardHtml(c, readOnly)).join('')
     : '<p class="empty">No losses recorded.</p>';
 }
 
