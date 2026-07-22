@@ -114,6 +114,7 @@
   .chicken-meta{font-size:12px;color:var(--text-dim);margin-top:2px;}
   .chicken-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;font-size:13px;}
   .chicken-grid > div{overflow:hidden;}
+  .chicken-notes{font-size:12px;color:var(--text-dim);font-style:italic;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
   .chicken-label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);}
   .gender-tag{display:inline-block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:20px;margin-left:6px;vertical-align:middle;}
   .gender-tag.hen{background:var(--amber-dim);color:var(--amber);}
@@ -300,6 +301,10 @@
           </div>
           <div class="row">
             <div><label>Expected eggs / year</label><input type="number" min="0" id="ch-expected" placeholder="e.g. 250"></div>
+            <div><label>Egg colour</label><input type="text" id="ch-egg-colour" placeholder="e.g. Blue"></div>
+          </div>
+          <div class="row">
+            <div><label>Notes</label><textarea id="ch-notes" placeholder="e.g. Bent beak, rescued 2024"></textarea></div>
           </div>
           <button class="btn full" onclick="saveChicken()">Save chicken</button>
           <button class="btn secondary full" id="ch-cancel-btn" style="display:none;margin-top:8px;" onclick="cancelEditChicken()">Cancel edit</button>
@@ -424,8 +429,8 @@
 
       <section id="chicken-import-section">
         <p class="sec-title">Import Chickens</p>
-        <p class="share-note" style="margin-bottom:10px;">Paste one chicken per line. Just a name works, or add details separated by commas: <code>Name, Tag, Tag Colour, Breed, Gender, DOB (YYYY-MM-DD), Expected Eggs/Year</code>.</p>
-        <textarea id="import-list-text" placeholder="Henrietta, 14, Red, Rhode Island Red, Hen, 2024-03-15, 280&#10;Clucky"></textarea>
+        <p class="share-note" style="margin-bottom:10px;">Paste one chicken per line. Just a name works, or add details separated by commas: <code>Name, Tag, Tag Colour, Breed, Gender, DOB (YYYY-MM-DD), Expected Eggs/Year, Egg Colour, Notes</code>. Anything after the Egg Colour is treated as notes, commas and all.</p>
+        <textarea id="import-list-text" placeholder="Henrietta, 14, Red, Rhode Island Red, Hen, 2024-03-15, 280, Blue, Rescued in 2024&#10;Clucky"></textarea>
         <button class="btn full" style="margin-top:8px;" id="import-preview-btn" onclick="previewImportList()">Preview import</button>
         <div class="status" id="import-status"></div>
 
@@ -736,7 +741,8 @@ function rowToEgg(r){ return { id: r.id, date: r.date, total: r.total, cracked: 
 function rowToChicken(r){
   return {
     id: r.id, name: r.name, tag: r.tag, tagColour: r.tag_colour, breed: r.breed,
-    gender: r.gender, dob: r.dob, expectedEggsPerYear: r.expected_eggs_per_year
+    gender: r.gender, dob: r.dob, expectedEggsPerYear: r.expected_eggs_per_year,
+    eggColour: r.egg_colour, notes: r.notes
   };
 }
 function rowToHealthCheck(r){ return { id: r.id, date: r.date, chickenId: r.chicken_id, items: r.items || [] }; }
@@ -929,6 +935,8 @@ function resetChickenForm(){
   document.getElementById('ch-gender').value = 'Hen';
   document.getElementById('ch-dob').value = '';
   document.getElementById('ch-expected').value = '';
+  document.getElementById('ch-egg-colour').value = '';
+  document.getElementById('ch-notes').value = '';
   document.getElementById('chicken-form-title').textContent = 'Add a Chicken';
   document.getElementById('ch-cancel-btn').style.display = 'none';
   document.getElementById('chicken-form-details').open = false;
@@ -948,7 +956,9 @@ async function saveChicken(){
     breed,
     gender: document.getElementById('ch-gender').value,
     dob: document.getElementById('ch-dob').value || null,
-    expected_eggs_per_year: Number(document.getElementById('ch-expected').value) || 0
+    expected_eggs_per_year: Number(document.getElementById('ch-expected').value) || 0,
+    egg_colour: document.getElementById('ch-egg-colour').value.trim(),
+    notes: document.getElementById('ch-notes').value.trim()
   };
 
   let error;
@@ -978,7 +988,8 @@ function previewImportList(){
 
   pendingImportPayloads = lines.map(line => {
     const parts = line.split(',').map(p => p.trim());
-    const [name, tag, tagColourInput, breedInput, genderInput, dob, expectedInput] = parts;
+    const [name, tag, tagColourInput, breedInput, genderInput, dob, expectedInput, eggColourInput] = parts;
+    const notes = parts.slice(8).join(', ').trim();
     const matchedBreed = findBreedPreset(breedInput);
     const breed = matchedBreed || breedInput || '';
     const explicitExpected = expectedInput !== undefined && expectedInput !== '' ? Number(expectedInput) : null;
@@ -991,7 +1002,9 @@ function previewImportList(){
       breed,
       gender: genderInput && /rooster|cockerel|cock\b|male/i.test(genderInput) ? 'Rooster' : 'Hen',
       dob: dob || null,
-      expected_eggs_per_year: expected
+      expected_eggs_per_year: expected,
+      egg_colour: eggColourInput || '',
+      notes
     };
   });
 
@@ -999,7 +1012,7 @@ function previewImportList(){
   document.getElementById('import-preview-list').innerHTML = pendingImportPayloads.map(p => `
     <div class="import-preview-row">
       <span class="name">${escapeHtml(p.name)}</span>
-      <span class="meta">${[p.tag_colour, p.tag].filter(Boolean).join(' ') || '&mdash;'} &middot; ${escapeHtml(p.breed || 'Unknown breed')} &middot; ${p.gender}${p.dob ? ' &middot; ' + formatDateNice(p.dob) : ''}${p.expected_eggs_per_year ? ' &middot; ' + p.expected_eggs_per_year + '/yr' : ''}</span>
+      <span class="meta">${[p.tag_colour, p.tag].filter(Boolean).join(' ') || '&mdash;'} &middot; ${escapeHtml(p.breed || 'Unknown breed')} &middot; ${p.gender}${p.dob ? ' &middot; ' + formatDateNice(p.dob) : ''}${p.expected_eggs_per_year ? ' &middot; ' + p.expected_eggs_per_year + '/yr' : ''}${p.egg_colour ? ' &middot; ' + escapeHtml(p.egg_colour) + ' eggs' : ''}${p.notes ? ' &middot; ' + escapeHtml(p.notes) : ''}</span>
     </div>
   `).join('');
   document.getElementById('import-preview-section').style.display = 'block';
@@ -1113,6 +1126,8 @@ function editChicken(id){
   document.getElementById('ch-gender').value = c.gender || 'Hen';
   document.getElementById('ch-dob').value = c.dob || '';
   document.getElementById('ch-expected').value = c.expectedEggsPerYear || '';
+  document.getElementById('ch-egg-colour').value = c.eggColour || '';
+  document.getElementById('ch-notes').value = c.notes || '';
   document.getElementById('chicken-form-title').textContent = 'Edit Chicken';
   document.getElementById('ch-cancel-btn').style.display = 'block';
   document.getElementById('chicken-form-details').open = true;
@@ -1170,7 +1185,9 @@ function renderChickens(){
         <div><span class="chicken-label">Age</span><span>${calcAge(c.dob)}</span></div>
         <div><span class="chicken-label">Date of birth</span><span>${c.dob ? formatDateNice(c.dob) : '—'}</span></div>
         <div><span class="chicken-label">Expected eggs / yr</span><span>${c.expectedEggsPerYear || '—'}</span></div>
+        <div><span class="chicken-label">Egg colour</span><span>${escapeHtml(c.eggColour) || '—'}</span></div>
       </div>
+      ${c.notes ? `<div class="chicken-notes">${escapeHtml(c.notes)}</div>` : ''}
     </div>`;
   }).join('');
 }
