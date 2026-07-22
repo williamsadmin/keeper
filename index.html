@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<title>Chicken Keeper</title>
+<meta name="description" content="Egg counts, your flock, and health checks — all in one place.">
+<meta name="theme-color" content="#1B1E26">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Keeper">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#1B1E26; --surface:#242833; --surface-alt:#2D323F; --border:#3A3F4D;
+    --text:#F2EFE9; --text-dim:#9BA3B0; --amber:#F2A93B; --amber-dim:#6B5530;
+    --teal:#43C6AC; --danger:#E2574C;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:680px;margin:0 auto;padding:20px 16px 60px;}
+  .eyebrow{font-family:'Oswald',sans-serif;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);margin:0 0 6px;}
+  h1{font-family:'Oswald',sans-serif;font-size:26px;font-weight:600;letter-spacing:.01em;margin:0 0 6px;text-transform:uppercase;}
+  .sub{color:var(--text-dim);font-size:14px;margin:0 0 4px;line-height:1.5;}
+  section{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;}
+  .sec-title{font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin:0 0 12px;}
+  label{font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px;}
+  input[type=text], input[type=number], input[type=date], select{
+    background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:7px;
+    padding:9px 10px;font-size:14px;font-family:inherit;width:100%;
+  }
+  textarea{
+    background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:7px;
+    padding:9px 10px;font-size:13px;font-family:inherit;width:100%;resize:vertical;min-height:60px;
+  }
+  input:focus, select:focus, textarea:focus{outline:2px solid var(--amber);outline-offset:1px;}
+  .row{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+  .row > div{flex:1;min-width:140px;}
+  .btn{background:var(--amber);color:#1B1E26;border:none;border-radius:7px;padding:10px 16px;font-weight:600;font-size:14px;cursor:pointer;font-family:inherit;}
+  .btn:active{transform:translateY(1px);}
+  .btn.secondary{background:transparent;color:var(--text);border:1px solid var(--border);}
+  .btn.danger{background:var(--danger);color:#1B1E26;}
+  .btn.full{width:100%;}
+  .status{font-size:12px;min-height:16px;margin-top:8px;}
+  .empty{color:var(--text-dim);font-size:13px;}
+
+  /* Top nav */
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;padding-top:calc(14px + env(safe-area-inset-top));border-bottom:1px solid var(--border);}
+  .topbar .brand{font-family:'Oswald',sans-serif;font-weight:600;letter-spacing:.05em;text-transform:uppercase;font-size:15px;}
+  .tabbar{display:flex;overflow-x:auto;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:20;}
+  .tabbar button{
+    flex:1; min-width:110px; background:none;border:none;color:var(--text-dim);
+    font-family:inherit;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;
+    padding:13px 8px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;
+  }
+  .tabbar button.active{color:var(--amber);border-bottom-color:var(--amber);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  /* Egg count */
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
+  .stat-card{background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;padding:12px;}
+  .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin-bottom:6px;}
+  .stat-main{font-family:'Oswald',sans-serif;font-size:28px;font-weight:600;color:var(--amber);line-height:1;}
+  .stat-sub{font-size:11px;color:var(--text-dim);margin:2px 0 8px;}
+  .stat-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text-dim);padding:2px 0;}
+  .stat-row strong{color:var(--text);}
+  .log-item{display:flex;align-items:center;justify-content:space-between;background:var(--surface-alt);border:1px solid var(--border);border-radius:7px;padding:10px 12px;margin-bottom:8px;gap:8px;}
+  .log-item .text-dim{color:var(--text-dim);}
+  .icon-btn{background:var(--surface-alt);border:1px solid var(--border);color:var(--text-dim);width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:13px;flex-shrink:0;}
+  .icon-btn.danger{color:var(--danger);}
+  .icon-row{display:flex;gap:6px;flex-shrink:0;}
+
+  /* Chickens */
+  .chicken-card{background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;}
+  .chicken-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;}
+  .chicken-name{font-family:'Oswald',sans-serif;font-weight:600;font-size:16px;}
+  .chicken-meta{font-size:12px;color:var(--text-dim);margin-top:2px;}
+  .chicken-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;font-size:13px;}
+  .chicken-grid > div{overflow:hidden;}
+  .chicken-label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);}
+  .gender-tag{display:inline-block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:20px;margin-left:6px;vertical-align:middle;}
+  .gender-tag.hen{background:var(--amber-dim);color:var(--amber);}
+  .gender-tag.rooster{background:#3A3F4D;color:var(--teal);}
+
+  /* Health checks */
+  .hc-item{background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;transition:border-color .15s;}
+  .hc-item.flag-issue{border-color:var(--danger);}
+  .hc-item.flag-good{border-color:var(--teal);}
+  .hc-item-head{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .hc-item-name{font-weight:600;font-size:14px;}
+  .info-btn{width:22px;height:22px;border-radius:50%;background:var(--border);color:var(--text);border:none;
+    font-size:12px;font-style:italic;font-family:Georgia,serif;cursor:pointer;line-height:1;flex-shrink:0;}
+  .info-btn.open{background:var(--amber);color:#1B1E26;}
+  .hc-item-normal{font-size:12px;color:var(--text-dim);margin:6px 0;line-height:1.5;}
+  .hc-info{display:none;font-size:12px;color:var(--amber);background:var(--amber-dim);border-radius:6px;padding:8px 10px;margin-bottom:8px;line-height:1.5;}
+  .hc-toggle{display:flex;gap:8px;margin-top:6px;}
+  .hc-opt{flex:1;padding:8px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-weight:600;font-size:12px;cursor:pointer;font-family:inherit;}
+  .hc-opt.good.selected{background:var(--teal);border-color:var(--teal);color:#1B1E26;}
+  .hc-opt.issue.selected{background:var(--danger);border-color:var(--danger);color:#1B1E26;}
+  .hc-note{margin-top:8px;display:none;}
+
+  details.hc-record{background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden;}
+  summary.hc-record-summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px;font-size:13px;font-weight:600;gap:8px;}
+  summary.hc-record-summary::-webkit-details-marker{display:none;}
+  summary.hc-record-summary .who{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .issue-badge, .ok-badge{flex-shrink:0;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;}
+  .issue-badge{background:var(--danger);color:#1B1E26;}
+  .ok-badge{background:var(--teal);color:#1B1E26;}
+  .hc-record-body{padding:0 12px 12px;border-top:1px solid var(--border);}
+  .hc-record-row{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;gap:8px;}
+  .hc-record-note{font-size:11px;color:var(--text-dim);font-style:italic;padding:0 0 6px;}
+  .issue-text{color:var(--danger);font-weight:600;flex-shrink:0;}
+  .good-text{color:var(--teal);font-weight:600;flex-shrink:0;}
+  .unchecked-text{color:var(--text-dim);flex-shrink:0;}
+</style>
+</head>
+<body>
+
+<button id="pwa-install-btn" class="btn" style="display:none;position:fixed;bottom:16px;right:16px;z-index:60;box-shadow:0 4px 16px rgba(0,0,0,.4);">Install app</button>
+
+<div class="topbar">
+  <span class="brand">🐔 Chicken Keeper</span>
+</div>
+<div class="tabbar">
+  <button class="tab-btn active" data-tab="eggs" onclick="switchTab('eggs')">Egg Count</button>
+  <button class="tab-btn" data-tab="chickens" onclick="switchTab('chickens')">Chickens</button>
+  <button class="tab-btn" data-tab="health" onclick="switchTab('health')">Health Checks</button>
+</div>
+
+<div class="wrap">
+
+  <!-- EGG COUNT TAB -->
+  <div id="tab-eggs" class="tab-panel active">
+    <p class="eyebrow">Egg Count</p>
+    <h1>Daily Eggs</h1>
+    <p class="sub">Log today's total and any cracked or deformed eggs. Totals and averages update automatically.</p>
+
+    <section>
+      <p class="sec-title">Log Eggs</p>
+      <div class="row">
+        <div><label>Date</label><input type="date" id="egg-date"></div>
+      </div>
+      <div class="row">
+        <div><label>Total eggs</label><input type="number" min="0" inputmode="numeric" id="egg-total" placeholder="0"></div>
+        <div><label>Cracked / deformed</label><input type="number" min="0" inputmode="numeric" id="egg-cracked" placeholder="0"></div>
+      </div>
+      <button class="btn full" onclick="saveEggEntry()">Save entry</button>
+      <div class="status" id="egg-status"></div>
+    </section>
+
+    <section>
+      <p class="sec-title">Totals &amp; Averages</p>
+      <div class="stat-grid" id="egg-stats"></div>
+    </section>
+
+    <section>
+      <p class="sec-title">Recent Entries</p>
+      <div id="egg-log"></div>
+    </section>
+  </div>
+
+  <!-- CHICKENS TAB -->
+  <div id="tab-chickens" class="tab-panel">
+    <p class="eyebrow">The Flock</p>
+    <h1>Chickens</h1>
+    <p class="sub">Keep a record of every bird — breed, tag, age and how many eggs you can expect from them.</p>
+
+    <section>
+      <p class="sec-title">Flock Summary</p>
+      <div class="stat-card">
+        <div class="stat-label">Expected eggs from hens</div>
+        <div class="stat-main"><span id="expected-total">0</span> <span style="font-size:14px;color:var(--text-dim);font-family:'Inter',sans-serif;font-weight:400;">/ year</span></div>
+        <div class="stat-sub">~<span id="expected-total-week">0</span> eggs / week across the flock</div>
+      </div>
+    </section>
+
+    <section>
+      <p class="sec-title" id="chicken-form-title">Add a Chicken</p>
+      <div class="row">
+        <div><label>Name</label><input type="text" id="ch-name" placeholder="e.g. Henrietta"></div>
+      </div>
+      <div class="row">
+        <div><label>Leg / tag number</label><input type="text" id="ch-tag" placeholder="e.g. 14"></div>
+        <div><label>Tag colour</label><input type="text" id="ch-tag-colour" placeholder="e.g. Red"></div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Breed</label>
+          <select id="ch-breed" onchange="onBreedChange()"></select>
+        </div>
+      </div>
+      <div class="row" id="ch-breed-custom-row" style="display:none;">
+        <div><label>Breed name</label><input type="text" id="ch-breed-custom" placeholder="e.g. Cream Legbar"></div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Gender</label>
+          <select id="ch-gender">
+            <option value="Hen">Hen</option>
+            <option value="Rooster">Rooster</option>
+          </select>
+        </div>
+        <div><label>Date of birth</label><input type="date" id="ch-dob"></div>
+      </div>
+      <div class="row">
+        <div><label>Expected eggs / year</label><input type="number" min="0" id="ch-expected" placeholder="e.g. 250"></div>
+      </div>
+      <button class="btn full" onclick="saveChicken()">Save chicken</button>
+      <button class="btn secondary full" id="ch-cancel-btn" style="display:none;margin-top:8px;" onclick="cancelEditChicken()">Cancel edit</button>
+      <div class="status" id="chicken-status"></div>
+    </section>
+
+    <section>
+      <p class="sec-title">Your Chickens</p>
+      <div id="chicken-list"></div>
+    </section>
+  </div>
+
+  <!-- HEALTH CHECKS TAB -->
+  <div id="tab-health" class="tab-panel">
+    <p class="eyebrow">Wellbeing</p>
+    <h1>Health Checks</h1>
+    <p class="sub">Work through each area, tap the <strong>i</strong> for what to watch out for, and flag anything that needs attention.</p>
+
+    <section>
+      <p class="sec-title">New Health Check</p>
+      <div class="row">
+        <div><label>Chicken</label><select id="hc-chicken"><option value="">Whole flock / general</option></select></div>
+        <div><label>Date</label><input type="date" id="hc-date"></div>
+      </div>
+    </section>
+
+    <section>
+      <p class="sec-title">Checklist</p>
+      <div id="hc-items"></div>
+    </section>
+
+    <section>
+      <button class="btn full" onclick="saveHealthCheck()">Save health check</button>
+      <div class="status" id="hc-status"></div>
+    </section>
+
+    <section>
+      <p class="sec-title">Past Checks</p>
+      <div id="hc-history"></div>
+    </section>
+  </div>
+
+</div>
+
+<script>
+// ---------- DATA ----------
+const STORAGE_KEY = 'chickenKeeperData';
+let state = { eggs: [], chickens: [], healthChecks: [] };
+let editingChickenId = null;
+let hcCurrent = {};
+
+function loadData(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return { eggs: [], chickens: [], healthChecks: [] };
+    const parsed = JSON.parse(raw);
+    return {
+      eggs: Array.isArray(parsed.eggs) ? parsed.eggs : [],
+      chickens: Array.isArray(parsed.chickens) ? parsed.chickens : [],
+      healthChecks: Array.isArray(parsed.healthChecks) ? parsed.healthChecks : []
+    };
+  }catch(e){
+    return { eggs: [], chickens: [], healthChecks: [] };
+  }
+}
+
+function saveData(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function genId(){
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function escapeHtml(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function pad(n){ return String(n).padStart(2, '0'); }
+
+function todayStr(){
+  const d = new Date();
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+}
+
+function formatDateNice(dateStr){
+  if(!dateStr) return '—';
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function setStatus(id, msg, isError){
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.style.color = isError ? 'var(--danger)' : 'var(--teal)';
+  if(msg){
+    setTimeout(() => { if(el.textContent === msg) el.textContent = ''; }, 3000);
+  }
+}
+
+function switchTab(tab){
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+}
+
+// ---------- EGG COUNT ----------
+function saveEggEntry(){
+  const date = document.getElementById('egg-date').value;
+  const total = parseInt(document.getElementById('egg-total').value, 10);
+  const cracked = parseInt(document.getElementById('egg-cracked').value, 10) || 0;
+
+  if(!date){ setStatus('egg-status', 'Pick a date.', true); return; }
+  if(isNaN(total) || total < 0){ setStatus('egg-status', 'Enter a valid total.', true); return; }
+  if(cracked > total){ setStatus('egg-status', "Cracked can't exceed total.", true); return; }
+
+  const idx = state.eggs.findIndex(e => e.date === date);
+  const entry = { date, total, cracked };
+  if(idx >= 0) state.eggs[idx] = entry; else state.eggs.push(entry);
+  state.eggs.sort((a, b) => a.date < b.date ? 1 : -1);
+  saveData();
+
+  setStatus('egg-status', 'Saved.', false);
+  document.getElementById('egg-total').value = '';
+  document.getElementById('egg-cracked').value = '';
+  document.getElementById('egg-date').value = todayStr();
+  renderEggs();
+}
+
+function editEggEntry(date){
+  const e = state.eggs.find(x => x.date === date);
+  if(!e) return;
+  document.getElementById('egg-date').value = e.date;
+  document.getElementById('egg-total').value = e.total;
+  document.getElementById('egg-cracked').value = e.cracked;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function deleteEggEntry(date){
+  if(!confirm('Delete this entry?')) return;
+  state.eggs = state.eggs.filter(e => e.date !== date);
+  saveData();
+  renderEggs();
+}
+
+function startOfWeek(d){
+  const dt = new Date(d);
+  const day = (dt.getDay() + 6) % 7; // Monday = 0
+  dt.setDate(dt.getDate() - day);
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+
+function computePeriodStats(start, end){
+  const rows = state.eggs.filter(e => {
+    const t = new Date(e.date + 'T00:00:00');
+    return t >= start && t <= end;
+  });
+  const total = rows.reduce((s, e) => s + e.total, 0);
+  const cracked = rows.reduce((s, e) => s + e.cracked, 0);
+  const good = total - cracked;
+  const days = rows.length;
+  const avg = days ? total / days : 0;
+  return { total, cracked, good, avg, days };
+}
+
+function renderEggStats(){
+  const now = new Date();
+  const weekStart = startOfWeek(now);
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6); weekEnd.setHours(23, 59, 59, 999);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const yearStart = new Date(now.getFullYear(), 0, 1);
+  const yearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+
+  const w = computePeriodStats(weekStart, weekEnd);
+  const m = computePeriodStats(monthStart, monthEnd);
+  const y = computePeriodStats(yearStart, yearEnd);
+
+  const card = (label, s) => `
+    <div class="stat-card">
+      <div class="stat-label">${label}</div>
+      <div class="stat-main">${s.total}</div>
+      <div class="stat-sub">eggs total</div>
+      <div class="stat-row"><span>Good</span><strong>${s.good}</strong></div>
+      <div class="stat-row"><span>Cracked</span><strong>${s.cracked}</strong></div>
+      <div class="stat-row"><span>Avg / day logged</span><strong>${s.avg.toFixed(1)}</strong></div>
+    </div>`;
+
+  document.getElementById('egg-stats').innerHTML = card('This Week', w) + card('This Month', m) + card('This Year', y);
+}
+
+function renderEggLog(){
+  const el = document.getElementById('egg-log');
+  if(!state.eggs.length){ el.innerHTML = '<p class="empty">No entries yet.</p>'; return; }
+  el.innerHTML = state.eggs.slice(0, 90).map(e => `
+    <div class="log-item">
+      <div>
+        <strong>${formatDateNice(e.date)}</strong>
+        <div class="text-dim" style="font-size:12px;">${e.total} total &middot; ${e.cracked} cracked &middot; ${e.total - e.cracked} good</div>
+      </div>
+      <div class="icon-row">
+        <button class="icon-btn" onclick="editEggEntry('${e.date}')" aria-label="Edit">&#9998;</button>
+        <button class="icon-btn danger" onclick="deleteEggEntry('${e.date}')" aria-label="Delete">&#10005;</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderEggs(){ renderEggStats(); renderEggLog(); }
+
+// ---------- CHICKENS ----------
+const BREED_PRESETS = {
+  'Rhode Island Red': 280,
+  'Leghorn': 300,
+  'Sussex': 260,
+  'Plymouth Rock': 240,
+  'Orpington': 190,
+  'Australorp': 270,
+  'Wyandotte': 220,
+  'Marans': 180,
+  'Silkie': 110,
+  'Brahma': 160,
+  'Hybrid / Warren / ISA Brown': 300
+};
+
+function populateBreedOptions(){
+  const sel = document.getElementById('ch-breed');
+  let html = '<option value="">Select breed…</option>';
+  Object.keys(BREED_PRESETS).forEach(b => { html += `<option value="${escapeHtml(b)}">${escapeHtml(b)} (~${BREED_PRESETS[b]}/yr)</option>`; });
+  html += '<option value="__custom">Other (type below)</option>';
+  sel.innerHTML = html;
+}
+
+function onBreedChange(){
+  const sel = document.getElementById('ch-breed').value;
+  const customRow = document.getElementById('ch-breed-custom-row');
+  if(sel === '__custom'){ customRow.style.display = 'flex'; return; }
+  customRow.style.display = 'none';
+  if(sel && BREED_PRESETS[sel] != null){
+    document.getElementById('ch-expected').value = BREED_PRESETS[sel];
+  }
+}
+
+function calcAge(dobStr){
+  if(!dobStr) return '—';
+  const dob = new Date(dobStr + 'T00:00:00');
+  const now = new Date();
+  if(dob > now) return 'Not born yet';
+
+  let years = now.getFullYear() - dob.getFullYear();
+  let months = now.getMonth() - dob.getMonth();
+  if(now.getDate() < dob.getDate()) months -= 1;
+  if(months < 0){ years -= 1; months += 12; }
+
+  if(years === 0 && months === 0){
+    const diffDays = Math.floor((now - dob) / 86400000);
+    if(diffDays < 14) return diffDays + (diffDays === 1 ? ' day' : ' days');
+    return Math.floor(diffDays / 7) + ' weeks';
+  }
+  if(years === 0) return months + (months === 1 ? ' month' : ' months');
+  return years + (years === 1 ? ' year' : ' years') + (months ? ', ' + months + (months === 1 ? ' month' : ' months') : '');
+}
+
+function resetChickenForm(){
+  editingChickenId = null;
+  document.getElementById('ch-name').value = '';
+  document.getElementById('ch-tag').value = '';
+  document.getElementById('ch-tag-colour').value = '';
+  document.getElementById('ch-breed').value = '';
+  document.getElementById('ch-breed-custom-row').style.display = 'none';
+  document.getElementById('ch-breed-custom').value = '';
+  document.getElementById('ch-gender').value = 'Hen';
+  document.getElementById('ch-dob').value = '';
+  document.getElementById('ch-expected').value = '';
+  document.getElementById('chicken-form-title').textContent = 'Add a Chicken';
+  document.getElementById('ch-cancel-btn').style.display = 'none';
+}
+
+function saveChicken(){
+  const name = document.getElementById('ch-name').value.trim();
+  if(!name){ setStatus('chicken-status', 'Name is required.', true); return; }
+
+  const breedSel = document.getElementById('ch-breed').value;
+  const breed = breedSel === '__custom' ? document.getElementById('ch-breed-custom').value.trim() : breedSel;
+
+  const chicken = {
+    id: editingChickenId || genId(),
+    name,
+    tag: document.getElementById('ch-tag').value.trim(),
+    tagColour: document.getElementById('ch-tag-colour').value.trim(),
+    breed,
+    gender: document.getElementById('ch-gender').value,
+    dob: document.getElementById('ch-dob').value,
+    expectedEggsPerYear: Number(document.getElementById('ch-expected').value) || 0
+  };
+
+  if(editingChickenId){
+    const idx = state.chickens.findIndex(c => c.id === editingChickenId);
+    if(idx >= 0) state.chickens[idx] = chicken;
+  } else {
+    state.chickens.push(chicken);
+  }
+  saveData();
+  resetChickenForm();
+  setStatus('chicken-status', 'Saved.', false);
+  renderChickens();
+  renderHealthChickenOptions();
+}
+
+function editChicken(id){
+  const c = state.chickens.find(x => x.id === id);
+  if(!c) return;
+  editingChickenId = id;
+  document.getElementById('ch-name').value = c.name || '';
+  document.getElementById('ch-tag').value = c.tag || '';
+  document.getElementById('ch-tag-colour').value = c.tagColour || '';
+
+  const breedSel = document.getElementById('ch-breed');
+  const hasPreset = Array.from(breedSel.options).some(o => o.value === c.breed);
+  if(c.breed && hasPreset){
+    breedSel.value = c.breed;
+    document.getElementById('ch-breed-custom-row').style.display = 'none';
+  } else if(c.breed){
+    breedSel.value = '__custom';
+    document.getElementById('ch-breed-custom-row').style.display = 'flex';
+    document.getElementById('ch-breed-custom').value = c.breed;
+  } else {
+    breedSel.value = '';
+    document.getElementById('ch-breed-custom-row').style.display = 'none';
+  }
+
+  document.getElementById('ch-gender').value = c.gender || 'Hen';
+  document.getElementById('ch-dob').value = c.dob || '';
+  document.getElementById('ch-expected').value = c.expectedEggsPerYear || '';
+  document.getElementById('chicken-form-title').textContent = 'Edit Chicken';
+  document.getElementById('ch-cancel-btn').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelEditChicken(){
+  resetChickenForm();
+}
+
+function deleteChicken(id){
+  if(!confirm('Delete this chicken?')) return;
+  state.chickens = state.chickens.filter(c => c.id !== id);
+  if(editingChickenId === id) resetChickenForm();
+  saveData();
+  renderChickens();
+  renderHealthChickenOptions();
+}
+
+function renderChickens(){
+  const listEl = document.getElementById('chicken-list');
+  const hens = state.chickens.filter(c => c.gender === 'Hen');
+  const totalExpected = hens.reduce((s, c) => s + (Number(c.expectedEggsPerYear) || 0), 0);
+  document.getElementById('expected-total').textContent = totalExpected;
+  document.getElementById('expected-total-week').textContent = (totalExpected / 52).toFixed(1);
+
+  if(!state.chickens.length){ listEl.innerHTML = '<p class="empty">No chickens added yet.</p>'; return; }
+
+  listEl.innerHTML = state.chickens.map(c => {
+    const genderClass = c.gender === 'Rooster' ? 'rooster' : 'hen';
+    const tagText = [c.tag, c.tagColour].filter(Boolean).join(' &middot; ') || '—';
+    return `
+    <div class="chicken-card">
+      <div class="chicken-card-head">
+        <div>
+          <div class="chicken-name">${escapeHtml(c.name)}<span class="gender-tag ${genderClass}">${escapeHtml(c.gender || 'Hen')}</span></div>
+          <div class="chicken-meta">${escapeHtml(c.breed || 'Unknown breed')}</div>
+        </div>
+        <div class="icon-row">
+          <button class="icon-btn" onclick="editChicken('${c.id}')" aria-label="Edit">&#9998;</button>
+          <button class="icon-btn danger" onclick="deleteChicken('${c.id}')" aria-label="Delete">&#10005;</button>
+        </div>
+      </div>
+      <div class="chicken-grid">
+        <div><span class="chicken-label">Tag</span><span>${tagText}</span></div>
+        <div><span class="chicken-label">Age</span><span>${calcAge(c.dob)}</span></div>
+        <div><span class="chicken-label">Date of birth</span><span>${c.dob ? formatDateNice(c.dob) : '—'}</span></div>
+        <div><span class="chicken-label">Expected eggs / yr</span><span>${c.expectedEggsPerYear || '—'}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ---------- HEALTH CHECKS ----------
+const HEALTH_ITEMS = [
+  { key: 'eyes', name: 'Eyes', normal: 'Clear, bright, no foreign objects.', issue: 'Look out for swelling or puffiness — could be from trauma or infection.' },
+  { key: 'ears', name: 'Ears', normal: 'Clean, no discharge, no crust.', issue: 'Look out for any discharge, often yellow and bad smelling — could be an infection.' },
+  { key: 'nasal', name: 'Nasal cavity', normal: 'Clear, no discharge, no blood.', issue: 'Look out for swollen sinuses.' },
+  { key: 'beak', name: 'Beak', normal: 'No blood, proper alignment, not overgrown.', issue: "Look out for the top and bottom of the beak not aligning properly — this could mean they aren't eating or drinking." },
+  { key: 'oral', name: 'Oral cavity', normal: 'Pink in colour, no odour, clean.', issue: 'Look out for excessive drooling and open-mouth breathing — could be a sign of fowl pox.' },
+  { key: 'comb', name: 'Comb', normal: 'Red in colour, smooth.', issue: 'Look out for pale or white combs — can be a sign of anaemia.' },
+  { key: 'wattles', name: 'Wattles', normal: 'Warm to the touch, smooth, red in colour.', issue: 'Look out for the wattle being purple or blue in colour — this can be a sign of lack of oxygen or poor circulation.' },
+  { key: 'feathers', name: 'Feathers / skin', normal: 'Shiny, smooth, full coverage, no mites, no crust.', issue: 'Look out for bald patches or missing feathers — can be a sign of feather plucking or parasite infestation.' },
+  { key: 'wings', name: 'Wings', normal: 'Held tight to the body, symmetrical.', issue: 'Look out for abnormalities in wing position (one drooping) — this can be a sign of injury or trauma.' },
+  { key: 'legs', name: 'Legs', normal: 'Smooth scales, flexible, no discolouration.', issue: 'Look out for swollen joints, especially around the hock or feet — this can be a sign of bumblefoot.' },
+  { key: 'scales', name: 'Scales', normal: 'Flat, no crust, no swelling.', issue: 'Look out for raised or lifted scales — this can be a sign of scaly leg mites.' },
+  { key: 'claws', name: 'Claws', normal: 'Correct length, not twisted, no blood.', issue: 'Look out for overly long, curled claws — this can cause pain, injury or even infection.' },
+  { key: 'vent', name: 'Vent', normal: 'Clean, no debris, healthy pink colour, no mites.', issue: 'Look out for discharge that seems thick or bad smelling — this can be a sign of a fungal infection.' },
+  { key: 'bodyscore', name: 'Body Condition Score', normal: 'Aim for a score of around 3 out of 5.', issue: 'A score of 1–2 means underweight, often from a lack of nutrition. A score of 4–5 means overweight.' },
+  { key: 'gait', name: 'Gait', normal: 'No limping, fluid motion, high activity levels.', issue: 'Look out for limping or favouring one leg over the other — this can be a sign of pain or injury.' },
+  { key: 'behaviour', name: 'Behaviour', normal: 'Preening, active, foraging.', issue: 'Look out for chickens that isolate themselves from the flock — this can be a sign of illness.' }
+];
+
+function renderHealthChickenOptions(){
+  const sel = document.getElementById('hc-chicken');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Whole flock / general</option>' +
+    state.chickens.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  sel.value = current;
+}
+
+function renderHealthItems(){
+  const el = document.getElementById('hc-items');
+  el.innerHTML = HEALTH_ITEMS.map(item => `
+    <div class="hc-item" data-key="${item.key}">
+      <div class="hc-item-head">
+        <span class="hc-item-name">${item.name}</span>
+        <button type="button" class="info-btn" id="info-btn-${item.key}" onclick="toggleInfo('${item.key}')" aria-label="What to look out for">i</button>
+      </div>
+      <div class="hc-item-normal">${item.normal}</div>
+      <div class="hc-info" id="info-${item.key}">${item.issue}</div>
+      <div class="hc-toggle">
+        <button type="button" class="hc-opt good" data-val="good" onclick="setItemStatus('${item.key}','good')">&#10003; All good</button>
+        <button type="button" class="hc-opt issue" data-val="issue" onclick="setItemStatus('${item.key}','issue')">&#9888; Issue</button>
+      </div>
+      <textarea class="hc-note" id="note-${item.key}" placeholder="What did you notice?" oninput="onNoteInput('${item.key}')"></textarea>
+    </div>
+  `).join('');
+}
+
+function toggleInfo(key){
+  const el = document.getElementById('info-' + key);
+  const btn = document.getElementById('info-btn-' + key);
+  const open = el.style.display === 'block';
+  el.style.display = open ? 'none' : 'block';
+  btn.classList.toggle('open', !open);
+}
+
+function setItemStatus(key, val){
+  hcCurrent[key] = hcCurrent[key] || {};
+  hcCurrent[key].status = val;
+  const card = document.querySelector('.hc-item[data-key="' + key + '"]');
+  card.querySelectorAll('.hc-opt').forEach(b => b.classList.toggle('selected', b.dataset.val === val));
+  const noteEl = document.getElementById('note-' + key);
+  noteEl.style.display = val === 'issue' ? 'block' : 'none';
+  card.classList.toggle('flag-issue', val === 'issue');
+  card.classList.toggle('flag-good', val === 'good');
+}
+
+function onNoteInput(key){
+  hcCurrent[key] = hcCurrent[key] || {};
+  hcCurrent[key].note = document.getElementById('note-' + key).value;
+}
+
+function saveHealthCheck(){
+  const date = document.getElementById('hc-date').value;
+  if(!date){ setStatus('hc-status', 'Pick a date.', true); return; }
+  const answered = HEALTH_ITEMS.filter(i => hcCurrent[i.key] && hcCurrent[i.key].status);
+  if(!answered.length){ setStatus('hc-status', 'Tick at least one item before saving.', true); return; }
+
+  const record = {
+    id: genId(),
+    date,
+    chickenId: document.getElementById('hc-chicken').value || null,
+    items: HEALTH_ITEMS.map(i => ({
+      key: i.key,
+      name: i.name,
+      status: (hcCurrent[i.key] && hcCurrent[i.key].status) || 'unchecked',
+      note: (hcCurrent[i.key] && hcCurrent[i.key].note) || ''
+    }))
+  };
+  state.healthChecks.unshift(record);
+  saveData();
+
+  setStatus('hc-status', 'Health check saved.', false);
+  hcCurrent = {};
+  renderHealthItems();
+  document.getElementById('hc-chicken').value = '';
+  document.getElementById('hc-date').value = todayStr();
+  renderHealthHistory();
+}
+
+function chickenNameById(id){
+  if(!id) return 'Whole flock';
+  const c = state.chickens.find(x => x.id === id);
+  return c ? c.name : 'Deleted chicken';
+}
+
+function renderHealthHistory(){
+  const el = document.getElementById('hc-history');
+  if(!state.healthChecks.length){ el.innerHTML = '<p class="empty">No health checks recorded yet.</p>'; return; }
+
+  el.innerHTML = state.healthChecks.map(r => {
+    const issues = r.items.filter(i => i.status === 'issue');
+    const badge = issues.length
+      ? `<span class="issue-badge">${issues.length} issue${issues.length > 1 ? 's' : ''}</span>`
+      : `<span class="ok-badge">All good</span>`;
+    return `
+    <details class="hc-record">
+      <summary class="hc-record-summary">
+        <span class="who">${formatDateNice(r.date)} &middot; ${escapeHtml(chickenNameById(r.chickenId))}</span>
+        ${badge}
+      </summary>
+      <div class="hc-record-body">
+        ${r.items.map(i => {
+          const cls = i.status === 'issue' ? 'issue-text' : (i.status === 'good' ? 'good-text' : 'unchecked-text');
+          const label = i.status === 'issue' ? 'Issue' : (i.status === 'good' ? 'All good' : 'Not checked');
+          return `
+          <div class="hc-record-row"><span>${escapeHtml(i.name)}</span><span class="${cls}">${label}</span></div>
+          ${i.note ? `<div class="hc-record-note">${escapeHtml(i.note)}</div>` : ''}`;
+        }).join('')}
+        <button class="btn danger" style="margin-top:10px;" onclick="deleteHealthCheck('${r.id}')">Delete record</button>
+      </div>
+    </details>`;
+  }).join('');
+}
+
+function deleteHealthCheck(id){
+  if(!confirm('Delete this health check record?')) return;
+  state.healthChecks = state.healthChecks.filter(r => r.id !== id);
+  saveData();
+  renderHealthHistory();
+}
+
+// ---------- PWA ----------
+function registerSW(){
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  }
+}
+
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  document.getElementById('pwa-install-btn').style.display = 'block';
+});
+document.getElementById('pwa-install-btn').addEventListener('click', async () => {
+  document.getElementById('pwa-install-btn').style.display = 'none';
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+  }
+});
+
+// ---------- INIT ----------
+function init(){
+  state = loadData();
+  document.getElementById('egg-date').value = todayStr();
+  document.getElementById('hc-date').value = todayStr();
+  populateBreedOptions();
+  renderEggs();
+  renderChickens();
+  renderHealthChickenOptions();
+  renderHealthItems();
+  renderHealthHistory();
+  registerSW();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
