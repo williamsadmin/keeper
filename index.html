@@ -144,6 +144,9 @@
   .hc-opt{flex:1;padding:8px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text-dim);font-weight:600;font-size:12px;cursor:pointer;font-family:inherit;}
   .hc-opt.good.selected{background:var(--teal);border-color:var(--teal);color:#193246;}
   .hc-opt.issue.selected{background:var(--danger);border-color:var(--danger);color:#193246;}
+  .hc-score-toggle{gap:6px;}
+  .hc-opt.score{padding:8px 4px;}
+  .hc-opt.score.selected{background:var(--amber);border-color:var(--amber);color:#193246;}
   .hc-note{margin-top:8px;display:none;}
 
   .hc-session-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px;}
@@ -431,6 +434,7 @@
         <p class="sec-title">New Health Check</p>
         <p class="share-note" id="hc-setup-info" style="margin-bottom:10px;"></p>
         <div class="row">
+          <div><label>Chicken</label><select id="hc-target-chicken" onchange="renderHcSetupInfo()"><option value="">All (go through everyone)</option></select></div>
           <div><label>Date</label><input type="date" id="hc-date"></div>
         </div>
         <button class="btn full" onclick="startHealthCheckSession()">Start health check</button>
@@ -809,8 +813,26 @@ function applyRolePermissions(){
   if(readOnly) document.getElementById('hc-session-section').style.display = 'none';
 }
 
+function renderHcTargetOptions(){
+  const sel = document.getElementById('hc-target-chicken');
+  const current = sel.value;
+  const living = state.chickens.filter(c => !c.isDeceased);
+  sel.innerHTML = '<option value="">All (go through everyone)</option>' +
+    living.map(c => `<option value="${c.id}">${escapeHtml(c.name)}${c.tag ? ' (Tag ' + escapeHtml(c.tag) + ')' : ''}</option>`).join('');
+  sel.value = living.some(c => c.id === current) ? current : '';
+}
+
 function renderHcSetupInfo(){
-  const n = state.chickens.filter(c => !c.isDeceased).length;
+  const targetId = document.getElementById('hc-target-chicken').value;
+  const living = state.chickens.filter(c => !c.isDeceased);
+  if(targetId){
+    const c = living.find(x => x.id === targetId);
+    document.getElementById('hc-setup-info').textContent = c
+      ? `This will check just ${c.name}.`
+      : 'This will go through the checklist for each of your chickens, one at a time.';
+    return;
+  }
+  const n = living.length;
   document.getElementById('hc-setup-info').textContent = n
     ? `This will go through the checklist for each of your ${n} chicken${n > 1 ? 's' : ''}, one at a time.`
     : 'You have no chickens added yet, so this will be a single general check for the flock.';
@@ -823,6 +845,7 @@ function renderAll(){
   hcSession = null;
   document.getElementById('hc-setup-section').style.display = isReadOnly() ? 'none' : 'block';
   document.getElementById('hc-session-section').style.display = 'none';
+  renderHcTargetOptions();
   renderHcSetupInfo();
   renderHealthHistory();
   if(document.getElementById('tab-sharing').classList.contains('active')) renderSharingTab();
@@ -1173,6 +1196,7 @@ async function saveChicken(){
   resetChickenForm();
   setStatus('chicken-status', 'Saved.', false);
   renderChickens();
+  renderHcTargetOptions();
   renderHcSetupInfo();
 }
 
@@ -1297,6 +1321,7 @@ async function confirmImportList(){
   setStatus('import-status', `Imported ${count} chicken${count > 1 ? 's' : ''}.`, false);
   await loadFlockData();
   renderChickens();
+  renderHcTargetOptions();
   renderHcSetupInfo();
 }
 
@@ -1475,6 +1500,7 @@ async function deleteChicken(id){
   if(editingChickenId === id) resetChickenForm();
   await loadFlockData();
   renderChickens();
+  renderHcTargetOptions();
   renderHcSetupInfo();
 }
 
@@ -1540,6 +1566,10 @@ function renderChickens(){
 
 // ---------- HEALTH CHECKS ----------
 const HEALTH_ITEMS = [
+  { key: 'wings', name: 'Wings', normal: 'Held tight to the body, symmetrical.', issue: 'Look out for abnormalities in wing position (one drooping) — this can be a sign of injury or trauma.' },
+  { key: 'bodyscore', name: 'Body Condition Score', normal: 'Aim for a score of around 3 out of 5.', issue: 'A score of 1–2 means underweight, often from a lack of nutrition. A score of 4–5 means overweight.', scoreOptions: [1, 2, 3, 4, 5] },
+  { key: 'gait', name: 'Gait', normal: 'No limping, fluid motion, high activity levels.', issue: 'Look out for limping or favouring one leg over the other — this can be a sign of pain or injury.' },
+  { key: 'behaviour', name: 'Behaviour', normal: 'Preening, active, foraging.', issue: 'Look out for chickens that isolate themselves from the flock — this can be a sign of illness.' },
   { key: 'eyes', name: 'Eyes', normal: 'Clear, bright, no foreign objects.', issue: 'Look out for swelling or puffiness — could be from trauma or infection.' },
   { key: 'ears', name: 'Ears', normal: 'Clean, no discharge, no crust.', issue: 'Look out for any discharge, often yellow and bad smelling — could be an infection.' },
   { key: 'nasal', name: 'Nasal cavity', normal: 'Clear, no discharge, no blood.', issue: 'Look out for swollen sinuses.' },
@@ -1548,14 +1578,10 @@ const HEALTH_ITEMS = [
   { key: 'comb', name: 'Comb', normal: 'Red in colour, smooth.', issue: 'Look out for pale or white combs — can be a sign of anaemia.' },
   { key: 'wattles', name: 'Wattles', normal: 'Warm to the touch, smooth, red in colour.', issue: 'Look out for the wattle being purple or blue in colour — this can be a sign of lack of oxygen or poor circulation.' },
   { key: 'feathers', name: 'Feathers / skin', normal: 'Shiny, smooth, full coverage, no mites, no crust.', issue: 'Look out for bald patches or missing feathers — can be a sign of feather plucking or parasite infestation.' },
-  { key: 'wings', name: 'Wings', normal: 'Held tight to the body, symmetrical.', issue: 'Look out for abnormalities in wing position (one drooping) — this can be a sign of injury or trauma.' },
   { key: 'legs', name: 'Legs', normal: 'Smooth scales, flexible, no discolouration.', issue: 'Look out for swollen joints, especially around the hock or feet — this can be a sign of bumblefoot.' },
   { key: 'scales', name: 'Scales', normal: 'Flat, no crust, no swelling.', issue: 'Look out for raised or lifted scales — this can be a sign of scaly leg mites.' },
   { key: 'claws', name: 'Claws', normal: 'Correct length, not twisted, no blood.', issue: 'Look out for overly long, curled claws — this can cause pain, injury or even infection.' },
-  { key: 'vent', name: 'Vent', normal: 'Clean, no debris, healthy pink colour, no mites.', issue: 'Look out for discharge that seems thick or bad smelling — this can be a sign of a fungal infection.' },
-  { key: 'bodyscore', name: 'Body Condition Score', normal: 'Aim for a score of around 3 out of 5.', issue: 'A score of 1–2 means underweight, often from a lack of nutrition. A score of 4–5 means overweight.' },
-  { key: 'gait', name: 'Gait', normal: 'No limping, fluid motion, high activity levels.', issue: 'Look out for limping or favouring one leg over the other — this can be a sign of pain or injury.' },
-  { key: 'behaviour', name: 'Behaviour', normal: 'Preening, active, foraging.', issue: 'Look out for chickens that isolate themselves from the flock — this can be a sign of illness.' }
+  { key: 'vent', name: 'Vent', normal: 'Clean, no debris, healthy pink colour, no mites.', issue: 'Look out for discharge that seems thick or bad smelling — this can be a sign of a fungal infection.' }
 ];
 
 function chickenNameById(id){
@@ -1569,9 +1595,18 @@ function startHealthCheckSession(){
   if(!date){ setStatus('hc-setup-status', 'Pick a date.', true); return; }
 
   const livingChickens = state.chickens.filter(c => !c.isDeceased);
-  const birdList = livingChickens.length
-    ? livingChickens.map(c => ({ chickenId: c.id, chickenName: c.name }))
-    : [{ chickenId: null, chickenName: 'Whole flock' }];
+  const targetId = document.getElementById('hc-target-chicken').value;
+
+  let birdList;
+  if(targetId){
+    const c = livingChickens.find(x => x.id === targetId);
+    if(!c){ setStatus('hc-setup-status', 'That chicken could not be found — pick again.', true); return; }
+    birdList = [{ chickenId: c.id, chickenName: c.name }];
+  } else {
+    birdList = livingChickens.length
+      ? livingChickens.map(c => ({ chickenId: c.id, chickenName: c.name }))
+      : [{ chickenId: null, chickenName: 'Whole flock' }];
+  }
 
   hcSession = {
     date,
@@ -1604,23 +1639,40 @@ function renderHcCurrentBird(){
   document.getElementById('hc-next-btn').textContent = hcSession.index === hcSession.birds.length - 1 ? 'Finish & save' : 'Next bird';
 }
 
+function hcIsIssueStatus(item, status){
+  if(item.scoreOptions) return status != null && status !== '' && Number(status) !== 3;
+  return status === 'issue';
+}
+
+function hcIsGoodStatus(item, status){
+  if(item.scoreOptions) return Number(status) === 3;
+  return status === 'good';
+}
+
 function renderHealthItems(itemState){
   const el = document.getElementById('hc-items');
   el.innerHTML = HEALTH_ITEMS.map(item => {
     const current = itemState[item.key] || {};
+    const isIssue = hcIsIssueStatus(item, current.status);
+    const isGood = hcIsGoodStatus(item, current.status);
+    const toggleHtml = item.scoreOptions
+      ? `<div class="hc-toggle hc-score-toggle">${item.scoreOptions.map(n => `
+          <button type="button" class="hc-opt score ${String(current.status) === String(n) ? 'selected' : ''}" data-val="${n}" onclick="hcSetItemStatus('${item.key}','${n}')">${n}</button>
+        `).join('')}</div>`
+      : `<div class="hc-toggle">
+          <button type="button" class="hc-opt good ${current.status === 'good' ? 'selected' : ''}" data-val="good" onclick="hcSetItemStatus('${item.key}','good')">&#10003; All good</button>
+          <button type="button" class="hc-opt issue ${current.status === 'issue' ? 'selected' : ''}" data-val="issue" onclick="hcSetItemStatus('${item.key}','issue')">&#9888; Issue</button>
+        </div>`;
     return `
-    <div class="hc-item ${current.status === 'issue' ? 'flag-issue' : (current.status === 'good' ? 'flag-good' : '')}" data-key="${item.key}">
+    <div class="hc-item ${isIssue ? 'flag-issue' : (isGood ? 'flag-good' : '')}" data-key="${item.key}">
       <div class="hc-item-head">
         <span class="hc-item-name">${item.name}</span>
         <button type="button" class="info-btn" id="info-btn-${item.key}" onclick="toggleInfo('${item.key}')" aria-label="What to look out for">i</button>
       </div>
       <div class="hc-item-normal">${item.normal}</div>
       <div class="hc-info" id="info-${item.key}">${item.issue}</div>
-      <div class="hc-toggle">
-        <button type="button" class="hc-opt good ${current.status === 'good' ? 'selected' : ''}" data-val="good" onclick="hcSetItemStatus('${item.key}','good')">&#10003; All good</button>
-        <button type="button" class="hc-opt issue ${current.status === 'issue' ? 'selected' : ''}" data-val="issue" onclick="hcSetItemStatus('${item.key}','issue')">&#9888; Issue</button>
-      </div>
-      <textarea class="hc-note" id="note-${item.key}" placeholder="What did you notice?" style="display:${current.status === 'issue' ? 'block' : 'none'};" oninput="hcNoteInput('${item.key}')">${escapeHtml(current.note || '')}</textarea>
+      ${toggleHtml}
+      <textarea class="hc-note" id="note-${item.key}" placeholder="What did you notice?" style="display:${isIssue ? 'block' : 'none'};" oninput="hcNoteInput('${item.key}')">${escapeHtml(current.note || '')}</textarea>
     </div>
     `;
   }).join('');
@@ -1635,15 +1687,18 @@ function toggleInfo(key){
 }
 
 function hcSetItemStatus(key, val){
+  const item = HEALTH_ITEMS.find(i => i.key === key);
   const bird = hcSession.birds[hcSession.index];
   bird.items[key] = bird.items[key] || {};
   bird.items[key].status = val;
   const card = document.querySelector('.hc-item[data-key="' + key + '"]');
-  card.querySelectorAll('.hc-opt').forEach(b => b.classList.toggle('selected', b.dataset.val === val));
+  card.querySelectorAll('.hc-opt').forEach(b => b.classList.toggle('selected', String(b.dataset.val) === String(val)));
+  const isIssue = hcIsIssueStatus(item, val);
+  const isGood = hcIsGoodStatus(item, val);
   const noteEl = document.getElementById('note-' + key);
-  noteEl.style.display = val === 'issue' ? 'block' : 'none';
-  card.classList.toggle('flag-issue', val === 'issue');
-  card.classList.toggle('flag-good', val === 'good');
+  noteEl.style.display = isIssue ? 'block' : 'none';
+  card.classList.toggle('flag-issue', isIssue);
+  card.classList.toggle('flag-good', isGood);
 }
 
 function hcNoteInput(key){
@@ -1698,8 +1753,27 @@ async function finishHealthCheckSession(){
   document.getElementById('hc-session-section').style.display = 'none';
   document.getElementById('hc-setup-section').style.display = 'block';
   document.getElementById('hc-date').value = todayStr();
+  document.getElementById('hc-target-chicken').value = '';
+  renderHcSetupInfo();
   setStatus('hc-setup-status', 'Health check saved.', false);
   renderHealthHistory();
+}
+
+function historyItemIsIssue(i){
+  const item = HEALTH_ITEMS.find(h => h.key === i.key);
+  if(item && item.scoreOptions) return i.status != null && i.status !== '' && i.status !== 'unchecked' && Number(i.status) !== 3;
+  return i.status === 'issue';
+}
+
+function historyItemDisplay(i){
+  const item = HEALTH_ITEMS.find(h => h.key === i.key);
+  if(item && item.scoreOptions){
+    if(i.status == null || i.status === '' || i.status === 'unchecked') return { cls: 'unchecked-text', label: 'Not checked' };
+    return { cls: Number(i.status) === 3 ? 'good-text' : 'issue-text', label: 'Score: ' + i.status };
+  }
+  const cls = i.status === 'issue' ? 'issue-text' : (i.status === 'good' ? 'good-text' : 'unchecked-text');
+  const label = i.status === 'issue' ? 'Issue' : (i.status === 'good' ? 'All good' : 'Not checked');
+  return { cls, label };
 }
 
 function renderHealthHistory(){
@@ -1712,7 +1786,7 @@ function renderHealthHistory(){
 
     if(isSession){
       const birds = r.items;
-      const totalIssues = birds.reduce((s, b) => s + b.items.filter(i => i.status === 'issue').length, 0);
+      const totalIssues = birds.reduce((s, b) => s + b.items.filter(historyItemIsIssue).length, 0);
       const badge = totalIssues
         ? `<span class="issue-badge">${totalIssues} issue${totalIssues > 1 ? 's' : ''}</span>`
         : `<span class="ok-badge">All good</span>`;
@@ -1724,7 +1798,7 @@ function renderHealthHistory(){
         </summary>
         <div class="hc-record-body">
           ${birds.map(b => {
-            const birdIssues = b.items.filter(i => i.status === 'issue').length;
+            const birdIssues = b.items.filter(historyItemIsIssue).length;
             const birdBadge = birdIssues
               ? `<span class="issue-badge">${birdIssues} issue${birdIssues > 1 ? 's' : ''}</span>`
               : `<span class="ok-badge">All good</span>`;
@@ -1732,8 +1806,7 @@ function renderHealthHistory(){
             <div class="hc-bird-block">
               <div class="hc-bird-block-name"><span>${escapeHtml(b.chickenName || chickenNameById(b.chickenId))}</span>${birdBadge}</div>
               ${b.items.map(i => {
-                const cls = i.status === 'issue' ? 'issue-text' : (i.status === 'good' ? 'good-text' : 'unchecked-text');
-                const label = i.status === 'issue' ? 'Issue' : (i.status === 'good' ? 'All good' : 'Not checked');
+                const { cls, label } = historyItemDisplay(i);
                 return `
                 <div class="hc-record-row"><span>${escapeHtml(i.name)}</span><span class="${cls}">${label}</span></div>
                 ${i.note ? `<div class="hc-record-note">${escapeHtml(i.note)}</div>` : ''}`;
@@ -1746,7 +1819,7 @@ function renderHealthHistory(){
     }
 
     // Legacy single-bird flat records (saved before the per-bird session flow)
-    const issues = r.items.filter(i => i.status === 'issue');
+    const issues = r.items.filter(historyItemIsIssue);
     const badge = issues.length
       ? `<span class="issue-badge">${issues.length} issue${issues.length > 1 ? 's' : ''}</span>`
       : `<span class="ok-badge">All good</span>`;
@@ -1758,8 +1831,7 @@ function renderHealthHistory(){
       </summary>
       <div class="hc-record-body">
         ${r.items.map(i => {
-          const cls = i.status === 'issue' ? 'issue-text' : (i.status === 'good' ? 'good-text' : 'unchecked-text');
-          const label = i.status === 'issue' ? 'Issue' : (i.status === 'good' ? 'All good' : 'Not checked');
+          const { cls, label } = historyItemDisplay(i);
           return `
           <div class="hc-record-row"><span>${escapeHtml(i.name)}</span><span class="${cls}">${label}</span></div>
           ${i.note ? `<div class="hc-record-note">${escapeHtml(i.note)}</div>` : ''}`;
