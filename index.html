@@ -794,16 +794,16 @@ function renderEggStats(){
   const card = (label, s, sub) => `
     <div class="stat-card">
       <div class="stat-label">${label}</div>
-      <div class="stat-main">${s.total}</div>
-      <div class="stat-sub">${sub || 'eggs total'}</div>
-      <div class="stat-row"><span>Good</span><strong>${s.good}</strong></div>
+      <div class="stat-main">${s.good}</div>
+      <div class="stat-sub">${sub || 'good eggs'}</div>
+      <div class="stat-row"><span>Total</span><strong>${s.total}</strong></div>
       <div class="stat-row"><span>Cracked</span><strong>${s.cracked}</strong></div>
       <div class="stat-row"><span>Avg / day logged</span><strong>${s.avg.toFixed(1)}</strong></div>
     </div>`;
 
   document.getElementById('egg-stats').innerHTML =
-    card('This Week', w, 'eggs total (Mon&ndash;Sun)') +
-    card('Running Week', r, 'eggs total (last 7 days)') +
+    card('This Week', w, 'good eggs (Mon&ndash;Sun)') +
+    card('Running Week', r, 'good eggs (last 7 days)') +
     card('This Month', m) +
     card('This Year', y);
 }
