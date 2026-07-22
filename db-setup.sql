@@ -107,6 +107,8 @@ drop policy if exists "profiles readable" on profiles;
 create policy "profiles readable" on profiles for select using (auth.uid() is not null);
 drop policy if exists "profiles self update" on profiles;
 create policy "profiles self update" on profiles for update using (id = auth.uid());
+drop policy if exists "profiles self insert" on profiles;
+create policy "profiles self insert" on profiles for insert with check (id = auth.uid());
 
 -- collaborators: the flock owner manages their own grants; an invited
 -- user can see and accept (update) the invite addressed to their email.

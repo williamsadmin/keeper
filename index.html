@@ -15,6 +15,7 @@
 <meta name="apple-mobile-web-app-title" content="Keeper">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg:#1B1E26; --surface:#242833; --surface-alt:#2D323F; --border:#3A3F4D;
@@ -30,7 +31,7 @@
   section{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;}
   .sec-title{font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin:0 0 12px;}
   label{font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px;}
-  input[type=text], input[type=number], input[type=date], select{
+  input[type=text], input[type=number], input[type=date], input[type=email], input[type=password], select{
     background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:7px;
     padding:9px 10px;font-size:14px;font-family:inherit;width:100%;
   }
@@ -49,14 +50,27 @@
   .status{font-size:12px;min-height:16px;margin-top:8px;}
   .empty{color:var(--text-dim);font-size:13px;}
 
+  /* Auth screen */
+  #auth-screen{max-width:380px;margin:calc(60px + env(safe-area-inset-top)) auto 0;padding:0 16px;}
+  #auth-screen .toggle-row{display:flex;gap:8px;margin-top:14px;justify-content:center;font-size:13px;color:var(--text-dim);}
+  #auth-screen .toggle-row a{color:var(--amber);cursor:pointer;text-decoration:underline;}
+
   /* Top nav */
+  #app-screen{display:none;}
   .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;padding-top:calc(14px + env(safe-area-inset-top));border-bottom:1px solid var(--border);}
   .topbar .brand{font-family:'Oswald',sans-serif;font-weight:600;letter-spacing:.05em;text-transform:uppercase;font-size:15px;}
+  .topbar .email{font-size:12px;color:var(--text-dim);}
+  .flock-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border);}
+  .flock-bar label{margin:0;flex-shrink:0;}
+  .flock-bar select{flex:1;}
+  .role-badge{flex-shrink:0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:5px 10px;border-radius:20px;background:var(--surface-alt);color:var(--text-dim);white-space:nowrap;}
+  .role-badge.editor{background:var(--amber-dim);color:var(--amber);}
+  .role-badge.viewer{background:#3A3F4D;color:var(--teal);}
   .tabbar{display:flex;overflow-x:auto;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:20;}
   .tabbar button{
-    flex:1; min-width:110px; background:none;border:none;color:var(--text-dim);
+    flex:1; min-width:100px; background:none;border:none;color:var(--text-dim);
     font-family:inherit;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;
-    padding:13px 8px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;
+    padding:13px 6px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;
   }
   .tabbar button.active{color:var(--amber);border-bottom-color:var(--amber);}
   .tab-panel{display:none;}
@@ -118,167 +132,224 @@
   .issue-text{color:var(--danger);font-weight:600;flex-shrink:0;}
   .good-text{color:var(--teal);font-weight:600;flex-shrink:0;}
   .unchecked-text{color:var(--text-dim);flex-shrink:0;}
+
+  /* Sharing */
+  .share-note{font-size:13px;color:var(--text-dim);line-height:1.6;}
 </style>
 </head>
 <body>
 
 <button id="pwa-install-btn" class="btn" style="display:none;position:fixed;bottom:16px;right:16px;z-index:60;box-shadow:0 4px 16px rgba(0,0,0,.4);">Install app</button>
 
-<div class="topbar">
-  <span class="brand">🐔 Chicken Keeper</span>
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <p class="eyebrow">Chicken Keeper</p>
+  <h1 id="auth-title">Log in</h1>
+  <p class="sub" style="margin-bottom:16px;">Egg counts, your flock and health checks — saved to your account and shareable with others.</p>
+  <section>
+    <div class="row"><div><label>Email</label><input type="email" id="auth-email" autocomplete="email"></div></div>
+    <div class="row"><div><label>Password</label><input type="password" id="auth-password" autocomplete="current-password"></div></div>
+    <button class="btn full" id="auth-submit-btn" onclick="submitAuth()">Log in</button>
+    <div class="status" id="auth-status"></div>
+    <div class="toggle-row" id="auth-toggle">
+      Don't have an account? <a onclick="toggleAuthMode()">Sign up</a>
+    </div>
+  </section>
 </div>
-<div class="tabbar">
-  <button class="tab-btn active" data-tab="eggs" onclick="switchTab('eggs')">Egg Count</button>
-  <button class="tab-btn" data-tab="chickens" onclick="switchTab('chickens')">Chickens</button>
-  <button class="tab-btn" data-tab="health" onclick="switchTab('health')">Health Checks</button>
-</div>
 
-<div class="wrap">
-
-  <!-- EGG COUNT TAB -->
-  <div id="tab-eggs" class="tab-panel active">
-    <p class="eyebrow">Egg Count</p>
-    <h1>Daily Eggs</h1>
-    <p class="sub">Log today's total and any cracked or deformed eggs. Totals and averages update automatically.</p>
-
-    <section>
-      <p class="sec-title">Log Eggs</p>
-      <div class="row">
-        <div><label>Date</label><input type="date" id="egg-date"></div>
-      </div>
-      <div class="row">
-        <div><label>Total eggs</label><input type="number" min="0" inputmode="numeric" id="egg-total" placeholder="0"></div>
-        <div><label>Cracked / deformed</label><input type="number" min="0" inputmode="numeric" id="egg-cracked" placeholder="0"></div>
-      </div>
-      <button class="btn full" onclick="saveEggEntry()">Save entry</button>
-      <div class="status" id="egg-status"></div>
-    </section>
-
-    <section>
-      <p class="sec-title">Totals &amp; Averages</p>
-      <div class="stat-grid" id="egg-stats"></div>
-    </section>
-
-    <section>
-      <p class="sec-title">Recent Entries</p>
-      <div id="egg-log"></div>
-    </section>
+<!-- MAIN APP -->
+<div id="app-screen">
+  <div class="topbar">
+    <span class="brand">🐔 Chicken Keeper</span>
+    <span>
+      <span class="email" id="user-email"></span>
+      <button class="btn secondary" style="padding:6px 10px;font-size:12px;margin-left:8px;" onclick="logout()">Log out</button>
+    </span>
   </div>
 
-  <!-- CHICKENS TAB -->
-  <div id="tab-chickens" class="tab-panel">
-    <p class="eyebrow">The Flock</p>
-    <h1>Chickens</h1>
-    <p class="sub">Keep a record of every bird — breed, tag, age and how many eggs you can expect from them.</p>
+  <div class="flock-bar" id="flock-bar" style="display:none;">
+    <label>Viewing</label>
+    <select id="flock-select" onchange="onFlockChange()"></select>
+    <span class="role-badge" id="role-badge" style="display:none;"></span>
+  </div>
 
-    <section>
-      <p class="sec-title">Flock Summary</p>
-      <div class="stat-card">
-        <div class="stat-label">Expected eggs from hens</div>
-        <div class="stat-main"><span id="expected-total">0</span> <span style="font-size:14px;color:var(--text-dim);font-family:'Inter',sans-serif;font-weight:400;">/ year</span></div>
-        <div class="stat-sub">~<span id="expected-total-week">0</span> eggs / week across the flock</div>
-      </div>
-    </section>
+  <div class="tabbar">
+    <button class="tab-btn active" data-tab="eggs" onclick="switchTab('eggs')">Egg Count</button>
+    <button class="tab-btn" data-tab="chickens" onclick="switchTab('chickens')">Chickens</button>
+    <button class="tab-btn" data-tab="health" onclick="switchTab('health')">Health Checks</button>
+    <button class="tab-btn" data-tab="sharing" onclick="switchTab('sharing')">Sharing</button>
+  </div>
 
-    <section>
-      <p class="sec-title" id="chicken-form-title">Add a Chicken</p>
-      <div class="row">
-        <div><label>Name</label><input type="text" id="ch-name" placeholder="e.g. Henrietta"></div>
-      </div>
-      <div class="row">
-        <div><label>Leg / tag number</label><input type="text" id="ch-tag" placeholder="e.g. 14"></div>
-        <div><label>Tag colour</label><input type="text" id="ch-tag-colour" placeholder="e.g. Red"></div>
-      </div>
-      <div class="row">
-        <div>
-          <label>Breed</label>
-          <select id="ch-breed" onchange="onBreedChange()"></select>
+  <div class="wrap">
+
+    <!-- EGG COUNT TAB -->
+    <div id="tab-eggs" class="tab-panel active">
+      <p class="eyebrow">Egg Count</p>
+      <h1>Daily Eggs</h1>
+      <p class="sub">Log today's total and any cracked or deformed eggs. Totals and averages update automatically.</p>
+
+      <section id="egg-form-section">
+        <p class="sec-title">Log Eggs</p>
+        <div class="row">
+          <div><label>Date</label><input type="date" id="egg-date"></div>
         </div>
-      </div>
-      <div class="row" id="ch-breed-custom-row" style="display:none;">
-        <div><label>Breed name</label><input type="text" id="ch-breed-custom" placeholder="e.g. Cream Legbar"></div>
-      </div>
-      <div class="row">
-        <div>
-          <label>Gender</label>
-          <select id="ch-gender">
-            <option value="Hen">Hen</option>
-            <option value="Rooster">Rooster</option>
-          </select>
+        <div class="row">
+          <div><label>Total eggs</label><input type="number" min="0" inputmode="numeric" id="egg-total" placeholder="0"></div>
+          <div><label>Cracked / deformed</label><input type="number" min="0" inputmode="numeric" id="egg-cracked" placeholder="0"></div>
         </div>
-        <div><label>Date of birth</label><input type="date" id="ch-dob"></div>
-      </div>
-      <div class="row">
-        <div><label>Expected eggs / year</label><input type="number" min="0" id="ch-expected" placeholder="e.g. 250"></div>
-      </div>
-      <button class="btn full" onclick="saveChicken()">Save chicken</button>
-      <button class="btn secondary full" id="ch-cancel-btn" style="display:none;margin-top:8px;" onclick="cancelEditChicken()">Cancel edit</button>
-      <div class="status" id="chicken-status"></div>
-    </section>
+        <button class="btn full" onclick="saveEggEntry()">Save entry</button>
+        <div class="status" id="egg-status"></div>
+      </section>
 
-    <section>
-      <p class="sec-title">Your Chickens</p>
-      <div id="chicken-list"></div>
-    </section>
+      <section>
+        <p class="sec-title">Totals &amp; Averages</p>
+        <div class="stat-grid" id="egg-stats"></div>
+      </section>
+
+      <section>
+        <p class="sec-title">Recent Entries</p>
+        <div id="egg-log"></div>
+      </section>
+    </div>
+
+    <!-- CHICKENS TAB -->
+    <div id="tab-chickens" class="tab-panel">
+      <p class="eyebrow">The Flock</p>
+      <h1>Chickens</h1>
+      <p class="sub">Keep a record of every bird — breed, tag, age and how many eggs you can expect from them.</p>
+
+      <section>
+        <p class="sec-title">Flock Summary</p>
+        <div class="stat-card">
+          <div class="stat-label">Expected eggs from hens</div>
+          <div class="stat-main"><span id="expected-total">0</span> <span style="font-size:14px;color:var(--text-dim);font-family:'Inter',sans-serif;font-weight:400;">/ year</span></div>
+          <div class="stat-sub">~<span id="expected-total-week">0</span> eggs / week across the flock</div>
+        </div>
+      </section>
+
+      <section id="chicken-form-section">
+        <p class="sec-title" id="chicken-form-title">Add a Chicken</p>
+        <div class="row">
+          <div><label>Name</label><input type="text" id="ch-name" placeholder="e.g. Henrietta"></div>
+        </div>
+        <div class="row">
+          <div><label>Leg / tag number</label><input type="text" id="ch-tag" placeholder="e.g. 14"></div>
+          <div><label>Tag colour</label><input type="text" id="ch-tag-colour" placeholder="e.g. Red"></div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Breed</label>
+            <select id="ch-breed" onchange="onBreedChange()"></select>
+          </div>
+        </div>
+        <div class="row" id="ch-breed-custom-row" style="display:none;">
+          <div><label>Breed name</label><input type="text" id="ch-breed-custom" placeholder="e.g. Cream Legbar"></div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Gender</label>
+            <select id="ch-gender">
+              <option value="Hen">Hen</option>
+              <option value="Rooster">Rooster</option>
+            </select>
+          </div>
+          <div><label>Date of birth</label><input type="date" id="ch-dob"></div>
+        </div>
+        <div class="row">
+          <div><label>Expected eggs / year</label><input type="number" min="0" id="ch-expected" placeholder="e.g. 250"></div>
+        </div>
+        <button class="btn full" onclick="saveChicken()">Save chicken</button>
+        <button class="btn secondary full" id="ch-cancel-btn" style="display:none;margin-top:8px;" onclick="cancelEditChicken()">Cancel edit</button>
+        <div class="status" id="chicken-status"></div>
+      </section>
+
+      <section>
+        <p class="sec-title">Your Chickens</p>
+        <div id="chicken-list"></div>
+      </section>
+    </div>
+
+    <!-- HEALTH CHECKS TAB -->
+    <div id="tab-health" class="tab-panel">
+      <p class="eyebrow">Wellbeing</p>
+      <h1>Health Checks</h1>
+      <p class="sub">Work through each area, tap the <strong>i</strong> for what to watch out for, and flag anything that needs attention.</p>
+
+      <section id="hc-form-section">
+        <p class="sec-title">New Health Check</p>
+        <div class="row">
+          <div><label>Chicken</label><select id="hc-chicken"><option value="">Whole flock / general</option></select></div>
+          <div><label>Date</label><input type="date" id="hc-date"></div>
+        </div>
+      </section>
+
+      <section id="hc-checklist-section">
+        <p class="sec-title">Checklist</p>
+        <div id="hc-items"></div>
+      </section>
+
+      <section id="hc-save-section">
+        <button class="btn full" onclick="saveHealthCheck()">Save health check</button>
+        <div class="status" id="hc-status"></div>
+      </section>
+
+      <section>
+        <p class="sec-title">Past Checks</p>
+        <div id="hc-history"></div>
+      </section>
+    </div>
+
+    <!-- SHARING TAB -->
+    <div id="tab-sharing" class="tab-panel">
+      <p class="eyebrow">Access</p>
+      <h1>Sharing</h1>
+      <p class="sub">Give someone view-only access to your flock, or let them edit it too.</p>
+
+      <section id="share-viewing-note" style="display:none;">
+        <p class="sec-title">Access</p>
+        <p class="share-note" id="share-viewing-note-text"></p>
+      </section>
+
+      <section id="share-manage-section" style="display:none;">
+        <p class="sec-title">Invite Someone</p>
+        <div class="row">
+          <div><label>Email</label><input type="email" id="share-email" placeholder="them@example.com"></div>
+          <div>
+            <label>Access</label>
+            <select id="share-role">
+              <option value="viewer">Can view</option>
+              <option value="editor">Can edit</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn full" onclick="inviteCollaborator()">Send invite</button>
+        <div class="status" id="share-status"></div>
+      </section>
+
+      <section id="share-list-section" style="display:none;">
+        <p class="sec-title">People With Access</p>
+        <div id="collaborator-list"></div>
+      </section>
+    </div>
+
   </div>
-
-  <!-- HEALTH CHECKS TAB -->
-  <div id="tab-health" class="tab-panel">
-    <p class="eyebrow">Wellbeing</p>
-    <h1>Health Checks</h1>
-    <p class="sub">Work through each area, tap the <strong>i</strong> for what to watch out for, and flag anything that needs attention.</p>
-
-    <section>
-      <p class="sec-title">New Health Check</p>
-      <div class="row">
-        <div><label>Chicken</label><select id="hc-chicken"><option value="">Whole flock / general</option></select></div>
-        <div><label>Date</label><input type="date" id="hc-date"></div>
-      </div>
-    </section>
-
-    <section>
-      <p class="sec-title">Checklist</p>
-      <div id="hc-items"></div>
-    </section>
-
-    <section>
-      <button class="btn full" onclick="saveHealthCheck()">Save health check</button>
-      <div class="status" id="hc-status"></div>
-    </section>
-
-    <section>
-      <p class="sec-title">Past Checks</p>
-      <div id="hc-history"></div>
-    </section>
-  </div>
-
 </div>
 
 <script>
-// ---------- DATA ----------
-const STORAGE_KEY = 'chickenKeeperData';
+// ---------- SUPABASE ----------
+const SUPABASE_URL = 'https://hiaqlvjsbxhiqgxkyclt.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Yge5Ho0X4NPg6UK4aEfcgw_XJhN3Mpa';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ---------- STATE ----------
+let currentUser = null;
+let isSignup = false;
+let flocks = []; // [{ ownerId, label, role: 'owner'|'editor'|'viewer' }]
+let currentFlockOwnerId = null;
+let currentRole = 'owner';
 let state = { eggs: [], chickens: [], healthChecks: [] };
 let editingChickenId = null;
 let hcCurrent = {};
-
-function loadData(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw) return { eggs: [], chickens: [], healthChecks: [] };
-    const parsed = JSON.parse(raw);
-    return {
-      eggs: Array.isArray(parsed.eggs) ? parsed.eggs : [],
-      chickens: Array.isArray(parsed.chickens) ? parsed.chickens : [],
-      healthChecks: Array.isArray(parsed.healthChecks) ? parsed.healthChecks : []
-    };
-  }catch(e){
-    return { eggs: [], chickens: [], healthChecks: [] };
-  }
-}
-
-function saveData(){
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-}
 
 function genId(){
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -309,13 +380,208 @@ function setStatus(id, msg, isError){
   }
 }
 
+function isReadOnly(){ return currentRole === 'viewer'; }
+
 function switchTab(tab){
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+  if(tab === 'sharing') renderSharingTab();
+}
+
+// ---------- AUTH ----------
+function toggleAuthMode(){
+  isSignup = !isSignup;
+  document.getElementById('auth-title').textContent = isSignup ? 'Sign up' : 'Log in';
+  document.getElementById('auth-submit-btn').textContent = isSignup ? 'Sign up' : 'Log in';
+  document.getElementById('auth-toggle').innerHTML = isSignup
+    ? 'Already have an account? <a onclick="toggleAuthMode()">Log in</a>'
+    : "Don't have an account? <a onclick=\"toggleAuthMode()\">Sign up</a>";
+  document.getElementById('auth-status').textContent = '';
+}
+
+async function submitAuth(){
+  const email = document.getElementById('auth-email').value.trim().toLowerCase();
+  const password = document.getElementById('auth-password').value;
+  const statusEl = document.getElementById('auth-status');
+  if(!email || !password){
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = 'Enter both an email and a password.';
+    return;
+  }
+  statusEl.style.color = 'var(--text-dim)';
+  statusEl.textContent = isSignup ? 'Signing up…' : 'Logging in…';
+  try{
+    let result;
+    if(isSignup){
+      result = await sb.auth.signUp({ email, password });
+    } else {
+      result = await sb.auth.signInWithPassword({ email, password });
+    }
+    if(result.error) throw result.error;
+    if(isSignup && !result.data.session){
+      statusEl.style.color = 'var(--teal)';
+      statusEl.textContent = 'Account created — check your email to confirm, then log in.';
+      return;
+    }
+    await onLoggedIn(result.data.session.user);
+  }catch(e){
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = e.message || 'Something went wrong.';
+  }
+}
+
+async function logout(){
+  await sb.auth.signOut();
+  currentUser = null;
+  flocks = [];
+  currentFlockOwnerId = null;
+  currentRole = 'owner';
+  state = { eggs: [], chickens: [], healthChecks: [] };
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'block';
+}
+
+async function onLoggedIn(user){
+  currentUser = user;
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'block';
+  document.getElementById('user-email').textContent = user.email;
+
+  await ensureProfile();
+  await acceptPendingInvites();
+  await loadFlocks();
+  renderFlockSelector();
+  await loadFlockData();
+  renderAll();
+}
+
+async function checkExistingSession(){
+  const { data } = await sb.auth.getSession();
+  if(data && data.session && data.session.user){
+    await onLoggedIn(data.session.user);
+  }
+}
+
+async function ensureProfile(){
+  await sb.from('profiles').upsert({ id: currentUser.id, email: currentUser.email.toLowerCase() });
+}
+
+async function acceptPendingInvites(){
+  const { data } = await sb.from('collaborators')
+    .select('id')
+    .eq('invited_email', currentUser.email.toLowerCase())
+    .eq('status', 'pending');
+  if(data && data.length){
+    const ids = data.map(r => r.id);
+    await sb.from('collaborators').update({ status: 'accepted', accepted_user_id: currentUser.id }).in('id', ids);
+  }
+}
+
+// ---------- FLOCKS (sharing scope) ----------
+async function loadFlocks(){
+  flocks = [{ ownerId: currentUser.id, label: 'My flock', role: 'owner' }];
+
+  const { data } = await sb.from('collaborators')
+    .select('owner_id, role')
+    .eq('accepted_user_id', currentUser.id)
+    .eq('status', 'accepted');
+
+  if(data && data.length){
+    const ownerIds = data.map(d => d.owner_id);
+    const { data: profs } = await sb.from('profiles').select('id, email').in('id', ownerIds);
+    const emailMap = {};
+    (profs || []).forEach(p => { emailMap[p.id] = p.email; });
+    data.forEach(d => {
+      const email = emailMap[d.owner_id] || 'Shared flock';
+      flocks.push({ ownerId: d.owner_id, label: email + (d.role === 'editor' ? ' (can edit)' : ' (view only)'), role: d.role });
+    });
+  }
+
+  if(!currentFlockOwnerId){
+    currentFlockOwnerId = currentUser.id;
+  }
+  const match = flocks.find(f => f.ownerId === currentFlockOwnerId);
+  if(match){
+    currentRole = match.role;
+  } else {
+    currentFlockOwnerId = currentUser.id;
+    currentRole = 'owner';
+  }
+}
+
+function renderFlockSelector(){
+  const bar = document.getElementById('flock-bar');
+  const sel = document.getElementById('flock-select');
+  if(flocks.length <= 1){
+    bar.style.display = 'none';
+    renderRoleBadge();
+    return;
+  }
+  bar.style.display = 'flex';
+  sel.innerHTML = flocks.map(f => `<option value="${f.ownerId}" ${f.ownerId === currentFlockOwnerId ? 'selected' : ''}>${escapeHtml(f.label)}</option>`).join('');
+  renderRoleBadge();
+}
+
+function renderRoleBadge(){
+  const badge = document.getElementById('role-badge');
+  if(currentRole === 'owner'){ badge.style.display = 'none'; return; }
+  badge.style.display = 'inline-block';
+  badge.textContent = currentRole === 'editor' ? 'Can edit' : 'View only';
+  badge.className = 'role-badge ' + currentRole;
+}
+
+async function onFlockChange(){
+  currentFlockOwnerId = document.getElementById('flock-select').value;
+  const match = flocks.find(f => f.ownerId === currentFlockOwnerId);
+  currentRole = match ? match.role : 'viewer';
+  renderRoleBadge();
+  await loadFlockData();
+  renderAll();
+}
+
+function applyRolePermissions(){
+  const readOnly = isReadOnly();
+  document.getElementById('egg-form-section').style.display = readOnly ? 'none' : 'block';
+  document.getElementById('chicken-form-section').style.display = readOnly ? 'none' : 'block';
+  document.getElementById('hc-form-section').style.display = readOnly ? 'none' : 'block';
+  document.getElementById('hc-checklist-section').style.display = readOnly ? 'none' : 'block';
+  document.getElementById('hc-save-section').style.display = readOnly ? 'none' : 'block';
+}
+
+function renderAll(){
+  applyRolePermissions();
+  renderEggs();
+  renderChickens();
+  renderHealthChickenOptions();
+  hcCurrent = {};
+  renderHealthItems();
+  renderHealthHistory();
+  if(document.getElementById('tab-sharing').classList.contains('active')) renderSharingTab();
+}
+
+// ---------- DATA LOADING ----------
+function rowToEgg(r){ return { id: r.id, date: r.date, total: r.total, cracked: r.cracked }; }
+function rowToChicken(r){
+  return {
+    id: r.id, name: r.name, tag: r.tag, tagColour: r.tag_colour, breed: r.breed,
+    gender: r.gender, dob: r.dob, expectedEggsPerYear: r.expected_eggs_per_year
+  };
+}
+function rowToHealthCheck(r){ return { id: r.id, date: r.date, chickenId: r.chicken_id, items: r.items || [] }; }
+
+async function loadFlockData(){
+  const [eggsRes, chickensRes, hcRes] = await Promise.all([
+    sb.from('eggs').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
+    sb.from('chickens').select('*').eq('owner_id', currentFlockOwnerId).order('created_at'),
+    sb.from('health_checks').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false })
+  ]);
+  state.eggs = (eggsRes.data || []).map(rowToEgg);
+  state.chickens = (chickensRes.data || []).map(rowToChicken);
+  state.healthChecks = (hcRes.data || []).map(rowToHealthCheck);
 }
 
 // ---------- EGG COUNT ----------
-function saveEggEntry(){
+async function saveEggEntry(){
   const date = document.getElementById('egg-date').value;
   const total = parseInt(document.getElementById('egg-total').value, 10);
   const cracked = parseInt(document.getElementById('egg-cracked').value, 10) || 0;
@@ -324,12 +590,11 @@ function saveEggEntry(){
   if(isNaN(total) || total < 0){ setStatus('egg-status', 'Enter a valid total.', true); return; }
   if(cracked > total){ setStatus('egg-status', "Cracked can't exceed total.", true); return; }
 
-  const idx = state.eggs.findIndex(e => e.date === date);
-  const entry = { date, total, cracked };
-  if(idx >= 0) state.eggs[idx] = entry; else state.eggs.push(entry);
-  state.eggs.sort((a, b) => a.date < b.date ? 1 : -1);
-  saveData();
+  const { error } = await sb.from('eggs')
+    .upsert({ owner_id: currentFlockOwnerId, date, total, cracked }, { onConflict: 'owner_id,date' });
+  if(error){ setStatus('egg-status', error.message, true); return; }
 
+  await loadFlockData();
   setStatus('egg-status', 'Saved.', false);
   document.getElementById('egg-total').value = '';
   document.getElementById('egg-cracked').value = '';
@@ -346,10 +611,11 @@ function editEggEntry(date){
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function deleteEggEntry(date){
+async function deleteEggEntry(date){
   if(!confirm('Delete this entry?')) return;
-  state.eggs = state.eggs.filter(e => e.date !== date);
-  saveData();
+  const { error } = await sb.from('eggs').delete().eq('owner_id', currentFlockOwnerId).eq('date', date);
+  if(error){ setStatus('egg-status', error.message, true); return; }
+  await loadFlockData();
   renderEggs();
 }
 
@@ -403,16 +669,18 @@ function renderEggStats(){
 function renderEggLog(){
   const el = document.getElementById('egg-log');
   if(!state.eggs.length){ el.innerHTML = '<p class="empty">No entries yet.</p>'; return; }
+  const readOnly = isReadOnly();
   el.innerHTML = state.eggs.slice(0, 90).map(e => `
     <div class="log-item">
       <div>
         <strong>${formatDateNice(e.date)}</strong>
         <div class="text-dim" style="font-size:12px;">${e.total} total &middot; ${e.cracked} cracked &middot; ${e.total - e.cracked} good</div>
       </div>
+      ${readOnly ? '' : `
       <div class="icon-row">
         <button class="icon-btn" onclick="editEggEntry('${e.date}')" aria-label="Edit">&#9998;</button>
         <button class="icon-btn danger" onclick="deleteEggEntry('${e.date}')" aria-label="Delete">&#10005;</button>
-      </div>
+      </div>`}
     </div>`).join('');
 }
 
@@ -486,31 +754,32 @@ function resetChickenForm(){
   document.getElementById('ch-cancel-btn').style.display = 'none';
 }
 
-function saveChicken(){
+async function saveChicken(){
   const name = document.getElementById('ch-name').value.trim();
   if(!name){ setStatus('chicken-status', 'Name is required.', true); return; }
 
   const breedSel = document.getElementById('ch-breed').value;
   const breed = breedSel === '__custom' ? document.getElementById('ch-breed-custom').value.trim() : breedSel;
 
-  const chicken = {
-    id: editingChickenId || genId(),
+  const payload = {
     name,
     tag: document.getElementById('ch-tag').value.trim(),
-    tagColour: document.getElementById('ch-tag-colour').value.trim(),
+    tag_colour: document.getElementById('ch-tag-colour').value.trim(),
     breed,
     gender: document.getElementById('ch-gender').value,
-    dob: document.getElementById('ch-dob').value,
-    expectedEggsPerYear: Number(document.getElementById('ch-expected').value) || 0
+    dob: document.getElementById('ch-dob').value || null,
+    expected_eggs_per_year: Number(document.getElementById('ch-expected').value) || 0
   };
 
+  let error;
   if(editingChickenId){
-    const idx = state.chickens.findIndex(c => c.id === editingChickenId);
-    if(idx >= 0) state.chickens[idx] = chicken;
+    ({ error } = await sb.from('chickens').update(payload).eq('id', editingChickenId));
   } else {
-    state.chickens.push(chicken);
+    ({ error } = await sb.from('chickens').insert({ ...payload, owner_id: currentFlockOwnerId }));
   }
-  saveData();
+  if(error){ setStatus('chicken-status', error.message, true); return; }
+
+  await loadFlockData();
   resetChickenForm();
   setStatus('chicken-status', 'Saved.', false);
   renderChickens();
@@ -551,11 +820,12 @@ function cancelEditChicken(){
   resetChickenForm();
 }
 
-function deleteChicken(id){
+async function deleteChicken(id){
   if(!confirm('Delete this chicken?')) return;
-  state.chickens = state.chickens.filter(c => c.id !== id);
+  const { error } = await sb.from('chickens').delete().eq('id', id);
+  if(error){ setStatus('chicken-status', error.message, true); return; }
   if(editingChickenId === id) resetChickenForm();
-  saveData();
+  await loadFlockData();
   renderChickens();
   renderHealthChickenOptions();
 }
@@ -569,6 +839,7 @@ function renderChickens(){
 
   if(!state.chickens.length){ listEl.innerHTML = '<p class="empty">No chickens added yet.</p>'; return; }
 
+  const readOnly = isReadOnly();
   listEl.innerHTML = state.chickens.map(c => {
     const genderClass = c.gender === 'Rooster' ? 'rooster' : 'hen';
     const tagText = [c.tag, c.tagColour].filter(Boolean).join(' &middot; ') || '—';
@@ -579,10 +850,11 @@ function renderChickens(){
           <div class="chicken-name">${escapeHtml(c.name)}<span class="gender-tag ${genderClass}">${escapeHtml(c.gender || 'Hen')}</span></div>
           <div class="chicken-meta">${escapeHtml(c.breed || 'Unknown breed')}</div>
         </div>
+        ${readOnly ? '' : `
         <div class="icon-row">
           <button class="icon-btn" onclick="editChicken('${c.id}')" aria-label="Edit">&#9998;</button>
           <button class="icon-btn danger" onclick="deleteChicken('${c.id}')" aria-label="Delete">&#10005;</button>
-        </div>
+        </div>`}
       </div>
       <div class="chicken-grid">
         <div><span class="chicken-label">Tag</span><span>${tagText}</span></div>
@@ -665,26 +937,28 @@ function onNoteInput(key){
   hcCurrent[key].note = document.getElementById('note-' + key).value;
 }
 
-function saveHealthCheck(){
+async function saveHealthCheck(){
   const date = document.getElementById('hc-date').value;
   if(!date){ setStatus('hc-status', 'Pick a date.', true); return; }
   const answered = HEALTH_ITEMS.filter(i => hcCurrent[i.key] && hcCurrent[i.key].status);
   if(!answered.length){ setStatus('hc-status', 'Tick at least one item before saving.', true); return; }
 
-  const record = {
-    id: genId(),
-    date,
-    chickenId: document.getElementById('hc-chicken').value || null,
-    items: HEALTH_ITEMS.map(i => ({
-      key: i.key,
-      name: i.name,
-      status: (hcCurrent[i.key] && hcCurrent[i.key].status) || 'unchecked',
-      note: (hcCurrent[i.key] && hcCurrent[i.key].note) || ''
-    }))
-  };
-  state.healthChecks.unshift(record);
-  saveData();
+  const items = HEALTH_ITEMS.map(i => ({
+    key: i.key,
+    name: i.name,
+    status: (hcCurrent[i.key] && hcCurrent[i.key].status) || 'unchecked',
+    note: (hcCurrent[i.key] && hcCurrent[i.key].note) || ''
+  }));
 
+  const { error } = await sb.from('health_checks').insert({
+    owner_id: currentFlockOwnerId,
+    chicken_id: document.getElementById('hc-chicken').value || null,
+    date,
+    items
+  });
+  if(error){ setStatus('hc-status', error.message, true); return; }
+
+  await loadFlockData();
   setStatus('hc-status', 'Health check saved.', false);
   hcCurrent = {};
   renderHealthItems();
@@ -703,6 +977,7 @@ function renderHealthHistory(){
   const el = document.getElementById('hc-history');
   if(!state.healthChecks.length){ el.innerHTML = '<p class="empty">No health checks recorded yet.</p>'; return; }
 
+  const readOnly = isReadOnly();
   el.innerHTML = state.healthChecks.map(r => {
     const issues = r.items.filter(i => i.status === 'issue');
     const badge = issues.length
@@ -722,17 +997,94 @@ function renderHealthHistory(){
           <div class="hc-record-row"><span>${escapeHtml(i.name)}</span><span class="${cls}">${label}</span></div>
           ${i.note ? `<div class="hc-record-note">${escapeHtml(i.note)}</div>` : ''}`;
         }).join('')}
-        <button class="btn danger" style="margin-top:10px;" onclick="deleteHealthCheck('${r.id}')">Delete record</button>
+        ${readOnly ? '' : `<button class="btn danger" style="margin-top:10px;" onclick="deleteHealthCheck('${r.id}')">Delete record</button>`}
       </div>
     </details>`;
   }).join('');
 }
 
-function deleteHealthCheck(id){
+async function deleteHealthCheck(id){
   if(!confirm('Delete this health check record?')) return;
-  state.healthChecks = state.healthChecks.filter(r => r.id !== id);
-  saveData();
+  const { error } = await sb.from('health_checks').delete().eq('id', id);
+  if(error){ setStatus('hc-status', error.message, true); return; }
+  await loadFlockData();
   renderHealthHistory();
+}
+
+// ---------- SHARING ----------
+function renderSharingTab(){
+  const ownFlock = currentFlockOwnerId === currentUser.id;
+  document.getElementById('share-manage-section').style.display = ownFlock ? 'block' : 'none';
+  document.getElementById('share-list-section').style.display = ownFlock ? 'block' : 'none';
+  document.getElementById('share-viewing-note').style.display = ownFlock ? 'none' : 'block';
+
+  if(!ownFlock){
+    const f = flocks.find(x => x.ownerId === currentFlockOwnerId);
+    const roleWord = f && f.role === 'editor' ? 'edit' : 'view-only';
+    const ownerLabel = f ? f.label.replace(/ \(.*\)$/, '') : 'this';
+    document.getElementById('share-viewing-note-text').textContent =
+      `You have ${roleWord} access to ${ownerLabel}'s flock. Only they can manage who has access.`;
+    return;
+  }
+  loadCollaborators();
+}
+
+async function loadCollaborators(){
+  const { data, error } = await sb.from('collaborators').select('*').eq('owner_id', currentUser.id).order('created_at');
+  if(error){ setStatus('share-status', error.message, true); return; }
+  renderCollaboratorList(data || []);
+}
+
+function renderCollaboratorList(rows){
+  const el = document.getElementById('collaborator-list');
+  if(!rows.length){ el.innerHTML = '<p class="empty">You haven\'t shared your flock with anyone yet.</p>'; return; }
+  el.innerHTML = rows.map(r => `
+    <div class="log-item">
+      <div>
+        <strong>${escapeHtml(r.invited_email)}</strong>
+        <div class="text-dim" style="font-size:12px;">${r.status === 'accepted' ? 'Accepted' : 'Invited — waiting for them to sign up or log in'}</div>
+      </div>
+      <div class="icon-row">
+        <select onchange="changeCollaboratorRole('${r.id}', this.value)" style="width:auto;padding:6px 8px;font-size:12px;">
+          <option value="viewer" ${r.role === 'viewer' ? 'selected' : ''}>Can view</option>
+          <option value="editor" ${r.role === 'editor' ? 'selected' : ''}>Can edit</option>
+        </select>
+        <button class="icon-btn danger" onclick="removeCollaborator('${r.id}')" aria-label="Remove">&#10005;</button>
+      </div>
+    </div>`).join('');
+}
+
+async function inviteCollaborator(){
+  const email = document.getElementById('share-email').value.trim().toLowerCase();
+  const role = document.getElementById('share-role').value;
+  if(!email || !email.includes('@')){ setStatus('share-status', 'Enter a valid email.', true); return; }
+  if(email === currentUser.email.toLowerCase()){ setStatus('share-status', "That's your own account.", true); return; }
+
+  const { data: existing } = await sb.from('collaborators')
+    .select('id, status').eq('owner_id', currentUser.id).eq('invited_email', email).maybeSingle();
+
+  let error;
+  if(existing){
+    ({ error } = await sb.from('collaborators').update({ role }).eq('id', existing.id));
+  } else {
+    ({ error } = await sb.from('collaborators').insert({ owner_id: currentUser.id, invited_email: email, role, status: 'pending' }));
+  }
+  if(error){ setStatus('share-status', error.message, true); return; }
+
+  setStatus('share-status', "Invite saved — they'll get access once they sign up or log in with that email.", false);
+  document.getElementById('share-email').value = '';
+  loadCollaborators();
+}
+
+async function changeCollaboratorRole(id, role){
+  await sb.from('collaborators').update({ role }).eq('id', id);
+  loadCollaborators();
+}
+
+async function removeCollaborator(id){
+  if(!confirm("Remove this person's access?")) return;
+  await sb.from('collaborators').delete().eq('id', id);
+  loadCollaborators();
 }
 
 // ---------- PWA ----------
@@ -759,16 +1111,12 @@ document.getElementById('pwa-install-btn').addEventListener('click', async () =>
 
 // ---------- INIT ----------
 function init(){
-  state = loadData();
   document.getElementById('egg-date').value = todayStr();
   document.getElementById('hc-date').value = todayStr();
   populateBreedOptions();
-  renderEggs();
-  renderChickens();
-  renderHealthChickenOptions();
   renderHealthItems();
-  renderHealthHistory();
   registerSW();
+  checkExistingSession();
 }
 
 document.addEventListener('DOMContentLoaded', init);
