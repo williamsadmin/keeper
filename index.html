@@ -119,6 +119,11 @@
   .gender-tag{display:inline-block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:20px;margin-left:6px;vertical-align:middle;}
   .gender-tag.hen{background:var(--amber-dim);color:var(--amber);}
   .gender-tag.rooster{background:#3A3F4D;color:var(--teal);}
+  .deceased-tag{display:inline-block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:20px;margin-left:6px;vertical-align:middle;background:transparent;color:var(--danger);border:1px solid var(--danger);}
+  .chicken-card.deceased{opacity:.8;border-style:dashed;}
+  .checkbox-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .checkbox-row input[type=checkbox]{width:auto;}
+  .checkbox-row label{margin:0;color:var(--text);font-size:13px;}
 
   /* Health checks */
   .hc-item{background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;transition:border-color .15s;}
@@ -336,6 +341,13 @@
           <div class="row">
             <div><label>Notes</label><textarea id="ch-notes" placeholder="e.g. Bent beak, rescued 2024"></textarea></div>
           </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="ch-deceased" onchange="onDeceasedToggle()">
+            <label for="ch-deceased">This chicken has died</label>
+          </div>
+          <div class="row" id="ch-deceased-date-row" style="display:none;">
+            <div><label>Deceased date</label><input type="date" id="ch-deceased-date"></div>
+          </div>
           <button class="btn full" onclick="saveChicken()">Save chicken</button>
           <button class="btn secondary full" id="ch-cancel-btn" style="display:none;margin-top:8px;" onclick="cancelEditChicken()">Cancel edit</button>
           <div class="status" id="chicken-status"></div>
@@ -362,6 +374,13 @@
       <section>
         <p class="sec-title">Your Chickens</p>
         <div id="chicken-list"></div>
+      </section>
+
+      <section>
+        <details>
+          <summary class="sec-title">Losses (<span id="losses-summary">0</span>)</summary>
+          <div id="losses-list"></div>
+        </details>
       </section>
     </div>
 
@@ -747,7 +766,7 @@ function applyRolePermissions(){
 }
 
 function renderHcSetupInfo(){
-  const n = state.chickens.length;
+  const n = state.chickens.filter(c => !c.isDeceased).length;
   document.getElementById('hc-setup-info').textContent = n
     ? `This will go through the checklist for each of your ${n} chicken${n > 1 ? 's' : ''}, one at a time.`
     : 'You have no chickens added yet, so this will be a single general check for the flock.';
@@ -772,7 +791,8 @@ function rowToChicken(r){
   return {
     id: r.id, name: r.name, tag: r.tag, tagColour: r.tag_colour, breed: r.breed,
     gender: r.gender, dob: r.dob, expectedEggsPerYear: r.expected_eggs_per_year,
-    eggColour: r.egg_colour, notes: r.notes
+    eggColour: r.egg_colour, notes: r.notes,
+    isDeceased: r.is_deceased, deceasedDate: r.deceased_date
   };
 }
 function rowToHealthCheck(r){ return { id: r.id, date: r.date, chickenId: r.chicken_id, items: r.items || [] }; }
@@ -1032,28 +1052,45 @@ function resetChickenForm(){
   document.getElementById('ch-expected').value = '';
   document.getElementById('ch-egg-colour').value = '';
   document.getElementById('ch-notes').value = '';
+  document.getElementById('ch-deceased').checked = false;
+  document.getElementById('ch-deceased-date').value = '';
+  document.getElementById('ch-deceased-date-row').style.display = 'none';
   document.getElementById('chicken-form-title').textContent = 'Add a Chicken';
   document.getElementById('ch-cancel-btn').style.display = 'none';
   document.getElementById('chicken-form-details').open = false;
 }
 
+function onDeceasedToggle(){
+  const checked = document.getElementById('ch-deceased').checked;
+  document.getElementById('ch-deceased-date-row').style.display = checked ? 'flex' : 'none';
+  if(checked && !document.getElementById('ch-deceased-date').value){
+    document.getElementById('ch-deceased-date').value = todayStr();
+  }
+}
+
 async function saveChicken(){
-  const name = document.getElementById('ch-name').value.trim();
-  if(!name){ setStatus('chicken-status', 'Name is required.', true); return; }
+  const nameInput = document.getElementById('ch-name').value.trim();
+  const tag = document.getElementById('ch-tag').value.trim();
+  if(!nameInput && !tag){ setStatus('chicken-status', 'Enter a name or a tag number.', true); return; }
+  const name = nameInput || tag;
 
   const breedSel = document.getElementById('ch-breed').value;
   const breed = breedSel === '__custom' ? document.getElementById('ch-breed-custom').value.trim() : breedSel;
 
+  const isDeceased = document.getElementById('ch-deceased').checked;
+
   const payload = {
     name,
-    tag: document.getElementById('ch-tag').value.trim(),
+    tag,
     tag_colour: document.getElementById('ch-tag-colour').value.trim(),
     breed,
     gender: document.getElementById('ch-gender').value,
     dob: document.getElementById('ch-dob').value || null,
     expected_eggs_per_year: Number(document.getElementById('ch-expected').value) || 0,
     egg_colour: document.getElementById('ch-egg-colour').value.trim(),
-    notes: document.getElementById('ch-notes').value.trim()
+    notes: document.getElementById('ch-notes').value.trim(),
+    is_deceased: isDeceased,
+    deceased_date: isDeceased ? (document.getElementById('ch-deceased-date').value || null) : null
   };
 
   let error;
@@ -1091,7 +1128,7 @@ function previewImportList(){
     const expected = (explicitExpected != null && !isNaN(explicitExpected)) ? explicitExpected : (matchedBreed ? BREED_PRESETS[matchedBreed] : 0);
     return {
       owner_id: currentFlockOwnerId,
-      name: name || 'Unnamed',
+      name: name || tag || 'Unnamed',
       tag: tag || '',
       tag_colour: tagColourInput || '',
       breed,
@@ -1204,7 +1241,7 @@ function ageInWeeks(dobStr){
 function populateTagColourFilterOptions(){
   const sel = document.getElementById('filter-tag-colour');
   const current = sel.value;
-  const colours = Array.from(new Set(state.chickens.map(c => c.tagColour).filter(Boolean))).sort();
+  const colours = Array.from(new Set(state.chickens.filter(c => !c.isDeceased).map(c => c.tagColour).filter(Boolean))).sort();
   sel.innerHTML = '<option value="">All</option>' + colours.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
   sel.value = colours.includes(current) ? current : '';
 }
@@ -1280,6 +1317,9 @@ function editChicken(id){
   document.getElementById('ch-expected').value = c.expectedEggsPerYear || '';
   document.getElementById('ch-egg-colour').value = c.eggColour || '';
   document.getElementById('ch-notes').value = c.notes || '';
+  document.getElementById('ch-deceased').checked = !!c.isDeceased;
+  document.getElementById('ch-deceased-date').value = c.deceasedDate || '';
+  document.getElementById('ch-deceased-date-row').style.display = c.isDeceased ? 'flex' : 'none';
   document.getElementById('chicken-form-title').textContent = 'Edit Chicken';
   document.getElementById('ch-cancel-btn').style.display = 'block';
   document.getElementById('chicken-form-details').open = true;
@@ -1300,30 +1340,14 @@ async function deleteChicken(id){
   renderHcSetupInfo();
 }
 
-function renderChickens(){
-  const listEl = document.getElementById('chicken-list');
-  const hens = state.chickens.filter(c => c.gender === 'Hen');
-  const totalExpected = hens.reduce((s, c) => s + (Number(c.expectedEggsPerYear) || 0), 0);
-  document.getElementById('expected-total').textContent = totalExpected;
-  document.getElementById('expected-total-week').textContent = (totalExpected / 52).toFixed(1);
-
-  populateTagColourFilterOptions();
-
-  if(!state.chickens.length){ listEl.innerHTML = '<p class="empty">No chickens added yet.</p>'; return; }
-
-  const filters = getChickenFilters();
-  const filtered = state.chickens.filter(c => chickenMatchesFilters(c, filters));
-  if(!filtered.length){ listEl.innerHTML = '<p class="empty">No chickens match these filters.</p>'; return; }
-
-  const readOnly = isReadOnly();
-  listEl.innerHTML = filtered.map(c => {
-    const genderClass = c.gender === 'Rooster' ? 'rooster' : 'hen';
-    const tagText = [c.tag, c.tagColour].filter(Boolean).join(' &middot; ') || '—';
-    return `
-    <div class="chicken-card">
+function chickenCardHtml(c, readOnly){
+  const genderClass = c.gender === 'Rooster' ? 'rooster' : 'hen';
+  const tagText = [c.tag, c.tagColour].filter(Boolean).join(' &middot; ') || '—';
+  return `
+    <div class="chicken-card ${c.isDeceased ? 'deceased' : ''}">
       <div class="chicken-card-head">
         <div>
-          <div class="chicken-name">${escapeHtml(c.name)}<span class="gender-tag ${genderClass}">${escapeHtml(c.gender || 'Hen')}</span></div>
+          <div class="chicken-name">${escapeHtml(c.name)}<span class="gender-tag ${genderClass}">${escapeHtml(c.gender || 'Hen')}</span>${c.isDeceased ? '<span class="deceased-tag">Lost</span>' : ''}</div>
           <div class="chicken-meta">${escapeHtml(c.breed || 'Unknown breed')}</div>
         </div>
         ${readOnly ? '' : `
@@ -1338,10 +1362,41 @@ function renderChickens(){
         <div><span class="chicken-label">Date of birth</span><span>${c.dob ? formatDateNice(c.dob) : '—'}</span></div>
         <div><span class="chicken-label">Expected eggs / yr</span><span>${c.expectedEggsPerYear || '—'}</span></div>
         <div><span class="chicken-label">Egg colour</span><span>${escapeHtml(c.eggColour) || '—'}</span></div>
+        ${c.isDeceased ? `<div><span class="chicken-label">Deceased</span><span>${c.deceasedDate ? formatDateNice(c.deceasedDate) : '—'}</span></div>` : ''}
       </div>
       ${c.notes ? `<div class="chicken-notes">${escapeHtml(c.notes)}</div>` : ''}
     </div>`;
-  }).join('');
+}
+
+function renderChickens(){
+  const listEl = document.getElementById('chicken-list');
+  const lossesEl = document.getElementById('losses-list');
+  const activeChickens = state.chickens.filter(c => !c.isDeceased);
+  const deceasedChickens = state.chickens.filter(c => c.isDeceased);
+
+  const hens = activeChickens.filter(c => c.gender === 'Hen');
+  const totalExpected = hens.reduce((s, c) => s + (Number(c.expectedEggsPerYear) || 0), 0);
+  document.getElementById('expected-total').textContent = totalExpected;
+  document.getElementById('expected-total-week').textContent = (totalExpected / 52).toFixed(1);
+
+  populateTagColourFilterOptions();
+
+  const readOnly = isReadOnly();
+
+  if(!activeChickens.length){
+    listEl.innerHTML = '<p class="empty">No chickens added yet.</p>';
+  } else {
+    const filters = getChickenFilters();
+    const filtered = activeChickens.filter(c => chickenMatchesFilters(c, filters));
+    listEl.innerHTML = filtered.length
+      ? filtered.map(c => chickenCardHtml(c, readOnly)).join('')
+      : '<p class="empty">No chickens match these filters.</p>';
+  }
+
+  document.getElementById('losses-summary').textContent = deceasedChickens.length;
+  lossesEl.innerHTML = deceasedChickens.length
+    ? deceasedChickens.map(c => chickenCardHtml(c, readOnly)).join('')
+    : '<p class="empty">No losses recorded.</p>';
 }
 
 // ---------- HEALTH CHECKS ----------
@@ -1374,8 +1429,9 @@ function startHealthCheckSession(){
   const date = document.getElementById('hc-date').value;
   if(!date){ setStatus('hc-setup-status', 'Pick a date.', true); return; }
 
-  const birdList = state.chickens.length
-    ? state.chickens.map(c => ({ chickenId: c.id, chickenName: c.name }))
+  const livingChickens = state.chickens.filter(c => !c.isDeceased);
+  const birdList = livingChickens.length
+    ? livingChickens.map(c => ({ chickenId: c.id, chickenName: c.name }))
     : [{ chickenId: null, chickenName: 'Whole flock' }];
 
   hcSession = {

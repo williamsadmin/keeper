@@ -84,12 +84,16 @@ create table if not exists chickens (
   expected_eggs_per_year int default 0,
   egg_colour text,
   notes text,
+  is_deceased boolean not null default false,
+  deceased_date date,
   created_at timestamptz not null default now()
 );
 
 -- Safe to re-run against a chickens table created before these columns existed.
 alter table chickens add column if not exists egg_colour text;
 alter table chickens add column if not exists notes text;
+alter table chickens add column if not exists is_deceased boolean not null default false;
+alter table chickens add column if not exists deceased_date date;
 
 create table if not exists health_checks (
   id uuid primary key default gen_random_uuid(),
