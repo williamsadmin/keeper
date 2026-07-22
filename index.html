@@ -99,8 +99,9 @@
   .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin-bottom:6px;}
   .stat-main{font-family:'Oswald',sans-serif;font-size:28px;font-weight:600;color:var(--amber);line-height:1;}
   .stat-sub{font-size:11px;color:var(--text-dim);margin:2px 0 8px;}
-  .stat-halfdozen{font-size:12px;color:var(--text-dim);margin:-4px 0 8px;}
-  .stat-halfdozen strong{color:var(--text);font-weight:700;}
+  .stat-headline-row{display:flex;gap:14px;}
+  .stat-headline-row > div{flex:1;min-width:0;}
+  .stat-headline-row .stat-sub{white-space:normal;}
   .stat-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text-dim);padding:2px 0;}
   .stat-row strong{color:var(--text);}
   .log-item{display:flex;align-items:center;justify-content:space-between;background:var(--surface-alt);border:1px solid var(--border);border-radius:7px;padding:10px 12px;margin-bottom:8px;gap:8px;}
@@ -876,8 +877,18 @@ function startOfWeek(d){
   return dt;
 }
 
-function halfDozenLine(good){
-  return `<div class="stat-halfdozen"><strong>${(good / 6).toFixed(1)}</strong> half dozens</div>`;
+function statHeadlineRow(good, sub){
+  return `
+    <div class="stat-headline-row">
+      <div>
+        <div class="stat-main">${good}</div>
+        <div class="stat-sub">${sub || 'good eggs'}</div>
+      </div>
+      <div>
+        <div class="stat-main">${(good / 6).toFixed(1)}</div>
+        <div class="stat-sub">half dozens</div>
+      </div>
+    </div>`;
 }
 
 function computePeriodStats(start, end){
@@ -912,9 +923,7 @@ function renderEggStats(){
   const card = (label, s, sub) => `
     <div class="stat-card">
       <div class="stat-label">${label}</div>
-      <div class="stat-main">${s.good}</div>
-      <div class="stat-sub">${sub || 'good eggs'}</div>
-      ${halfDozenLine(s.good)}
+      ${statHeadlineRow(s.good, sub)}
       <div class="stat-row"><span>Total</span><strong>${s.total}</strong></div>
       <div class="stat-row"><span>Cracked</span><strong>${s.cracked}</strong></div>
       <div class="stat-row"><span>Avg / day logged</span><strong>${s.avg.toFixed(1)}</strong></div>
@@ -1003,9 +1012,7 @@ function renderHistoryStats(){
   el.innerHTML = `
     <div class="stat-card">
       <div class="stat-label">${escapeHtml(label)}</div>
-      <div class="stat-main">${s.good}</div>
-      <div class="stat-sub">good eggs</div>
-      ${halfDozenLine(s.good)}
+      ${statHeadlineRow(s.good)}
       <div class="stat-row"><span>Total</span><strong>${s.total}</strong></div>
       <div class="stat-row"><span>Cracked</span><strong>${s.cracked}</strong></div>
       <div class="stat-row"><span>Avg / day logged</span><strong>${s.avg.toFixed(1)}</strong></div>
