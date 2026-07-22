@@ -1,13 +1,13 @@
 {
-  "name": "Chicken Keeper",
-  "short_name": "Keeper",
+  "name": "Chickens",
+  "short_name": "Chickens",
   "description": "Egg counts, your flock, and health checks — all in one place.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#1B1E26",
-  "theme_color": "#1B1E26",
+  "background_color": "#193246",
+  "theme_color": "#193246",
   "icons": [
     { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
