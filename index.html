@@ -99,6 +99,8 @@
   .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin-bottom:6px;}
   .stat-main{font-family:'Oswald',sans-serif;font-size:28px;font-weight:600;color:var(--amber);line-height:1;}
   .stat-sub{font-size:11px;color:var(--text-dim);margin:2px 0 8px;}
+  .stat-halfdozen{font-size:12px;color:var(--text-dim);margin:-4px 0 8px;}
+  .stat-halfdozen strong{color:var(--text);font-weight:700;}
   .stat-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text-dim);padding:2px 0;}
   .stat-row strong{color:var(--text);}
   .log-item{display:flex;align-items:center;justify-content:space-between;background:var(--surface-alt);border:1px solid var(--border);border-radius:7px;padding:10px 12px;margin-bottom:8px;gap:8px;}
@@ -874,6 +876,10 @@ function startOfWeek(d){
   return dt;
 }
 
+function halfDozenLine(good){
+  return `<div class="stat-halfdozen"><strong>${(good / 6).toFixed(1)}</strong> half dozens</div>`;
+}
+
 function computePeriodStats(start, end){
   const rows = state.eggs.filter(e => {
     const t = new Date(e.date + 'T00:00:00');
@@ -908,6 +914,7 @@ function renderEggStats(){
       <div class="stat-label">${label}</div>
       <div class="stat-main">${s.good}</div>
       <div class="stat-sub">${sub || 'good eggs'}</div>
+      ${halfDozenLine(s.good)}
       <div class="stat-row"><span>Total</span><strong>${s.total}</strong></div>
       <div class="stat-row"><span>Cracked</span><strong>${s.cracked}</strong></div>
       <div class="stat-row"><span>Avg / day logged</span><strong>${s.avg.toFixed(1)}</strong></div>
@@ -998,6 +1005,7 @@ function renderHistoryStats(){
       <div class="stat-label">${escapeHtml(label)}</div>
       <div class="stat-main">${s.good}</div>
       <div class="stat-sub">good eggs</div>
+      ${halfDozenLine(s.good)}
       <div class="stat-row"><span>Total</span><strong>${s.total}</strong></div>
       <div class="stat-row"><span>Cracked</span><strong>${s.cracked}</strong></div>
       <div class="stat-row"><span>Avg / day logged</span><strong>${s.avg.toFixed(1)}</strong></div>
