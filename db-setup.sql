@@ -78,6 +78,7 @@ create table if not exists chickens (
   name text not null,
   tag text,
   tag_colour text,
+  animal_type text not null default 'Chicken',
   breed text,
   gender text not null default 'Hen',
   dob date,
@@ -94,6 +95,7 @@ alter table chickens add column if not exists egg_colour text;
 alter table chickens add column if not exists notes text;
 alter table chickens add column if not exists is_deceased boolean not null default false;
 alter table chickens add column if not exists deceased_date date;
+alter table chickens add column if not exists animal_type text not null default 'Chicken';
 
 create table if not exists health_checks (
   id uuid primary key default gen_random_uuid(),

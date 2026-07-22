@@ -321,6 +321,24 @@
           </div>
           <div class="row">
             <div>
+              <label>Animal</label>
+              <select id="ch-animal" onchange="onAnimalChange()">
+                <option value="Chicken">Chicken</option>
+                <option value="Duck">Duck</option>
+                <option value="Quail">Quail</option>
+                <option value="Goose">Goose</option>
+                <option value="Turkey">Turkey</option>
+                <option value="Guinea Fowl">Guinea Fowl</option>
+                <option value="Swan">Swan</option>
+                <option value="__custom">Other (type below)</option>
+              </select>
+            </div>
+          </div>
+          <div class="row" id="ch-animal-custom-row" style="display:none;">
+            <div><label>Animal name</label><input type="text" id="ch-animal-custom" placeholder="e.g. Peacock"></div>
+          </div>
+          <div class="row">
+            <div>
               <label>Breed</label>
               <select id="ch-breed" onchange="onBreedChange()"></select>
             </div>
@@ -373,7 +391,10 @@
           </div>
         </div>
         <div class="row">
+          <div><label>Animal</label><select id="filter-animal" onchange="onChickenFilterChange()"><option value="">All</option></select></div>
           <div><label>Gender</label><select id="filter-gender" onchange="onChickenFilterChange()"><option value="">All</option><option value="Hen">Hens</option><option value="Rooster">Roosters</option></select></div>
+        </div>
+        <div class="row">
           <div><label>Tag colour</label><select id="filter-tag-colour" onchange="onChickenFilterChange()"><option value="">All</option></select></div>
         </div>
         <div class="row">
@@ -494,8 +515,8 @@
 
       <section id="chicken-import-section">
         <p class="sec-title">Import Chickens</p>
-        <p class="share-note" style="margin-bottom:10px;">Paste one chicken per line. Just a name works, or add details separated by commas: <code>Name, Tag, Tag Colour, Breed, Gender, DOB (YYYY-MM-DD), Expected Eggs/Year, Egg Colour, Notes</code>. Anything after the Egg Colour is treated as notes, commas and all.</p>
-        <textarea id="import-list-text" placeholder="Henrietta, 14, Red, Rhode Island Red, Hen, 2024-03-15, 280, Blue, Rescued in 2024&#10;Clucky"></textarea>
+        <p class="share-note" style="margin-bottom:10px;">Paste one chicken (or duck, quail, etc.) per line. Just a name works, or add details separated by commas: <code>Name, Tag, Tag Colour, Animal, Breed, Gender, DOB (YYYY-MM-DD), Expected Eggs/Year, Egg Colour, Notes</code>. Animal defaults to Chicken if left blank. Anything after the Egg Colour is treated as notes, commas and all.</p>
+        <textarea id="import-list-text" placeholder="Henrietta, 14, Red, Chicken, Rhode Island Red, Hen, 2024-03-15, 280, Blue, Rescued in 2024&#10;Clucky"></textarea>
         <button class="btn full" style="margin-top:8px;" id="import-preview-btn" onclick="previewImportList()">Preview import</button>
         <div class="status" id="import-status"></div>
 
@@ -813,7 +834,7 @@ function rowToEgg(r){ return { id: r.id, date: r.date, total: r.total, cracked: 
 function rowToChicken(r){
   return {
     id: r.id, name: r.name, tag: r.tag, tagColour: r.tag_colour, breed: r.breed,
-    gender: r.gender, dob: r.dob, expectedEggsPerYear: r.expected_eggs_per_year,
+    animalType: r.animal_type, gender: r.gender, dob: r.dob, expectedEggsPerYear: r.expected_eggs_per_year,
     eggColour: r.egg_colour, notes: r.notes,
     isDeceased: r.is_deceased, deceasedDate: r.deceased_date
   };
@@ -1054,6 +1075,11 @@ function onBreedChange(){
   }
 }
 
+function onAnimalChange(){
+  const sel = document.getElementById('ch-animal').value;
+  document.getElementById('ch-animal-custom-row').style.display = sel === '__custom' ? 'flex' : 'none';
+}
+
 function calcAge(dobStr){
   if(!dobStr) return '—';
   const dob = new Date(dobStr + 'T00:00:00');
@@ -1079,6 +1105,9 @@ function resetChickenForm(){
   document.getElementById('ch-name').value = '';
   document.getElementById('ch-tag').value = '';
   document.getElementById('ch-tag-colour').value = '';
+  document.getElementById('ch-animal').value = 'Chicken';
+  document.getElementById('ch-animal-custom-row').style.display = 'none';
+  document.getElementById('ch-animal-custom').value = '';
   document.getElementById('ch-breed').value = '';
   document.getElementById('ch-breed-custom-row').style.display = 'none';
   document.getElementById('ch-breed-custom').value = '';
@@ -1112,12 +1141,16 @@ async function saveChicken(){
   const breedSel = document.getElementById('ch-breed').value;
   const breed = breedSel === '__custom' ? document.getElementById('ch-breed-custom').value.trim() : breedSel;
 
+  const animalSel = document.getElementById('ch-animal').value;
+  const animalType = animalSel === '__custom' ? (document.getElementById('ch-animal-custom').value.trim() || 'Chicken') : animalSel;
+
   const isDeceased = document.getElementById('ch-deceased').checked;
 
   const payload = {
     name,
     tag,
     tag_colour: document.getElementById('ch-tag-colour').value.trim(),
+    animal_type: animalType,
     breed,
     gender: document.getElementById('ch-gender').value,
     dob: document.getElementById('ch-dob').value || null,
@@ -1155,8 +1188,8 @@ function previewImportList(){
 
   pendingImportPayloads = lines.map(line => {
     const parts = line.split(',').map(p => p.trim());
-    const [name, tag, tagColourInput, breedInput, genderInput, dob, expectedInput, eggColourInput] = parts;
-    const notes = parts.slice(8).join(', ').trim();
+    const [name, tag, tagColourInput, animalInput, breedInput, genderInput, dob, expectedInput, eggColourInput] = parts;
+    const notes = parts.slice(9).join(', ').trim();
     const matchedBreed = findBreedPreset(breedInput);
     const breed = matchedBreed || breedInput || '';
     const explicitExpected = expectedInput !== undefined && expectedInput !== '' ? Number(expectedInput) : null;
@@ -1166,6 +1199,7 @@ function previewImportList(){
       name: name || tag || 'Unnamed',
       tag: tag || '',
       tag_colour: tagColourInput || '',
+      animal_type: animalInput || 'Chicken',
       breed,
       gender: genderInput && /rooster|cockerel|cock\b|male/i.test(genderInput) ? 'Rooster' : 'Hen',
       dob: dob || null,
@@ -1181,7 +1215,7 @@ function previewImportList(){
 }
 
 function importPreviewSummary(p){
-  return `${[p.tag_colour, p.tag].filter(Boolean).join(' ') || '&mdash;'} &middot; ${escapeHtml(p.breed || 'Unknown breed')} &middot; ${p.gender}${p.dob ? ' &middot; ' + formatDateNice(p.dob) : ''}${p.expected_eggs_per_year ? ' &middot; ' + p.expected_eggs_per_year + '/yr' : ''}${p.egg_colour ? ' &middot; ' + escapeHtml(p.egg_colour) + ' eggs' : ''}${p.notes ? ' &middot; ' + escapeHtml(p.notes) : ''}`;
+  return `${[p.tag_colour, p.tag].filter(Boolean).join(' ') || '&mdash;'} &middot; ${escapeHtml(p.animal_type || 'Chicken')} &middot; ${escapeHtml(p.breed || 'Unknown breed')} &middot; ${p.gender}${p.dob ? ' &middot; ' + formatDateNice(p.dob) : ''}${p.expected_eggs_per_year ? ' &middot; ' + p.expected_eggs_per_year + '/yr' : ''}${p.egg_colour ? ' &middot; ' + escapeHtml(p.egg_colour) + ' eggs' : ''}${p.notes ? ' &middot; ' + escapeHtml(p.notes) : ''}`;
 }
 
 function importPreviewRowHtml(p, i){
@@ -1198,6 +1232,9 @@ function importPreviewRowHtml(p, i){
       </div>
       <div class="row">
         <div><label>Tag colour</label><input type="text" value="${escapeHtml(p.tag_colour)}" oninput="updatePendingImport(${i}, 'tag_colour', this.value)"></div>
+        <div><label>Animal</label><input type="text" value="${escapeHtml(p.animal_type || 'Chicken')}" oninput="updatePendingImport(${i}, 'animal_type', this.value)"></div>
+      </div>
+      <div class="row">
         <div><label>Breed</label><input type="text" value="${escapeHtml(p.breed)}" oninput="updatePendingImport(${i}, 'breed', this.value)"></div>
       </div>
       <div class="row">
@@ -1281,9 +1318,18 @@ function populateTagColourFilterOptions(){
   sel.value = colours.includes(current) ? current : '';
 }
 
+function populateAnimalFilterOptions(){
+  const sel = document.getElementById('filter-animal');
+  const current = sel.value;
+  const animals = Array.from(new Set(state.chickens.filter(c => !c.isDeceased).map(c => c.animalType || 'Chicken').filter(Boolean))).sort();
+  sel.innerHTML = '<option value="">All</option>' + animals.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('');
+  sel.value = animals.includes(current) ? current : '';
+}
+
 function getChickenFilters(){
   const num = (id) => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
   return {
+    animalType: document.getElementById('filter-animal').value,
     gender: document.getElementById('filter-gender').value,
     tagColour: document.getElementById('filter-tag-colour').value,
     tagFrom: num('filter-tag-from'),
@@ -1294,6 +1340,7 @@ function getChickenFilters(){
 }
 
 function chickenMatchesFilters(c, f){
+  if(f.animalType && (c.animalType || 'Chicken') !== f.animalType) return false;
   if(f.gender && c.gender !== f.gender) return false;
   if(f.tagColour && (c.tagColour || '') !== f.tagColour) return false;
   if(f.tagFrom != null || f.tagTo != null){
@@ -1317,6 +1364,7 @@ function onChickenFilterChange(){
 
 function clearChickenFilters(){
   document.getElementById('filter-sort').value = 'tag-asc';
+  document.getElementById('filter-animal').value = '';
   document.getElementById('filter-gender').value = '';
   document.getElementById('filter-tag-colour').value = '';
   document.getElementById('filter-tag-from').value = '';
@@ -1376,6 +1424,18 @@ function editChicken(id){
   document.getElementById('ch-tag').value = c.tag || '';
   document.getElementById('ch-tag-colour').value = c.tagColour || '';
 
+  const animalSel = document.getElementById('ch-animal');
+  const animalValue = c.animalType || 'Chicken';
+  const hasAnimalPreset = Array.from(animalSel.options).some(o => o.value === animalValue);
+  if(hasAnimalPreset){
+    animalSel.value = animalValue;
+    document.getElementById('ch-animal-custom-row').style.display = 'none';
+  } else {
+    animalSel.value = '__custom';
+    document.getElementById('ch-animal-custom-row').style.display = 'flex';
+    document.getElementById('ch-animal-custom').value = animalValue;
+  }
+
   const breedSel = document.getElementById('ch-breed');
   const hasPreset = Array.from(breedSel.options).some(o => o.value === c.breed);
   if(c.breed && hasPreset){
@@ -1426,7 +1486,7 @@ function chickenCardHtml(c, readOnly){
       <div class="chicken-card-head">
         <div>
           <div class="chicken-name">${escapeHtml(c.name)}<span class="gender-tag ${genderClass}">${escapeHtml(c.gender || 'Hen')}</span>${c.isDeceased ? '<span class="deceased-tag">Lost</span>' : ''}</div>
-          <div class="chicken-meta">${escapeHtml(c.breed || 'Unknown breed')}</div>
+          <div class="chicken-meta">${escapeHtml(c.animalType || 'Chicken')} &middot; ${escapeHtml(c.breed || 'Unknown breed')}</div>
         </div>
         ${readOnly ? '' : `
         <div class="icon-row">
@@ -1458,6 +1518,7 @@ function renderChickens(){
   document.getElementById('expected-total-week').textContent = (totalExpected / 52).toFixed(1);
 
   populateTagColourFilterOptions();
+  populateAnimalFilterOptions();
 
   const readOnly = isReadOnly();
 
