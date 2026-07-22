@@ -1588,8 +1588,8 @@ function startHealthCheckSession(){
 
   const living = state.chickens.filter(c => !c.isDeceased);
   const pool = living.length
-    ? living.map(c => ({ id: c.id, name: c.name, tag: c.tag || '' }))
-    : [{ id: null, name: 'Whole flock', tag: '' }];
+    ? living.map(c => ({ id: c.id, name: c.name, tag: c.tag || '', tagColour: c.tagColour || '' }))
+    : [{ id: null, name: 'Whole flock', tag: '', tagColour: '' }];
 
   hcSession = { date, pool, completed: [], current: null };
 
@@ -1609,7 +1609,10 @@ function renderHcBirdMatches(){
   document.getElementById('hc-progress-label').textContent = `(${hcSession.completed.length} of ${hcSession.pool.length} done)`;
 
   const matches = q
-    ? remaining.filter(c => c.name.toLowerCase().includes(q) || (c.tag && c.tag.toLowerCase().includes(q)))
+    ? remaining.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        (c.tag && c.tag.toLowerCase().includes(q)) ||
+        (c.tagColour && c.tagColour.toLowerCase().includes(q)))
     : remaining;
 
   const el = document.getElementById('hc-bird-matches');
@@ -1623,9 +1626,14 @@ function renderHcBirdMatches(){
   }
   el.innerHTML = matches.map(c => `
     <button type="button" class="hc-bird-match" onclick="selectHcBird('${c.id}')">
-      ${escapeHtml(c.name)}${c.tag ? `<span class="hc-bird-match-tag">Tag ${escapeHtml(c.tag)}</span>` : ''}
+      ${escapeHtml(c.name)}${c.tag ? `<span class="hc-bird-match-tag">${escapeHtml(tagBadgeLabel(c.tag, c.tagColour))}</span>` : ''}
     </button>
   `).join('');
+}
+
+function tagBadgeLabel(tag, tagColour){
+  if(!tag) return '';
+  return tagColour ? `${tagColour} ${tag}` : `Tag ${tag}`;
 }
 
 function selectHcBird(id){
