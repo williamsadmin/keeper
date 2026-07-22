@@ -119,6 +119,10 @@
   .chicken-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;font-size:13px;}
   .chicken-grid > div{overflow:hidden;}
   .chicken-notes{font-size:12px;color:var(--text-dim);font-style:italic;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+  .chicken-history{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+  summary.chicken-history-toggle{cursor:pointer;user-select:none;font-size:11px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+  summary.chicken-history-toggle::marker{color:var(--amber);}
+  .chicken-history-body{margin-top:8px;}
   .chicken-label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);}
   .gender-tag{display:inline-block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:20px;margin-left:6px;vertical-align:middle;}
   .gender-tag.hen{background:var(--amber-dim);color:var(--amber);}
@@ -152,10 +156,9 @@
   .hc-session-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px;}
   .hc-session-progress{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;}
   .hc-session-bird-name{font-family:'Oswald',sans-serif;font-weight:600;font-size:16px;color:var(--amber);}
-  .hc-progress-dots{display:flex;gap:5px;margin-bottom:14px;flex-wrap:wrap;}
-  .hc-progress-dots span{width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0;}
-  .hc-progress-dots span.done{background:var(--teal);}
-  .hc-progress-dots span.current{background:var(--amber);}
+  .hc-bird-match{display:block;width:100%;text-align:left;background:var(--surface-alt);border:1px solid var(--border);border-radius:7px;padding:10px 12px;margin-bottom:8px;font-size:14px;font-weight:600;color:var(--text);cursor:pointer;font-family:inherit;}
+  .hc-bird-match:active{transform:translateY(1px);}
+  .hc-bird-match-tag{font-weight:400;color:var(--text-dim);font-size:12px;margin-left:6px;}
   .hc-bird-block{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;}
   .hc-bird-block-name{font-weight:600;font-size:13px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
 
@@ -434,11 +437,18 @@
         <p class="sec-title">New Health Check</p>
         <p class="share-note" id="hc-setup-info" style="margin-bottom:10px;"></p>
         <div class="row">
-          <div><label>Chicken</label><select id="hc-target-chicken" onchange="renderHcSetupInfo()"><option value="">All (go through everyone)</option></select></div>
           <div><label>Date</label><input type="date" id="hc-date"></div>
         </div>
         <button class="btn full" onclick="startHealthCheckSession()">Start health check</button>
         <div class="status" id="hc-setup-status"></div>
+      </section>
+
+      <section id="hc-picker-section" style="display:none;">
+        <p class="sec-title">Pick A Bird <span id="hc-progress-label"></span></p>
+        <input type="text" id="hc-bird-search" placeholder="Type a name or tag number…" oninput="renderHcBirdMatches()">
+        <div id="hc-bird-matches" style="margin-top:10px;"></div>
+        <button class="btn full" style="margin-top:12px;" onclick="finishHealthCheckSession()">Finish &amp; save</button>
+        <div class="status" id="hc-picker-status"></div>
       </section>
 
       <section id="hc-session-section" style="display:none;">
@@ -446,11 +456,10 @@
           <span class="hc-session-progress" id="hc-session-progress"></span>
           <span class="hc-session-bird-name" id="hc-session-bird-name"></span>
         </div>
-        <div class="hc-progress-dots" id="hc-progress-dots"></div>
         <div id="hc-items"></div>
         <div class="row" style="margin-top:6px;">
-          <div><button class="btn secondary full" id="hc-back-btn" onclick="hcPrevBird()">Back</button></div>
-          <div><button class="btn full" id="hc-next-btn" onclick="hcNextBird()">Next bird</button></div>
+          <div><button class="btn secondary full" onclick="cancelCurrentHcBird()">Cancel</button></div>
+          <div><button class="btn full" onclick="saveCurrentHcBird()">Save bird &amp; pick next</button></div>
         </div>
         <div class="status" id="hc-status"></div>
       </section>
@@ -569,7 +578,7 @@ let currentRole = 'owner';
 let state = { eggs: [], chickens: [], healthChecks: [] };
 let editingChickenId = null;
 let pendingImportPayloads = [];
-let hcSession = null; // { date, index, birds: [{ chickenId, chickenName, items: {} }] }
+let hcSession = null; // { date, pool: [{id,name,tag}], completed: [{chickenId,chickenName,items}], current: {chickenId,chickenName,items} | null }
 
 function genId(){
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -810,31 +819,16 @@ function applyRolePermissions(){
   document.getElementById('chicken-import-section').style.display = readOnly ? 'none' : 'block';
   document.getElementById('chicken-form-section').style.display = readOnly ? 'none' : 'block';
   document.getElementById('hc-setup-section').style.display = readOnly ? 'none' : 'block';
-  if(readOnly) document.getElementById('hc-session-section').style.display = 'none';
-}
-
-function renderHcTargetOptions(){
-  const sel = document.getElementById('hc-target-chicken');
-  const current = sel.value;
-  const living = state.chickens.filter(c => !c.isDeceased);
-  sel.innerHTML = '<option value="">All (go through everyone)</option>' +
-    living.map(c => `<option value="${c.id}">${escapeHtml(c.name)}${c.tag ? ' (Tag ' + escapeHtml(c.tag) + ')' : ''}</option>`).join('');
-  sel.value = living.some(c => c.id === current) ? current : '';
+  if(readOnly){
+    document.getElementById('hc-picker-section').style.display = 'none';
+    document.getElementById('hc-session-section').style.display = 'none';
+  }
 }
 
 function renderHcSetupInfo(){
-  const targetId = document.getElementById('hc-target-chicken').value;
-  const living = state.chickens.filter(c => !c.isDeceased);
-  if(targetId){
-    const c = living.find(x => x.id === targetId);
-    document.getElementById('hc-setup-info').textContent = c
-      ? `This will check just ${c.name}.`
-      : 'This will go through the checklist for each of your chickens, one at a time.';
-    return;
-  }
-  const n = living.length;
+  const n = state.chickens.filter(c => !c.isDeceased).length;
   document.getElementById('hc-setup-info').textContent = n
-    ? `This will go through the checklist for each of your ${n} chicken${n > 1 ? 's' : ''}, one at a time.`
+    ? `Search or tap to pick which of your ${n} chicken${n > 1 ? 's' : ''} to check, one at a time — finish whenever you're done, even if you haven't done them all.`
     : 'You have no chickens added yet, so this will be a single general check for the flock.';
 }
 
@@ -844,8 +838,8 @@ function renderAll(){
   renderChickens();
   hcSession = null;
   document.getElementById('hc-setup-section').style.display = isReadOnly() ? 'none' : 'block';
+  document.getElementById('hc-picker-section').style.display = 'none';
   document.getElementById('hc-session-section').style.display = 'none';
-  renderHcTargetOptions();
   renderHcSetupInfo();
   renderHealthHistory();
   if(document.getElementById('tab-sharing').classList.contains('active')) renderSharingTab();
@@ -1196,7 +1190,6 @@ async function saveChicken(){
   resetChickenForm();
   setStatus('chicken-status', 'Saved.', false);
   renderChickens();
-  renderHcTargetOptions();
   renderHcSetupInfo();
 }
 
@@ -1321,7 +1314,6 @@ async function confirmImportList(){
   setStatus('import-status', `Imported ${count} chicken${count > 1 ? 's' : ''}.`, false);
   await loadFlockData();
   renderChickens();
-  renderHcTargetOptions();
   renderHcSetupInfo();
 }
 
@@ -1500,7 +1492,6 @@ async function deleteChicken(id){
   if(editingChickenId === id) resetChickenForm();
   await loadFlockData();
   renderChickens();
-  renderHcTargetOptions();
   renderHcSetupInfo();
 }
 
@@ -1529,6 +1520,7 @@ function chickenCardHtml(c, readOnly){
         ${c.isDeceased ? `<div><span class="chicken-label">Deceased</span><span>${c.deceasedDate ? formatDateNice(c.deceasedDate) : '—'}</span></div>` : ''}
       </div>
       ${c.notes ? `<div class="chicken-notes">${escapeHtml(c.notes)}</div>` : ''}
+      ${chickenHistorySectionHtml(c.id)}
     </div>`;
 }
 
@@ -1594,49 +1586,63 @@ function startHealthCheckSession(){
   const date = document.getElementById('hc-date').value;
   if(!date){ setStatus('hc-setup-status', 'Pick a date.', true); return; }
 
-  const livingChickens = state.chickens.filter(c => !c.isDeceased);
-  const targetId = document.getElementById('hc-target-chicken').value;
+  const living = state.chickens.filter(c => !c.isDeceased);
+  const pool = living.length
+    ? living.map(c => ({ id: c.id, name: c.name, tag: c.tag || '' }))
+    : [{ id: null, name: 'Whole flock', tag: '' }];
 
-  let birdList;
-  if(targetId){
-    const c = livingChickens.find(x => x.id === targetId);
-    if(!c){ setStatus('hc-setup-status', 'That chicken could not be found — pick again.', true); return; }
-    birdList = [{ chickenId: c.id, chickenName: c.name }];
-  } else {
-    birdList = livingChickens.length
-      ? livingChickens.map(c => ({ chickenId: c.id, chickenName: c.name }))
-      : [{ chickenId: null, chickenName: 'Whole flock' }];
-  }
-
-  hcSession = {
-    date,
-    index: 0,
-    birds: birdList.map(b => ({ chickenId: b.chickenId, chickenName: b.chickenName, items: {} }))
-  };
+  hcSession = { date, pool, completed: [], current: null };
 
   document.getElementById('hc-setup-section').style.display = 'none';
+  document.getElementById('hc-session-section').style.display = 'none';
+  document.getElementById('hc-picker-section').style.display = 'block';
+  document.getElementById('hc-bird-search').value = '';
+  setStatus('hc-picker-status', '', false);
+  renderHcBirdMatches();
+}
+
+function renderHcBirdMatches(){
+  const q = document.getElementById('hc-bird-search').value.trim().toLowerCase();
+  const doneIds = new Set(hcSession.completed.map(b => String(b.chickenId)));
+  const remaining = hcSession.pool.filter(c => !doneIds.has(String(c.id)));
+
+  document.getElementById('hc-progress-label').textContent = `(${hcSession.completed.length} of ${hcSession.pool.length} done)`;
+
+  const matches = q
+    ? remaining.filter(c => c.name.toLowerCase().includes(q) || (c.tag && c.tag.toLowerCase().includes(q)))
+    : remaining;
+
+  const el = document.getElementById('hc-bird-matches');
+  if(!remaining.length){
+    el.innerHTML = '<p class="empty">All birds checked — tap Finish &amp; save below.</p>';
+    return;
+  }
+  if(!matches.length){
+    el.innerHTML = '<p class="empty">No matching bird.</p>';
+    return;
+  }
+  el.innerHTML = matches.map(c => `
+    <button type="button" class="hc-bird-match" onclick="selectHcBird('${c.id}')">
+      ${escapeHtml(c.name)}${c.tag ? `<span class="hc-bird-match-tag">Tag ${escapeHtml(c.tag)}</span>` : ''}
+    </button>
+  `).join('');
+}
+
+function selectHcBird(id){
+  const c = hcSession.pool.find(x => String(x.id) === String(id));
+  if(!c) return;
+  hcSession.current = { chickenId: c.id, chickenName: c.name, items: {} };
+  document.getElementById('hc-picker-section').style.display = 'none';
   document.getElementById('hc-session-section').style.display = 'block';
   setStatus('hc-status', '', false);
   renderHcCurrentBird();
 }
 
-function renderHcProgressDots(){
-  const el = document.getElementById('hc-progress-dots');
-  el.innerHTML = hcSession.birds.map((_, i) => {
-    const cls = i === hcSession.index ? 'current' : (i < hcSession.index ? 'done' : '');
-    return `<span class="${cls}"></span>`;
-  }).join('');
-}
-
 function renderHcCurrentBird(){
-  const bird = hcSession.birds[hcSession.index];
-  document.getElementById('hc-session-progress').textContent = `Bird ${hcSession.index + 1} of ${hcSession.birds.length}`;
+  const bird = hcSession.current;
+  document.getElementById('hc-session-progress').textContent = `${hcSession.completed.length} of ${hcSession.pool.length} done`;
   document.getElementById('hc-session-bird-name').textContent = bird.chickenName;
-  renderHcProgressDots();
   renderHealthItems(bird.items);
-
-  document.getElementById('hc-back-btn').disabled = hcSession.index === 0;
-  document.getElementById('hc-next-btn').textContent = hcSession.index === hcSession.birds.length - 1 ? 'Finish & save' : 'Next bird';
 }
 
 function hcIsIssueStatus(item, status){
@@ -1688,7 +1694,7 @@ function toggleInfo(key){
 
 function hcSetItemStatus(key, val){
   const item = HEALTH_ITEMS.find(i => i.key === key);
-  const bird = hcSession.birds[hcSession.index];
+  const bird = hcSession.current;
   bird.items[key] = bird.items[key] || {};
   bird.items[key].status = val;
   const card = document.querySelector('.hc-item[data-key="' + key + '"]');
@@ -1702,35 +1708,43 @@ function hcSetItemStatus(key, val){
 }
 
 function hcNoteInput(key){
-  const bird = hcSession.birds[hcSession.index];
+  const bird = hcSession.current;
   bird.items[key] = bird.items[key] || {};
   bird.items[key].note = document.getElementById('note-' + key).value;
 }
 
-function hcPrevBird(){
-  if(!hcSession || hcSession.index === 0) return;
-  hcSession.index -= 1;
-  setStatus('hc-status', '', false);
-  renderHcCurrentBird();
+function cancelCurrentHcBird(){
+  if(!hcSession) return;
+  hcSession.current = null;
+  document.getElementById('hc-session-section').style.display = 'none';
+  document.getElementById('hc-picker-section').style.display = 'block';
+  renderHcBirdMatches();
 }
 
-async function hcNextBird(){
-  if(!hcSession) return;
-  const bird = hcSession.birds[hcSession.index];
+function saveCurrentHcBird(){
+  if(!hcSession || !hcSession.current) return;
+  const bird = hcSession.current;
   const answered = Object.keys(bird.items).some(k => bird.items[k].status);
-  if(!answered){ setStatus('hc-status', 'Tick at least one item before moving on.', true); return; }
+  if(!answered){ setStatus('hc-status', 'Tick at least one item before saving.', true); return; }
 
-  if(hcSession.index < hcSession.birds.length - 1){
-    hcSession.index += 1;
-    setStatus('hc-status', '', false);
-    renderHcCurrentBird();
-  } else {
-    await finishHealthCheckSession();
-  }
+  hcSession.completed.push(bird);
+  hcSession.current = null;
+
+  document.getElementById('hc-session-section').style.display = 'none';
+  document.getElementById('hc-picker-section').style.display = 'block';
+  document.getElementById('hc-bird-search').value = '';
+  setStatus('hc-picker-status', '', false);
+  renderHcBirdMatches();
 }
 
 async function finishHealthCheckSession(){
-  const birds = hcSession.birds.map(b => ({
+  if(!hcSession) return;
+  if(hcSession.current){
+    if(!confirm("You have a bird in progress that hasn't been saved yet. Finish anyway and discard it?")) return;
+  }
+  if(!hcSession.completed.length){ setStatus('hc-picker-status', 'Check at least one bird before finishing.', true); return; }
+
+  const birds = hcSession.completed.map(b => ({
     chickenId: b.chickenId,
     chickenName: b.chickenName,
     items: HEALTH_ITEMS.map(i => ({
@@ -1746,17 +1760,18 @@ async function finishHealthCheckSession(){
     date: hcSession.date,
     items: birds
   });
-  if(error){ setStatus('hc-status', error.message, true); return; }
+  if(error){ setStatus('hc-picker-status', error.message, true); return; }
 
   await loadFlockData();
   hcSession = null;
+  document.getElementById('hc-picker-section').style.display = 'none';
   document.getElementById('hc-session-section').style.display = 'none';
   document.getElementById('hc-setup-section').style.display = 'block';
   document.getElementById('hc-date').value = todayStr();
-  document.getElementById('hc-target-chicken').value = '';
   renderHcSetupInfo();
   setStatus('hc-setup-status', 'Health check saved.', false);
   renderHealthHistory();
+  renderChickens();
 }
 
 function historyItemIsIssue(i){
@@ -1774,6 +1789,52 @@ function historyItemDisplay(i){
   const cls = i.status === 'issue' ? 'issue-text' : (i.status === 'good' ? 'good-text' : 'unchecked-text');
   const label = i.status === 'issue' ? 'Issue' : (i.status === 'good' ? 'All good' : 'Not checked');
   return { cls, label };
+}
+
+function getHealthHistoryForChicken(chickenId){
+  const out = [];
+  state.healthChecks.forEach(r => {
+    const isSession = Array.isArray(r.items) && r.items.length > 0 && Array.isArray(r.items[0].items);
+    if(isSession){
+      const block = r.items.find(b => String(b.chickenId) === String(chickenId));
+      if(block) out.push({ id: r.id, date: r.date, items: block.items });
+    } else if(String(r.chickenId) === String(chickenId)){
+      out.push({ id: r.id, date: r.date, items: r.items });
+    }
+  });
+  return out.sort((a, b) => a.date < b.date ? 1 : -1);
+}
+
+function chickenHistorySectionHtml(chickenId){
+  const entries = getHealthHistoryForChicken(chickenId);
+  if(!entries.length) return '';
+  return `
+    <details class="chicken-history">
+      <summary class="chicken-history-toggle">Health check history (${entries.length})</summary>
+      <div class="chicken-history-body">
+        ${entries.map(entry => {
+          const issues = entry.items.filter(historyItemIsIssue);
+          const badge = issues.length
+            ? `<span class="issue-badge">${issues.length} issue${issues.length > 1 ? 's' : ''}</span>`
+            : `<span class="ok-badge">All good</span>`;
+          return `
+          <details class="hc-record">
+            <summary class="hc-record-summary">
+              <span class="who">${formatDateNice(entry.date)}</span>
+              ${badge}
+            </summary>
+            <div class="hc-record-body">
+              ${entry.items.map(i => {
+                const { cls, label } = historyItemDisplay(i);
+                return `
+                <div class="hc-record-row"><span>${escapeHtml(i.name)}</span><span class="${cls}">${label}</span></div>
+                ${i.note ? `<div class="hc-record-note">${escapeHtml(i.note)}</div>` : ''}`;
+              }).join('')}
+            </div>
+          </details>`;
+        }).join('')}
+      </div>
+    </details>`;
 }
 
 function renderHealthHistory(){
@@ -1848,6 +1909,7 @@ async function deleteHealthCheck(id){
   if(error){ setStatus('hc-status', error.message, true); return; }
   await loadFlockData();
   renderHealthHistory();
+  renderChickens();
 }
 
 // ---------- SHARING ----------
