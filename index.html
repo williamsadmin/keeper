@@ -404,10 +404,14 @@
         <div class="row">
           <div><label>Tag colour</label><select id="filter-tag-colour" onchange="onChickenFilterChange()"><option value="">All</option></select></div>
         </div>
-        <div class="row">
+        <div class="row" id="filter-tag-single-row">
+          <div><label>Tag number</label><input type="number" id="filter-tag-exact" oninput="onChickenFilterChange()" placeholder="e.g. 14"></div>
+        </div>
+        <div class="row" id="filter-tag-range-row" style="display:none;">
           <div><label>Tag number from</label><input type="number" id="filter-tag-from" oninput="onChickenFilterChange()" placeholder="e.g. 1"></div>
           <div><label>Tag number to</label><input type="number" id="filter-tag-to" oninput="onChickenFilterChange()" placeholder="e.g. 50"></div>
         </div>
+        <button type="button" class="btn secondary full" style="margin-bottom:10px;" onclick="toggleTagRangeMode()" id="tag-range-toggle-btn">Search a range instead</button>
         <div class="row">
           <div><label>Age (weeks) from</label><input type="number" min="0" id="filter-age-from" oninput="onChickenFilterChange()" placeholder="e.g. 0"></div>
           <div><label>Age (weeks) to</label><input type="number" min="0" id="filter-age-to" oninput="onChickenFilterChange()" placeholder="e.g. 100"></div>
@@ -1397,12 +1401,29 @@ function populateAnimalFilterOptions(){
   sel.value = animals.includes(current) ? current : '';
 }
 
+let tagRangeMode = false;
+
+function toggleTagRangeMode(){
+  tagRangeMode = !tagRangeMode;
+  document.getElementById('filter-tag-single-row').style.display = tagRangeMode ? 'none' : 'flex';
+  document.getElementById('filter-tag-range-row').style.display = tagRangeMode ? 'flex' : 'none';
+  document.getElementById('tag-range-toggle-btn').textContent = tagRangeMode ? 'Search a single tag instead' : 'Search a range instead';
+  if(tagRangeMode){
+    document.getElementById('filter-tag-exact').value = '';
+  } else {
+    document.getElementById('filter-tag-from').value = '';
+    document.getElementById('filter-tag-to').value = '';
+  }
+  onChickenFilterChange();
+}
+
 function getChickenFilters(){
   const num = (id) => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
   return {
     animalType: document.getElementById('filter-animal').value,
     gender: document.getElementById('filter-gender').value,
     tagColour: document.getElementById('filter-tag-colour').value,
+    tagExact: num('filter-tag-exact'),
     tagFrom: num('filter-tag-from'),
     tagTo: num('filter-tag-to'),
     ageFrom: num('filter-age-from'),
@@ -1415,6 +1436,10 @@ function chickenMatchesFilters(c, f){
   if(f.gender === 'Male' && !isMaleGender(c.gender)) return false;
   if(f.gender === 'Female' && isMaleGender(c.gender)) return false;
   if(f.tagColour && (c.tagColour || '') !== f.tagColour) return false;
+  if(f.tagExact != null){
+    const tagNum = c.tag !== '' && !isNaN(Number(c.tag)) ? Number(c.tag) : null;
+    if(tagNum !== f.tagExact) return false;
+  }
   if(f.tagFrom != null || f.tagTo != null){
     const tagNum = c.tag !== '' && !isNaN(Number(c.tag)) ? Number(c.tag) : null;
     if(tagNum == null) return false;
@@ -1439,10 +1464,15 @@ function clearChickenFilters(){
   document.getElementById('filter-animal').value = '';
   document.getElementById('filter-gender').value = '';
   document.getElementById('filter-tag-colour').value = '';
+  document.getElementById('filter-tag-exact').value = '';
   document.getElementById('filter-tag-from').value = '';
   document.getElementById('filter-tag-to').value = '';
   document.getElementById('filter-age-from').value = '';
   document.getElementById('filter-age-to').value = '';
+  tagRangeMode = false;
+  document.getElementById('filter-tag-single-row').style.display = 'flex';
+  document.getElementById('filter-tag-range-row').style.display = 'none';
+  document.getElementById('tag-range-toggle-btn').textContent = 'Search a range instead';
   renderChickens();
 }
 
