@@ -47,6 +47,7 @@
   .btn.secondary{background:transparent;color:var(--text);border:1px solid var(--border);}
   .btn.danger{background:var(--danger);color:#1B1E26;}
   .btn.full{width:100%;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
   .status{font-size:12px;min-height:16px;margin-top:8px;}
   .empty{color:var(--text-dim);font-size:13px;}
 
@@ -73,6 +74,19 @@
     padding:13px 6px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;
   }
   .tabbar button.active{color:var(--amber);border-bottom-color:var(--amber);}
+  .menu-toggle-btn{
+    flex:0 0 auto;background:none;border:none;border-left:1px solid var(--border);color:var(--text-dim);
+    font-size:17px;padding:13px 18px;cursor:pointer;
+  }
+  .menu-toggle-btn.active{color:var(--amber);}
+  .menu-panel{display:none;flex-direction:column;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:45px;z-index:19;}
+  .menu-panel button{
+    display:block;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--border);
+    color:var(--text-dim);font-family:inherit;font-size:13px;font-weight:600;text-transform:uppercase;
+    letter-spacing:.03em;padding:14px 16px;cursor:pointer;
+  }
+  .menu-panel button:last-child{border-bottom:none;}
+  .menu-panel button.active{color:var(--amber);}
   .tab-panel{display:none;}
   .tab-panel.active{display:block;}
 
@@ -119,6 +133,16 @@
   .hc-opt.issue.selected{background:var(--danger);border-color:var(--danger);color:#1B1E26;}
   .hc-note{margin-top:8px;display:none;}
 
+  .hc-session-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px;}
+  .hc-session-progress{font-size:11px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;}
+  .hc-session-bird-name{font-family:'Oswald',sans-serif;font-weight:600;font-size:16px;color:var(--amber);}
+  .hc-progress-dots{display:flex;gap:5px;margin-bottom:14px;flex-wrap:wrap;}
+  .hc-progress-dots span{width:8px;height:8px;border-radius:50%;background:var(--border);flex-shrink:0;}
+  .hc-progress-dots span.done{background:var(--teal);}
+  .hc-progress-dots span.current{background:var(--amber);}
+  .hc-bird-block{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;}
+  .hc-bird-block-name{font-weight:600;font-size:13px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+
   details.hc-record{background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden;}
   summary.hc-record-summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px;font-size:13px;font-weight:600;gap:8px;}
   summary.hc-record-summary::-webkit-details-marker{display:none;}
@@ -133,8 +157,9 @@
   .good-text{color:var(--teal);font-weight:600;flex-shrink:0;}
   .unchecked-text{color:var(--text-dim);flex-shrink:0;}
 
-  /* Sharing */
+  /* Sharing / Account */
   .share-note{font-size:13px;color:var(--text-dim);line-height:1.6;}
+  code{background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:12px;}
 </style>
 </head>
 <body>
@@ -153,6 +178,9 @@
     <div class="status" id="auth-status"></div>
     <div class="toggle-row" id="auth-toggle">
       Don't have an account? <a onclick="toggleAuthMode()">Sign up</a>
+    </div>
+    <div class="toggle-row">
+      <a onclick="forgotPassword()">Forgot password?</a>
     </div>
   </section>
 </div>
@@ -177,7 +205,11 @@
     <button class="tab-btn active" data-tab="eggs" onclick="switchTab('eggs')">Egg Count</button>
     <button class="tab-btn" data-tab="chickens" onclick="switchTab('chickens')">Chickens</button>
     <button class="tab-btn" data-tab="health" onclick="switchTab('health')">Health Checks</button>
+    <button class="menu-toggle-btn" id="menu-toggle-btn" onclick="toggleMenu()" aria-label="More">&#9776;</button>
+  </div>
+  <div class="menu-panel" id="menu-panel">
     <button class="tab-btn" data-tab="sharing" onclick="switchTab('sharing')">Sharing</button>
+    <button class="tab-btn" data-tab="account" onclick="switchTab('account')">Account</button>
   </div>
 
   <div class="wrap">
@@ -225,6 +257,16 @@
           <div class="stat-main"><span id="expected-total">0</span> <span style="font-size:14px;color:var(--text-dim);font-family:'Inter',sans-serif;font-weight:400;">/ year</span></div>
           <div class="stat-sub">~<span id="expected-total-week">0</span> eggs / week across the flock</div>
         </div>
+      </section>
+
+      <section id="chicken-import-section">
+        <details>
+          <summary class="sec-title" style="cursor:pointer;">Import From List</summary>
+          <p class="share-note" style="margin-bottom:10px;">Paste one chicken per line. Just a name works, or add details separated by commas: <code>Name, Tag, Breed, Gender, DOB (YYYY-MM-DD)</code>.</p>
+          <textarea id="import-list-text" placeholder="Henrietta, 14, Rhode Island Red, Hen, 2024-03-15&#10;Clucky&#10;Nugget, , Silkie, Hen"></textarea>
+          <button class="btn full" style="margin-top:8px;" onclick="importChickensFromList()">Import</button>
+          <div class="status" id="import-status"></div>
+        </details>
       </section>
 
       <section id="chicken-form-section">
@@ -275,21 +317,27 @@
       <h1>Health Checks</h1>
       <p class="sub">Work through each area, tap the <strong>i</strong> for what to watch out for, and flag anything that needs attention.</p>
 
-      <section id="hc-form-section">
+      <section id="hc-setup-section">
         <p class="sec-title">New Health Check</p>
+        <p class="share-note" id="hc-setup-info" style="margin-bottom:10px;"></p>
         <div class="row">
-          <div><label>Chicken</label><select id="hc-chicken"><option value="">Whole flock / general</option></select></div>
           <div><label>Date</label><input type="date" id="hc-date"></div>
         </div>
+        <button class="btn full" onclick="startHealthCheckSession()">Start health check</button>
+        <div class="status" id="hc-setup-status"></div>
       </section>
 
-      <section id="hc-checklist-section">
-        <p class="sec-title">Checklist</p>
+      <section id="hc-session-section" style="display:none;">
+        <div class="hc-session-header">
+          <span class="hc-session-progress" id="hc-session-progress"></span>
+          <span class="hc-session-bird-name" id="hc-session-bird-name"></span>
+        </div>
+        <div class="hc-progress-dots" id="hc-progress-dots"></div>
         <div id="hc-items"></div>
-      </section>
-
-      <section id="hc-save-section">
-        <button class="btn full" onclick="saveHealthCheck()">Save health check</button>
+        <div class="row" style="margin-top:6px;">
+          <div><button class="btn secondary full" id="hc-back-btn" onclick="hcPrevBird()">Back</button></div>
+          <div><button class="btn full" id="hc-next-btn" onclick="hcNextBird()">Next bird</button></div>
+        </div>
         <div class="status" id="hc-status"></div>
       </section>
 
@@ -332,6 +380,30 @@
       </section>
     </div>
 
+    <!-- ACCOUNT TAB -->
+    <div id="tab-account" class="tab-panel">
+      <p class="eyebrow">Your Account</p>
+      <h1>Account</h1>
+      <p class="sub">Manage your login details.</p>
+
+      <section>
+        <p class="sec-title">Signed In As</p>
+        <p class="share-note" id="account-email-display"></p>
+      </section>
+
+      <section>
+        <p class="sec-title">Change Password</p>
+        <div class="row">
+          <div><label>New password</label><input type="password" id="account-new-password" autocomplete="new-password"></div>
+        </div>
+        <div class="row">
+          <div><label>Confirm new password</label><input type="password" id="account-confirm-password" autocomplete="new-password"></div>
+        </div>
+        <button class="btn full" onclick="changePassword()">Update password</button>
+        <div class="status" id="account-status"></div>
+      </section>
+    </div>
+
   </div>
 </div>
 
@@ -341,6 +413,15 @@ const SUPABASE_URL = 'https://hiaqlvjsbxhiqgxkyclt.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Yge5Ho0X4NPg6UK4aEfcgw_XJhN3Mpa';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+sb.auth.onAuthStateChange((event, session) => {
+  if(event === 'PASSWORD_RECOVERY' && session && session.user){
+    onLoggedIn(session.user).then(() => {
+      switchTab('account');
+      setStatus('account-status', 'Enter a new password below to finish resetting it.', false);
+    });
+  }
+});
+
 // ---------- STATE ----------
 let currentUser = null;
 let isSignup = false;
@@ -349,7 +430,7 @@ let currentFlockOwnerId = null;
 let currentRole = 'owner';
 let state = { eggs: [], chickens: [], healthChecks: [] };
 let editingChickenId = null;
-let hcCurrent = {};
+let hcSession = null; // { date, index, birds: [{ chickenId, chickenName, items: {} }] }
 
 function genId(){
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -382,11 +463,36 @@ function setStatus(id, msg, isError){
 
 function isReadOnly(){ return currentRole === 'viewer'; }
 
+const MENU_TABS = ['sharing', 'account'];
+
 function switchTab(tab){
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+  const menuBtn = document.getElementById('menu-toggle-btn');
+  if(menuBtn) menuBtn.classList.toggle('active', MENU_TABS.includes(tab));
+  closeMenu();
   if(tab === 'sharing') renderSharingTab();
+  if(tab === 'account') renderAccountTab();
 }
+
+function toggleMenu(){
+  const panel = document.getElementById('menu-panel');
+  if(!panel) return;
+  panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
+}
+
+function closeMenu(){
+  const panel = document.getElementById('menu-panel');
+  if(panel) panel.style.display = 'none';
+}
+
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('menu-panel');
+  const btn = document.getElementById('menu-toggle-btn');
+  if(!panel || panel.style.display !== 'flex') return;
+  if(panel.contains(e.target) || (btn && btn.contains(e.target))) return;
+  panel.style.display = 'none';
+});
 
 // ---------- AUTH ----------
 function toggleAuthMode(){
@@ -428,6 +534,26 @@ async function submitAuth(){
     statusEl.style.color = 'var(--danger)';
     statusEl.textContent = e.message || 'Something went wrong.';
   }
+}
+
+async function forgotPassword(){
+  const email = document.getElementById('auth-email').value.trim().toLowerCase();
+  const statusEl = document.getElementById('auth-status');
+  if(!email){
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = 'Enter your email above first, then tap "Forgot password?".';
+    return;
+  }
+  statusEl.style.color = 'var(--text-dim)';
+  statusEl.textContent = 'Sending reset link…';
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.href.split('#')[0] });
+  if(error){
+    statusEl.style.color = 'var(--danger)';
+    statusEl.textContent = error.message;
+    return;
+  }
+  statusEl.style.color = 'var(--teal)';
+  statusEl.textContent = 'Check your email for a password reset link.';
 }
 
 async function logout(){
@@ -542,21 +668,30 @@ async function onFlockChange(){
 function applyRolePermissions(){
   const readOnly = isReadOnly();
   document.getElementById('egg-form-section').style.display = readOnly ? 'none' : 'block';
+  document.getElementById('chicken-import-section').style.display = readOnly ? 'none' : 'block';
   document.getElementById('chicken-form-section').style.display = readOnly ? 'none' : 'block';
-  document.getElementById('hc-form-section').style.display = readOnly ? 'none' : 'block';
-  document.getElementById('hc-checklist-section').style.display = readOnly ? 'none' : 'block';
-  document.getElementById('hc-save-section').style.display = readOnly ? 'none' : 'block';
+  document.getElementById('hc-setup-section').style.display = readOnly ? 'none' : 'block';
+  if(readOnly) document.getElementById('hc-session-section').style.display = 'none';
+}
+
+function renderHcSetupInfo(){
+  const n = state.chickens.length;
+  document.getElementById('hc-setup-info').textContent = n
+    ? `This will go through the checklist for each of your ${n} chicken${n > 1 ? 's' : ''}, one at a time.`
+    : 'You have no chickens added yet, so this will be a single general check for the flock.';
 }
 
 function renderAll(){
   applyRolePermissions();
   renderEggs();
   renderChickens();
-  renderHealthChickenOptions();
-  hcCurrent = {};
-  renderHealthItems();
+  hcSession = null;
+  document.getElementById('hc-setup-section').style.display = isReadOnly() ? 'none' : 'block';
+  document.getElementById('hc-session-section').style.display = 'none';
+  renderHcSetupInfo();
   renderHealthHistory();
   if(document.getElementById('tab-sharing').classList.contains('active')) renderSharingTab();
+  if(document.getElementById('tab-account').classList.contains('active')) renderAccountTab();
 }
 
 // ---------- DATA LOADING ----------
@@ -783,7 +918,45 @@ async function saveChicken(){
   resetChickenForm();
   setStatus('chicken-status', 'Saved.', false);
   renderChickens();
-  renderHealthChickenOptions();
+  renderHcSetupInfo();
+}
+
+function findBreedPreset(breedInput){
+  if(!breedInput) return null;
+  return Object.keys(BREED_PRESETS).find(k => k.toLowerCase() === breedInput.trim().toLowerCase()) || null;
+}
+
+async function importChickensFromList(){
+  const raw = document.getElementById('import-list-text').value;
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  if(!lines.length){ setStatus('import-status', 'Paste at least one line.', true); return; }
+
+  const payloads = lines.map(line => {
+    const parts = line.split(',').map(p => p.trim());
+    const [name, tag, breedInput, genderInput, dob] = parts;
+    const matchedBreed = findBreedPreset(breedInput);
+    const breed = matchedBreed || breedInput || '';
+    const expected = matchedBreed ? BREED_PRESETS[matchedBreed] : 0;
+    return {
+      owner_id: currentFlockOwnerId,
+      name: name || 'Unnamed',
+      tag: tag || '',
+      tag_colour: '',
+      breed,
+      gender: genderInput && /rooster/i.test(genderInput) ? 'Rooster' : 'Hen',
+      dob: dob || null,
+      expected_eggs_per_year: expected
+    };
+  });
+
+  const { error } = await sb.from('chickens').insert(payloads);
+  if(error){ setStatus('import-status', error.message, true); return; }
+
+  document.getElementById('import-list-text').value = '';
+  setStatus('import-status', `Imported ${payloads.length} chicken${payloads.length > 1 ? 's' : ''}.`, false);
+  await loadFlockData();
+  renderChickens();
+  renderHcSetupInfo();
 }
 
 function editChicken(id){
@@ -827,7 +1000,7 @@ async function deleteChicken(id){
   if(editingChickenId === id) resetChickenForm();
   await loadFlockData();
   renderChickens();
-  renderHealthChickenOptions();
+  renderHcSetupInfo();
 }
 
 function renderChickens(){
@@ -886,18 +1059,57 @@ const HEALTH_ITEMS = [
   { key: 'behaviour', name: 'Behaviour', normal: 'Preening, active, foraging.', issue: 'Look out for chickens that isolate themselves from the flock — this can be a sign of illness.' }
 ];
 
-function renderHealthChickenOptions(){
-  const sel = document.getElementById('hc-chicken');
-  const current = sel.value;
-  sel.innerHTML = '<option value="">Whole flock / general</option>' +
-    state.chickens.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-  sel.value = current;
+function chickenNameById(id){
+  if(!id) return 'Whole flock';
+  const c = state.chickens.find(x => x.id === id);
+  return c ? c.name : 'Deleted chicken';
 }
 
-function renderHealthItems(){
+function startHealthCheckSession(){
+  const date = document.getElementById('hc-date').value;
+  if(!date){ setStatus('hc-setup-status', 'Pick a date.', true); return; }
+
+  const birdList = state.chickens.length
+    ? state.chickens.map(c => ({ chickenId: c.id, chickenName: c.name }))
+    : [{ chickenId: null, chickenName: 'Whole flock' }];
+
+  hcSession = {
+    date,
+    index: 0,
+    birds: birdList.map(b => ({ chickenId: b.chickenId, chickenName: b.chickenName, items: {} }))
+  };
+
+  document.getElementById('hc-setup-section').style.display = 'none';
+  document.getElementById('hc-session-section').style.display = 'block';
+  setStatus('hc-status', '', false);
+  renderHcCurrentBird();
+}
+
+function renderHcProgressDots(){
+  const el = document.getElementById('hc-progress-dots');
+  el.innerHTML = hcSession.birds.map((_, i) => {
+    const cls = i === hcSession.index ? 'current' : (i < hcSession.index ? 'done' : '');
+    return `<span class="${cls}"></span>`;
+  }).join('');
+}
+
+function renderHcCurrentBird(){
+  const bird = hcSession.birds[hcSession.index];
+  document.getElementById('hc-session-progress').textContent = `Bird ${hcSession.index + 1} of ${hcSession.birds.length}`;
+  document.getElementById('hc-session-bird-name').textContent = bird.chickenName;
+  renderHcProgressDots();
+  renderHealthItems(bird.items);
+
+  document.getElementById('hc-back-btn').disabled = hcSession.index === 0;
+  document.getElementById('hc-next-btn').textContent = hcSession.index === hcSession.birds.length - 1 ? 'Finish & save' : 'Next bird';
+}
+
+function renderHealthItems(itemState){
   const el = document.getElementById('hc-items');
-  el.innerHTML = HEALTH_ITEMS.map(item => `
-    <div class="hc-item" data-key="${item.key}">
+  el.innerHTML = HEALTH_ITEMS.map(item => {
+    const current = itemState[item.key] || {};
+    return `
+    <div class="hc-item ${current.status === 'issue' ? 'flag-issue' : (current.status === 'good' ? 'flag-good' : '')}" data-key="${item.key}">
       <div class="hc-item-head">
         <span class="hc-item-name">${item.name}</span>
         <button type="button" class="info-btn" id="info-btn-${item.key}" onclick="toggleInfo('${item.key}')" aria-label="What to look out for">i</button>
@@ -905,12 +1117,13 @@ function renderHealthItems(){
       <div class="hc-item-normal">${item.normal}</div>
       <div class="hc-info" id="info-${item.key}">${item.issue}</div>
       <div class="hc-toggle">
-        <button type="button" class="hc-opt good" data-val="good" onclick="setItemStatus('${item.key}','good')">&#10003; All good</button>
-        <button type="button" class="hc-opt issue" data-val="issue" onclick="setItemStatus('${item.key}','issue')">&#9888; Issue</button>
+        <button type="button" class="hc-opt good ${current.status === 'good' ? 'selected' : ''}" data-val="good" onclick="hcSetItemStatus('${item.key}','good')">&#10003; All good</button>
+        <button type="button" class="hc-opt issue ${current.status === 'issue' ? 'selected' : ''}" data-val="issue" onclick="hcSetItemStatus('${item.key}','issue')">&#9888; Issue</button>
       </div>
-      <textarea class="hc-note" id="note-${item.key}" placeholder="What did you notice?" oninput="onNoteInput('${item.key}')"></textarea>
+      <textarea class="hc-note" id="note-${item.key}" placeholder="What did you notice?" style="display:${current.status === 'issue' ? 'block' : 'none'};" oninput="hcNoteInput('${item.key}')">${escapeHtml(current.note || '')}</textarea>
     </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 function toggleInfo(key){
@@ -921,9 +1134,10 @@ function toggleInfo(key){
   btn.classList.toggle('open', !open);
 }
 
-function setItemStatus(key, val){
-  hcCurrent[key] = hcCurrent[key] || {};
-  hcCurrent[key].status = val;
+function hcSetItemStatus(key, val){
+  const bird = hcSession.birds[hcSession.index];
+  bird.items[key] = bird.items[key] || {};
+  bird.items[key].status = val;
   const card = document.querySelector('.hc-item[data-key="' + key + '"]');
   card.querySelectorAll('.hc-opt').forEach(b => b.classList.toggle('selected', b.dataset.val === val));
   const noteEl = document.getElementById('note-' + key);
@@ -932,45 +1146,60 @@ function setItemStatus(key, val){
   card.classList.toggle('flag-good', val === 'good');
 }
 
-function onNoteInput(key){
-  hcCurrent[key] = hcCurrent[key] || {};
-  hcCurrent[key].note = document.getElementById('note-' + key).value;
+function hcNoteInput(key){
+  const bird = hcSession.birds[hcSession.index];
+  bird.items[key] = bird.items[key] || {};
+  bird.items[key].note = document.getElementById('note-' + key).value;
 }
 
-async function saveHealthCheck(){
-  const date = document.getElementById('hc-date').value;
-  if(!date){ setStatus('hc-status', 'Pick a date.', true); return; }
-  const answered = HEALTH_ITEMS.filter(i => hcCurrent[i.key] && hcCurrent[i.key].status);
-  if(!answered.length){ setStatus('hc-status', 'Tick at least one item before saving.', true); return; }
+function hcPrevBird(){
+  if(!hcSession || hcSession.index === 0) return;
+  hcSession.index -= 1;
+  setStatus('hc-status', '', false);
+  renderHcCurrentBird();
+}
 
-  const items = HEALTH_ITEMS.map(i => ({
-    key: i.key,
-    name: i.name,
-    status: (hcCurrent[i.key] && hcCurrent[i.key].status) || 'unchecked',
-    note: (hcCurrent[i.key] && hcCurrent[i.key].note) || ''
+async function hcNextBird(){
+  if(!hcSession) return;
+  const bird = hcSession.birds[hcSession.index];
+  const answered = Object.keys(bird.items).some(k => bird.items[k].status);
+  if(!answered){ setStatus('hc-status', 'Tick at least one item before moving on.', true); return; }
+
+  if(hcSession.index < hcSession.birds.length - 1){
+    hcSession.index += 1;
+    setStatus('hc-status', '', false);
+    renderHcCurrentBird();
+  } else {
+    await finishHealthCheckSession();
+  }
+}
+
+async function finishHealthCheckSession(){
+  const birds = hcSession.birds.map(b => ({
+    chickenId: b.chickenId,
+    chickenName: b.chickenName,
+    items: HEALTH_ITEMS.map(i => ({
+      key: i.key,
+      name: i.name,
+      status: (b.items[i.key] && b.items[i.key].status) || 'unchecked',
+      note: (b.items[i.key] && b.items[i.key].note) || ''
+    }))
   }));
 
   const { error } = await sb.from('health_checks').insert({
     owner_id: currentFlockOwnerId,
-    chicken_id: document.getElementById('hc-chicken').value || null,
-    date,
-    items
+    date: hcSession.date,
+    items: birds
   });
   if(error){ setStatus('hc-status', error.message, true); return; }
 
   await loadFlockData();
-  setStatus('hc-status', 'Health check saved.', false);
-  hcCurrent = {};
-  renderHealthItems();
-  document.getElementById('hc-chicken').value = '';
+  hcSession = null;
+  document.getElementById('hc-session-section').style.display = 'none';
+  document.getElementById('hc-setup-section').style.display = 'block';
   document.getElementById('hc-date').value = todayStr();
+  setStatus('hc-setup-status', 'Health check saved.', false);
   renderHealthHistory();
-}
-
-function chickenNameById(id){
-  if(!id) return 'Whole flock';
-  const c = state.chickens.find(x => x.id === id);
-  return c ? c.name : 'Deleted chicken';
 }
 
 function renderHealthHistory(){
@@ -979,6 +1208,44 @@ function renderHealthHistory(){
 
   const readOnly = isReadOnly();
   el.innerHTML = state.healthChecks.map(r => {
+    const isSession = Array.isArray(r.items) && r.items.length > 0 && Array.isArray(r.items[0].items);
+
+    if(isSession){
+      const birds = r.items;
+      const totalIssues = birds.reduce((s, b) => s + b.items.filter(i => i.status === 'issue').length, 0);
+      const badge = totalIssues
+        ? `<span class="issue-badge">${totalIssues} issue${totalIssues > 1 ? 's' : ''}</span>`
+        : `<span class="ok-badge">All good</span>`;
+      return `
+      <details class="hc-record">
+        <summary class="hc-record-summary">
+          <span class="who">${formatDateNice(r.date)} &middot; ${birds.length} bird${birds.length > 1 ? 's' : ''} checked</span>
+          ${badge}
+        </summary>
+        <div class="hc-record-body">
+          ${birds.map(b => {
+            const birdIssues = b.items.filter(i => i.status === 'issue').length;
+            const birdBadge = birdIssues
+              ? `<span class="issue-badge">${birdIssues} issue${birdIssues > 1 ? 's' : ''}</span>`
+              : `<span class="ok-badge">All good</span>`;
+            return `
+            <div class="hc-bird-block">
+              <div class="hc-bird-block-name"><span>${escapeHtml(b.chickenName || chickenNameById(b.chickenId))}</span>${birdBadge}</div>
+              ${b.items.map(i => {
+                const cls = i.status === 'issue' ? 'issue-text' : (i.status === 'good' ? 'good-text' : 'unchecked-text');
+                const label = i.status === 'issue' ? 'Issue' : (i.status === 'good' ? 'All good' : 'Not checked');
+                return `
+                <div class="hc-record-row"><span>${escapeHtml(i.name)}</span><span class="${cls}">${label}</span></div>
+                ${i.note ? `<div class="hc-record-note">${escapeHtml(i.note)}</div>` : ''}`;
+              }).join('')}
+            </div>`;
+          }).join('')}
+          ${readOnly ? '' : `<button class="btn danger" style="margin-top:10px;" onclick="deleteHealthCheck('${r.id}')">Delete record</button>`}
+        </div>
+      </details>`;
+    }
+
+    // Legacy single-bird flat records (saved before the per-bird session flow)
     const issues = r.items.filter(i => i.status === 'issue');
     const badge = issues.length
       ? `<span class="issue-badge">${issues.length} issue${issues.length > 1 ? 's' : ''}</span>`
@@ -1087,6 +1354,25 @@ async function removeCollaborator(id){
   loadCollaborators();
 }
 
+// ---------- ACCOUNT ----------
+function renderAccountTab(){
+  document.getElementById('account-email-display').textContent = currentUser ? currentUser.email : '';
+}
+
+async function changePassword(){
+  const pw = document.getElementById('account-new-password').value;
+  const pw2 = document.getElementById('account-confirm-password').value;
+  if(!pw || pw.length < 6){ setStatus('account-status', 'Password must be at least 6 characters.', true); return; }
+  if(pw !== pw2){ setStatus('account-status', "Passwords don't match.", true); return; }
+
+  const { error } = await sb.auth.updateUser({ password: pw });
+  if(error){ setStatus('account-status', error.message, true); return; }
+
+  setStatus('account-status', 'Password updated.', false);
+  document.getElementById('account-new-password').value = '';
+  document.getElementById('account-confirm-password').value = '';
+}
+
 // ---------- PWA ----------
 function registerSW(){
   if('serviceWorker' in navigator){
@@ -1114,7 +1400,6 @@ function init(){
   document.getElementById('egg-date').value = todayStr();
   document.getElementById('hc-date').value = todayStr();
   populateBreedOptions();
-  renderHealthItems();
   registerSW();
   checkExistingSession();
 }
