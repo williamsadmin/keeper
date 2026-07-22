@@ -30,6 +30,9 @@
   .sub{color:var(--text-dim);font-size:14px;margin:0 0 4px;line-height:1.5;}
   section{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;}
   .sec-title{font-family:'Oswald',sans-serif;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-dim);margin:0 0 12px;}
+  summary.sec-title{cursor:pointer;user-select:none;margin:0;}
+  summary.sec-title::marker{color:var(--amber);}
+  details[open] summary.sec-title{margin-bottom:12px;}
   label{font-size:12px;color:var(--text-dim);display:block;margin-bottom:4px;}
   input[type=text], input[type=number], input[type=date], input[type=email], input[type=password], select{
     background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:7px;
@@ -160,6 +163,11 @@
   /* Sharing / Account */
   .share-note{font-size:13px;color:var(--text-dim);line-height:1.6;}
   code{background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:12px;}
+
+  /* Import preview */
+  .import-preview-row{display:flex;justify-content:space-between;gap:8px;background:var(--surface-alt);border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-bottom:6px;font-size:12px;}
+  .import-preview-row .name{font-weight:600;color:var(--text);}
+  .import-preview-row .meta{color:var(--text-dim);text-align:right;}
 </style>
 </head>
 <body>
@@ -239,8 +247,10 @@
       </section>
 
       <section>
-        <p class="sec-title">Recent Entries</p>
-        <div id="egg-log"></div>
+        <details>
+          <summary class="sec-title">Recent Entries</summary>
+          <div id="egg-log"></div>
+        </details>
       </section>
     </div>
 
@@ -259,50 +269,59 @@
         </div>
       </section>
 
-      <section id="chicken-import-section">
-        <details>
-          <summary class="sec-title" style="cursor:pointer;">Import From List</summary>
-          <p class="share-note" style="margin-bottom:10px;">Paste one chicken per line. Just a name works, or add details separated by commas: <code>Name, Tag, Breed, Gender, DOB (YYYY-MM-DD)</code>.</p>
-          <textarea id="import-list-text" placeholder="Henrietta, 14, Rhode Island Red, Hen, 2024-03-15&#10;Clucky&#10;Nugget, , Silkie, Hen"></textarea>
-          <button class="btn full" style="margin-top:8px;" onclick="importChickensFromList()">Import</button>
-          <div class="status" id="import-status"></div>
+      <section id="chicken-form-section">
+        <details id="chicken-form-details">
+          <summary class="sec-title" id="chicken-form-title">Add a Chicken</summary>
+          <div class="row">
+            <div><label>Name</label><input type="text" id="ch-name" placeholder="e.g. Henrietta"></div>
+          </div>
+          <div class="row">
+            <div><label>Leg / tag number</label><input type="text" id="ch-tag" placeholder="e.g. 14"></div>
+            <div><label>Tag colour</label><input type="text" id="ch-tag-colour" placeholder="e.g. Red"></div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Breed</label>
+              <select id="ch-breed" onchange="onBreedChange()"></select>
+            </div>
+          </div>
+          <div class="row" id="ch-breed-custom-row" style="display:none;">
+            <div><label>Breed name</label><input type="text" id="ch-breed-custom" placeholder="e.g. Cream Legbar"></div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Gender</label>
+              <select id="ch-gender">
+                <option value="Hen">Hen</option>
+                <option value="Rooster">Rooster</option>
+              </select>
+            </div>
+            <div><label>Date of birth</label><input type="date" id="ch-dob"></div>
+          </div>
+          <div class="row">
+            <div><label>Expected eggs / year</label><input type="number" min="0" id="ch-expected" placeholder="e.g. 250"></div>
+          </div>
+          <button class="btn full" onclick="saveChicken()">Save chicken</button>
+          <button class="btn secondary full" id="ch-cancel-btn" style="display:none;margin-top:8px;" onclick="cancelEditChicken()">Cancel edit</button>
+          <div class="status" id="chicken-status"></div>
         </details>
       </section>
 
-      <section id="chicken-form-section">
-        <p class="sec-title" id="chicken-form-title">Add a Chicken</p>
+      <section id="chicken-filter-section">
+        <p class="sec-title">Filter</p>
         <div class="row">
-          <div><label>Name</label><input type="text" id="ch-name" placeholder="e.g. Henrietta"></div>
-        </div>
-        <div class="row">
-          <div><label>Leg / tag number</label><input type="text" id="ch-tag" placeholder="e.g. 14"></div>
-          <div><label>Tag colour</label><input type="text" id="ch-tag-colour" placeholder="e.g. Red"></div>
+          <div><label>Gender</label><select id="filter-gender" onchange="onChickenFilterChange()"><option value="">All</option><option value="Hen">Hens</option><option value="Rooster">Roosters</option></select></div>
+          <div><label>Tag colour</label><select id="filter-tag-colour" onchange="onChickenFilterChange()"><option value="">All</option></select></div>
         </div>
         <div class="row">
-          <div>
-            <label>Breed</label>
-            <select id="ch-breed" onchange="onBreedChange()"></select>
-          </div>
-        </div>
-        <div class="row" id="ch-breed-custom-row" style="display:none;">
-          <div><label>Breed name</label><input type="text" id="ch-breed-custom" placeholder="e.g. Cream Legbar"></div>
+          <div><label>Tag number from</label><input type="number" id="filter-tag-from" oninput="onChickenFilterChange()" placeholder="e.g. 1"></div>
+          <div><label>Tag number to</label><input type="number" id="filter-tag-to" oninput="onChickenFilterChange()" placeholder="e.g. 50"></div>
         </div>
         <div class="row">
-          <div>
-            <label>Gender</label>
-            <select id="ch-gender">
-              <option value="Hen">Hen</option>
-              <option value="Rooster">Rooster</option>
-            </select>
-          </div>
-          <div><label>Date of birth</label><input type="date" id="ch-dob"></div>
+          <div><label>Age (weeks) from</label><input type="number" min="0" id="filter-age-from" oninput="onChickenFilterChange()" placeholder="e.g. 0"></div>
+          <div><label>Age (weeks) to</label><input type="number" min="0" id="filter-age-to" oninput="onChickenFilterChange()" placeholder="e.g. 100"></div>
         </div>
-        <div class="row">
-          <div><label>Expected eggs / year</label><input type="number" min="0" id="ch-expected" placeholder="e.g. 250"></div>
-        </div>
-        <button class="btn full" onclick="saveChicken()">Save chicken</button>
-        <button class="btn secondary full" id="ch-cancel-btn" style="display:none;margin-top:8px;" onclick="cancelEditChicken()">Cancel edit</button>
-        <div class="status" id="chicken-status"></div>
+        <button class="btn secondary full" onclick="clearChickenFilters()">Clear filters</button>
       </section>
 
       <section>
@@ -402,6 +421,23 @@
         <button class="btn full" onclick="changePassword()">Update password</button>
         <div class="status" id="account-status"></div>
       </section>
+
+      <section id="chicken-import-section">
+        <p class="sec-title">Import Chickens</p>
+        <p class="share-note" style="margin-bottom:10px;">Paste one chicken per line. Just a name works, or add details separated by commas: <code>Name, Tag, Tag Colour, Breed, Gender, DOB (YYYY-MM-DD), Expected Eggs/Year</code>.</p>
+        <textarea id="import-list-text" placeholder="Henrietta, 14, Red, Rhode Island Red, Hen, 2024-03-15, 280&#10;Clucky"></textarea>
+        <button class="btn full" style="margin-top:8px;" id="import-preview-btn" onclick="previewImportList()">Preview import</button>
+        <div class="status" id="import-status"></div>
+
+        <div id="import-preview-section" style="display:none;margin-top:14px;">
+          <p class="sec-title" id="import-preview-title">Preview</p>
+          <div id="import-preview-list"></div>
+          <div class="row" style="margin-top:6px;">
+            <div><button class="btn secondary full" onclick="cancelImportPreview()">Cancel</button></div>
+            <div><button class="btn full" id="import-confirm-btn" onclick="confirmImportList()">Confirm import</button></div>
+          </div>
+        </div>
+      </section>
     </div>
 
   </div>
@@ -430,6 +466,7 @@ let currentFlockOwnerId = null;
 let currentRole = 'owner';
 let state = { eggs: [], chickens: [], healthChecks: [] };
 let editingChickenId = null;
+let pendingImportPayloads = [];
 let hcSession = null; // { date, index, birds: [{ chickenId, chickenName, items: {} }] }
 
 function genId(){
@@ -894,6 +931,7 @@ function resetChickenForm(){
   document.getElementById('ch-expected').value = '';
   document.getElementById('chicken-form-title').textContent = 'Add a Chicken';
   document.getElementById('ch-cancel-btn').style.display = 'none';
+  document.getElementById('chicken-form-details').open = false;
 }
 
 async function saveChicken(){
@@ -933,37 +971,121 @@ function findBreedPreset(breedInput){
   return Object.keys(BREED_PRESETS).find(k => k.toLowerCase() === breedInput.trim().toLowerCase()) || null;
 }
 
-async function importChickensFromList(){
+function previewImportList(){
   const raw = document.getElementById('import-list-text').value;
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
   if(!lines.length){ setStatus('import-status', 'Paste at least one line.', true); return; }
 
-  const payloads = lines.map(line => {
+  pendingImportPayloads = lines.map(line => {
     const parts = line.split(',').map(p => p.trim());
-    const [name, tag, breedInput, genderInput, dob] = parts;
+    const [name, tag, tagColourInput, breedInput, genderInput, dob, expectedInput] = parts;
     const matchedBreed = findBreedPreset(breedInput);
     const breed = matchedBreed || breedInput || '';
-    const expected = matchedBreed ? BREED_PRESETS[matchedBreed] : 0;
+    const explicitExpected = expectedInput !== undefined && expectedInput !== '' ? Number(expectedInput) : null;
+    const expected = (explicitExpected != null && !isNaN(explicitExpected)) ? explicitExpected : (matchedBreed ? BREED_PRESETS[matchedBreed] : 0);
     return {
       owner_id: currentFlockOwnerId,
       name: name || 'Unnamed',
       tag: tag || '',
-      tag_colour: '',
+      tag_colour: tagColourInput || '',
       breed,
-      gender: genderInput && /rooster/i.test(genderInput) ? 'Rooster' : 'Hen',
+      gender: genderInput && /rooster|cockerel|cock\b|male/i.test(genderInput) ? 'Rooster' : 'Hen',
       dob: dob || null,
       expected_eggs_per_year: expected
     };
   });
 
-  const { error } = await sb.from('chickens').insert(payloads);
+  document.getElementById('import-preview-title').textContent = `Preview (${pendingImportPayloads.length} chicken${pendingImportPayloads.length > 1 ? 's' : ''})`;
+  document.getElementById('import-preview-list').innerHTML = pendingImportPayloads.map(p => `
+    <div class="import-preview-row">
+      <span class="name">${escapeHtml(p.name)}</span>
+      <span class="meta">${[p.tag_colour, p.tag].filter(Boolean).join(' ') || '&mdash;'} &middot; ${escapeHtml(p.breed || 'Unknown breed')} &middot; ${p.gender}${p.dob ? ' &middot; ' + formatDateNice(p.dob) : ''}${p.expected_eggs_per_year ? ' &middot; ' + p.expected_eggs_per_year + '/yr' : ''}</span>
+    </div>
+  `).join('');
+  document.getElementById('import-preview-section').style.display = 'block';
+  setStatus('import-status', '', false);
+}
+
+function cancelImportPreview(){
+  pendingImportPayloads = [];
+  document.getElementById('import-preview-section').style.display = 'none';
+}
+
+async function confirmImportList(){
+  if(!pendingImportPayloads.length) return;
+  const { error } = await sb.from('chickens').insert(pendingImportPayloads);
   if(error){ setStatus('import-status', error.message, true); return; }
 
+  const count = pendingImportPayloads.length;
   document.getElementById('import-list-text').value = '';
-  setStatus('import-status', `Imported ${payloads.length} chicken${payloads.length > 1 ? 's' : ''}.`, false);
+  document.getElementById('import-preview-section').style.display = 'none';
+  pendingImportPayloads = [];
+  setStatus('import-status', `Imported ${count} chicken${count > 1 ? 's' : ''}.`, false);
   await loadFlockData();
   renderChickens();
   renderHcSetupInfo();
+}
+
+// ---------- CHICKEN FILTERS ----------
+function ageInWeeks(dobStr){
+  if(!dobStr) return null;
+  const dob = new Date(dobStr + 'T00:00:00');
+  const now = new Date();
+  const diffDays = Math.floor((now - dob) / 86400000);
+  if(diffDays < 0) return null;
+  return diffDays / 7;
+}
+
+function populateTagColourFilterOptions(){
+  const sel = document.getElementById('filter-tag-colour');
+  const current = sel.value;
+  const colours = Array.from(new Set(state.chickens.map(c => c.tagColour).filter(Boolean))).sort();
+  sel.innerHTML = '<option value="">All</option>' + colours.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  sel.value = colours.includes(current) ? current : '';
+}
+
+function getChickenFilters(){
+  const num = (id) => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
+  return {
+    gender: document.getElementById('filter-gender').value,
+    tagColour: document.getElementById('filter-tag-colour').value,
+    tagFrom: num('filter-tag-from'),
+    tagTo: num('filter-tag-to'),
+    ageFrom: num('filter-age-from'),
+    ageTo: num('filter-age-to')
+  };
+}
+
+function chickenMatchesFilters(c, f){
+  if(f.gender && c.gender !== f.gender) return false;
+  if(f.tagColour && (c.tagColour || '') !== f.tagColour) return false;
+  if(f.tagFrom != null || f.tagTo != null){
+    const tagNum = c.tag !== '' && !isNaN(Number(c.tag)) ? Number(c.tag) : null;
+    if(tagNum == null) return false;
+    if(f.tagFrom != null && tagNum < f.tagFrom) return false;
+    if(f.tagTo != null && tagNum > f.tagTo) return false;
+  }
+  if(f.ageFrom != null || f.ageTo != null){
+    const w = ageInWeeks(c.dob);
+    if(w == null) return false;
+    if(f.ageFrom != null && w < f.ageFrom) return false;
+    if(f.ageTo != null && w > f.ageTo) return false;
+  }
+  return true;
+}
+
+function onChickenFilterChange(){
+  renderChickens();
+}
+
+function clearChickenFilters(){
+  document.getElementById('filter-gender').value = '';
+  document.getElementById('filter-tag-colour').value = '';
+  document.getElementById('filter-tag-from').value = '';
+  document.getElementById('filter-tag-to').value = '';
+  document.getElementById('filter-age-from').value = '';
+  document.getElementById('filter-age-to').value = '';
+  renderChickens();
 }
 
 function editChicken(id){
@@ -993,6 +1115,7 @@ function editChicken(id){
   document.getElementById('ch-expected').value = c.expectedEggsPerYear || '';
   document.getElementById('chicken-form-title').textContent = 'Edit Chicken';
   document.getElementById('ch-cancel-btn').style.display = 'block';
+  document.getElementById('chicken-form-details').open = true;
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1017,10 +1140,16 @@ function renderChickens(){
   document.getElementById('expected-total').textContent = totalExpected;
   document.getElementById('expected-total-week').textContent = (totalExpected / 52).toFixed(1);
 
+  populateTagColourFilterOptions();
+
   if(!state.chickens.length){ listEl.innerHTML = '<p class="empty">No chickens added yet.</p>'; return; }
 
+  const filters = getChickenFilters();
+  const filtered = state.chickens.filter(c => chickenMatchesFilters(c, filters));
+  if(!filtered.length){ listEl.innerHTML = '<p class="empty">No chickens match these filters.</p>'; return; }
+
   const readOnly = isReadOnly();
-  listEl.innerHTML = state.chickens.map(c => {
+  listEl.innerHTML = filtered.map(c => {
     const genderClass = c.gender === 'Rooster' ? 'rooster' : 'hen';
     const tagText = [c.tag, c.tagColour].filter(Boolean).join(' &middot; ') || '—';
     return `
