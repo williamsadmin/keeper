@@ -1840,12 +1840,20 @@ function renderHealthItems(itemState){
   }).join('');
 }
 
-function toggleInfo(key){
-  const el = document.getElementById('info-' + key);
-  const btn = document.getElementById('info-btn-' + key);
+function toggleInfoIds(infoId, btnId){
+  const el = document.getElementById(infoId);
+  const btn = document.getElementById(btnId);
   const open = el.style.display === 'block';
   el.style.display = open ? 'none' : 'block';
   btn.classList.toggle('open', !open);
+}
+
+function toggleInfo(key){
+  toggleInfoIds('info-' + key, 'info-btn-' + key);
+}
+
+function toggleEditInfo(editKey){
+  toggleInfoIds('edit-info-' + editKey, 'edit-info-btn-' + editKey);
 }
 
 function hcSetItemStatus(key, val){
@@ -2049,7 +2057,12 @@ function hcEditableItemsHtml(prefix, itemState){
         </div>`;
     return `
     <div class="hc-item ${isIssue ? 'flag-issue' : (isGood ? 'flag-good' : '')}" data-editkey="${editKey}">
-      <div class="hc-item-head"><span class="hc-item-name">${item.name}</span></div>
+      <div class="hc-item-head">
+        <span class="hc-item-name">${item.name}</span>
+        <button type="button" class="info-btn" id="edit-info-btn-${editKey}" onclick="toggleEditInfo('${editKey}')" aria-label="What to look out for">i</button>
+      </div>
+      <div class="hc-item-normal">${item.normal}</div>
+      <div class="hc-info" id="edit-info-${editKey}">${item.issue}</div>
       ${toggleHtml}
       <textarea class="hc-note" id="edit-note-${editKey}" placeholder="What did you notice?" style="display:${(isIssue || hcNoteAlwaysVisible(item)) ? 'block' : 'none'};" oninput="editHcNoteInput('${prefix}','${item.key}')">${escapeHtml(current.note || '')}</textarea>
     </div>`;
