@@ -508,6 +508,14 @@
         <div class="row">
           <div><label>Date</label><input type="date" id="hc-date"></div>
         </div>
+        <div class="row">
+          <div>
+            <label>Which coop?</label>
+            <select id="hc-coop-select">
+              <option value="">All coops</option>
+            </select>
+          </div>
+        </div>
         <button class="btn full" onclick="startHealthCheckSession()">Start health check</button>
         <div class="status" id="hc-setup-status"></div>
       </section>
@@ -516,6 +524,7 @@
         <p class="sec-title">Pick A Bird <span id="hc-progress-label"></span></p>
         <input type="text" id="hc-bird-search" placeholder="Type a name or tag number…" oninput="renderHcBirdMatches()">
         <div id="hc-bird-matches" style="margin-top:10px;"></div>
+        <button type="button" class="btn secondary full" id="hc-expand-all-coops-btn" style="display:none;margin-top:10px;" onclick="expandHcSessionToAllCoops()">Check all coops?</button>
         <button class="btn full" style="margin-top:12px;" onclick="finishHealthCheckSession()">Finish &amp; save</button>
         <div class="status" id="hc-picker-status"></div>
       </section>
@@ -1022,6 +1031,7 @@ function renderAll(){
   applyRolePermissions();
   renderEggs();
   populateCoopSelectOptions();
+  populateHcCoopSelectOptions();
   refreshFlockViews();
   if(document.getElementById('tab-chicken-detail').classList.contains('active')) switchTab('chickens');
   if(document.getElementById('tab-coop-detail').classList.contains('active')) switchTab('chickens');
@@ -1969,6 +1979,7 @@ async function addCoop(){
   await loadFlockData();
   renderCoopsList();
   populateCoopSelectOptions();
+  populateHcCoopSelectOptions();
   setStatus('coop-status', 'Added.', false);
 }
 
@@ -1979,6 +1990,7 @@ async function deleteCoop(id){
   await loadFlockData();
   renderCoopsList();
   populateCoopSelectOptions();
+  populateHcCoopSelectOptions();
 }
 
 async function renameCoop(){
@@ -1991,6 +2003,7 @@ async function renameCoop(){
   document.getElementById('coop-detail-name').textContent = name;
   renderCoopsList();
   populateCoopSelectOptions();
+  populateHcCoopSelectOptions();
   setStatus('coop-detail-status', 'Saved.', false);
 }
 
@@ -2020,16 +2033,35 @@ function chickenNameById(id){
   return c ? c.name : 'Deleted chicken';
 }
 
+function hcChickenPoolEntry(c){
+  return { id: c.id, name: c.name, tag: c.tag || '', tagColour: c.tagColour || '', gender: c.gender || '', dob: c.dob || '' };
+}
+
+function populateHcCoopSelectOptions(){
+  const sel = document.getElementById('hc-coop-select');
+  if(!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All coops</option>' +
+    state.coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('') +
+    '<option value="__unassigned">Unassigned</option>';
+  sel.value = (current === '' || current === '__unassigned' || state.coops.some(c => c.id === current)) ? current : '';
+}
+
 function startHealthCheckSession(){
   const date = document.getElementById('hc-date').value;
   if(!date){ setStatus('hc-setup-status', 'Pick a date.', true); return; }
 
+  const coopScope = document.getElementById('hc-coop-select').value;
   const living = state.chickens.filter(c => !c.isDeceased);
-  const pool = living.length
-    ? living.map(c => ({ id: c.id, name: c.name, tag: c.tag || '', tagColour: c.tagColour || '', gender: c.gender || '', dob: c.dob || '' }))
-    : [{ id: null, name: 'Whole flock', tag: '', tagColour: '', gender: '', dob: '' }];
+  const scoped = coopScope === ''
+    ? living
+    : living.filter(c => coopScope === '__unassigned' ? !c.coopId : c.coopId === coopScope);
 
-  hcSession = { date, pool, completed: [], current: null };
+  const pool = scoped.length
+    ? scoped.map(hcChickenPoolEntry)
+    : (living.length ? [] : [{ id: null, name: 'Whole flock', tag: '', tagColour: '', gender: '', dob: '' }]);
+
+  hcSession = { date, coopScope, pool, completed: [], current: null };
 
   document.getElementById('hc-setup-section').style.display = 'none';
   document.getElementById('hc-session-section').style.display = 'none';
@@ -2039,12 +2071,26 @@ function startHealthCheckSession(){
   renderHcBirdMatches();
 }
 
+function expandHcSessionToAllCoops(){
+  if(!hcSession || hcSession.coopScope === '') return;
+  const poolIds = new Set(hcSession.pool.map(c => String(c.id)));
+  const living = state.chickens.filter(c => !c.isDeceased);
+  living.forEach(c => {
+    if(!poolIds.has(String(c.id))) hcSession.pool.push(hcChickenPoolEntry(c));
+  });
+  hcSession.coopScope = '';
+  setStatus('hc-picker-status', 'Now checking all coops.', false);
+  renderHcBirdMatches();
+}
+
 function renderHcBirdMatches(){
   const q = document.getElementById('hc-bird-search').value.trim().toLowerCase();
   const doneIds = new Set(hcSession.completed.map(b => String(b.chickenId)));
   const remaining = hcSession.pool.filter(c => !doneIds.has(String(c.id)));
 
   document.getElementById('hc-progress-label').textContent = `(${hcSession.completed.length} of ${hcSession.pool.length} done)`;
+  const expandBtn = document.getElementById('hc-expand-all-coops-btn');
+  if(expandBtn) expandBtn.style.display = (hcSession.coopScope && hcSession.coopScope !== '') ? 'block' : 'none';
 
   const matches = q
     ? remaining.filter(c =>
@@ -2055,7 +2101,9 @@ function renderHcBirdMatches(){
 
   const el = document.getElementById('hc-bird-matches');
   if(!remaining.length){
-    el.innerHTML = '<p class="empty">All birds checked — tap Finish &amp; save below.</p>';
+    el.innerHTML = hcSession.pool.length
+      ? '<p class="empty">All birds checked — tap Finish &amp; save below.</p>'
+      : '<p class="empty">No birds in this coop yet — tap "Check all coops?" below to pick from everyone.</p>';
     return;
   }
   if(!matches.length){
