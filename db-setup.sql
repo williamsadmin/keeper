@@ -106,6 +106,50 @@ create table if not exists health_checks (
   created_at timestamptz not null default now()
 );
 
+-- ---------- Coops ----------
+create table if not exists coops (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table chickens add column if not exists coop_id uuid references coops(id) on delete set null;
+
+-- ---------- Sales ----------
+create table if not exists customers (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists sales (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  customer_id uuid references customers(id) on delete set null,
+  date date not null,
+  unit text not null default 'egg' check (unit in ('egg','half_dozen','dozen')),
+  quantity numeric not null default 0,
+  charged numeric not null default 0,
+  paid numeric not null default 0,
+  created_at timestamptz not null default now()
+);
+
+-- One row per flock owner. enabled/standard_unit/prices configured from the
+-- Account tab; readable/writable by anyone with flock access so collaborators
+-- see the same settings as the owner.
+create table if not exists sales_settings (
+  owner_id uuid primary key references auth.users(id) on delete cascade,
+  enabled boolean not null default false,
+  standard_unit text not null default 'dozen' check (standard_unit in ('egg','half_dozen','dozen')),
+  price_egg numeric not null default 0,
+  price_half_dozen numeric not null default 0,
+  price_dozen numeric not null default 0,
+  updated_at timestamptz not null default now()
+);
+
 -- ---------- Account deletion ----------
 -- Lets a signed-in user permanently delete their own account. All of
 -- profiles, collaborators (both as owner and as an accepted
@@ -131,6 +175,10 @@ alter table collaborators enable row level security;
 alter table eggs enable row level security;
 alter table chickens enable row level security;
 alter table health_checks enable row level security;
+alter table coops enable row level security;
+alter table customers enable row level security;
+alter table sales enable row level security;
+alter table sales_settings enable row level security;
 
 -- profiles: readable by any signed-in user (needed to resolve owner emails
 -- in the sharing UI); only the owner can update their own row.
@@ -181,3 +229,38 @@ drop policy if exists "hc update" on health_checks;
 create policy "hc update" on health_checks for update using (has_flock_access(owner_id, 'editor'));
 drop policy if exists "hc delete" on health_checks;
 create policy "hc delete" on health_checks for delete using (has_flock_access(owner_id, 'editor'));
+
+-- coops / customers / sales / sales_settings: same read/write shape, gated by role.
+drop policy if exists "coops read" on coops;
+create policy "coops read" on coops for select using (has_flock_access(owner_id));
+drop policy if exists "coops write" on coops;
+create policy "coops write" on coops for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "coops update" on coops;
+create policy "coops update" on coops for update using (has_flock_access(owner_id, 'editor'));
+drop policy if exists "coops delete" on coops;
+create policy "coops delete" on coops for delete using (has_flock_access(owner_id, 'editor'));
+
+drop policy if exists "customers read" on customers;
+create policy "customers read" on customers for select using (has_flock_access(owner_id));
+drop policy if exists "customers write" on customers;
+create policy "customers write" on customers for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "customers update" on customers;
+create policy "customers update" on customers for update using (has_flock_access(owner_id, 'editor'));
+drop policy if exists "customers delete" on customers;
+create policy "customers delete" on customers for delete using (has_flock_access(owner_id, 'editor'));
+
+drop policy if exists "sales read" on sales;
+create policy "sales read" on sales for select using (has_flock_access(owner_id));
+drop policy if exists "sales write" on sales;
+create policy "sales write" on sales for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "sales update" on sales;
+create policy "sales update" on sales for update using (has_flock_access(owner_id, 'editor'));
+drop policy if exists "sales delete" on sales;
+create policy "sales delete" on sales for delete using (has_flock_access(owner_id, 'editor'));
+
+drop policy if exists "sales_settings read" on sales_settings;
+create policy "sales_settings read" on sales_settings for select using (has_flock_access(owner_id));
+drop policy if exists "sales_settings write" on sales_settings;
+create policy "sales_settings write" on sales_settings for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "sales_settings update" on sales_settings;
+create policy "sales_settings update" on sales_settings for update using (has_flock_access(owner_id, 'editor'));

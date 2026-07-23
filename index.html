@@ -301,7 +301,7 @@
     <!-- CHICKENS TAB -->
     <div id="tab-chickens" class="tab-panel">
       <p class="eyebrow">The Flock</p>
-      <h1>Chickens</h1>
+      <h1>My Flock</h1>
       <p class="sub">Keep a record of every bird — breed, tag, age and how many eggs you can expect from them.</p>
 
       <section>
@@ -490,12 +490,21 @@
     <!-- SHARING TAB -->
     <div id="tab-sharing" class="tab-panel">
       <p class="eyebrow">Access</p>
-      <h1>Sharing</h1>
+      <h1>Share &amp; View</h1>
       <p class="sub">Give someone view-only access to your flock, or let them edit it too.</p>
 
       <section id="share-viewing-note" style="display:none;">
         <p class="sec-title">Access</p>
         <p class="share-note" id="share-viewing-note-text"></p>
+      </section>
+
+      <section id="share-default-flock-section" style="display:none;">
+        <p class="sec-title">Default Flock</p>
+        <p class="share-note" style="margin-bottom:10px;">Choose which flock this account sees first when logging in &mdash; handy if someone else should always land on a shared flock instead of their own.</p>
+        <div class="row">
+          <div><label>Open this flock by default</label><select id="default-flock-select" onchange="onDefaultFlockChange()"></select></div>
+        </div>
+        <div class="status" id="default-flock-status"></div>
       </section>
 
       <section id="share-manage-section" style="display:none;">
@@ -641,9 +650,9 @@ const MENU_TABS = [];
 
 const ALL_TABS = [
   { id: 'eggs', label: 'Egg Count' },
-  { id: 'chickens', label: 'Chickens' },
+  { id: 'chickens', label: 'My Flock' },
   { id: 'health', label: 'Health Checks' },
-  { id: 'sharing', label: 'Sharing' },
+  { id: 'sharing', label: 'Share & View' },
   { id: 'account', label: 'Account' }
 ];
 const DEFAULT_TOP_TABS = ['eggs', 'chickens', 'health'];
@@ -876,7 +885,8 @@ async function loadFlocks(){
   }
 
   if(!currentFlockOwnerId){
-    currentFlockOwnerId = currentUser.id;
+    const pref = loadDefaultFlockPref();
+    currentFlockOwnerId = (pref && flocks.some(f => f.ownerId === pref)) ? pref : currentUser.id;
   }
   const match = flocks.find(f => f.ownerId === currentFlockOwnerId);
   if(match){
@@ -885,6 +895,18 @@ async function loadFlocks(){
     currentFlockOwnerId = currentUser.id;
     currentRole = 'owner';
   }
+}
+
+function flockPrefStorageKey(){
+  return 'chickenKeeperDefaultFlock_' + (currentUser ? currentUser.id : 'anon');
+}
+
+function loadDefaultFlockPref(){
+  try{ return localStorage.getItem(flockPrefStorageKey()); } catch(e){ return null; }
+}
+
+function saveDefaultFlockPref(ownerId){
+  try{ localStorage.setItem(flockPrefStorageKey(), ownerId); } catch(e){}
 }
 
 function renderFlockSelector(){
@@ -2290,6 +2312,8 @@ function renderSharingTab(){
   document.getElementById('share-list-section').style.display = ownFlock ? 'block' : 'none';
   document.getElementById('share-viewing-note').style.display = ownFlock ? 'none' : 'block';
 
+  renderDefaultFlockSelector();
+
   if(!ownFlock){
     const f = flocks.find(x => x.ownerId === currentFlockOwnerId);
     const roleWord = f && f.role === 'editor' ? 'edit' : 'view-only';
@@ -2299,6 +2323,21 @@ function renderSharingTab(){
     return;
   }
   loadCollaborators();
+}
+
+function renderDefaultFlockSelector(){
+  const section = document.getElementById('share-default-flock-section');
+  const sel = document.getElementById('default-flock-select');
+  if(flocks.length <= 1){ section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  const pref = loadDefaultFlockPref() || currentUser.id;
+  sel.innerHTML = flocks.map(f => `<option value="${f.ownerId}" ${f.ownerId === pref ? 'selected' : ''}>${escapeHtml(f.label)}</option>`).join('');
+}
+
+function onDefaultFlockChange(){
+  const val = document.getElementById('default-flock-select').value;
+  saveDefaultFlockPref(val);
+  setStatus('default-flock-status', 'Saved — this flock will open automatically next time you log in.', false);
 }
 
 async function loadCollaborators(){
