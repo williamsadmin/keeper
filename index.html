@@ -314,7 +314,7 @@
       </section>
 
       <section>
-        <button class="btn full" id="add-chicken-btn" onclick="openChickenDetail(null)">+ Add a Chicken</button>
+        <button class="btn full" id="add-chicken-btn" onclick="openChickenDetail(null)">+ Add an Animal</button>
         <button class="btn secondary full" style="margin-top:8px;" onclick="switchTab('animal-search')">Search All Animals</button>
       </section>
 
@@ -405,7 +405,7 @@
       </section>
 
       <section>
-        <button class="btn full" id="add-chicken-to-coop-btn" onclick="addChickenToThisCoop()">+ Add a Chicken</button>
+        <button class="btn full" id="add-chicken-to-coop-btn" onclick="addChickenToThisCoop()">+ Add an Animal</button>
       </section>
 
       <section>
@@ -417,11 +417,11 @@
     <!-- CHICKEN DETAIL PAGE -->
     <div id="tab-chicken-detail" class="tab-panel">
       <button type="button" class="btn secondary" style="margin-bottom:14px;" onclick="closeChickenDetail()">&larr; Back</button>
-      <p class="eyebrow">Chicken Profile</p>
-      <h1 id="chicken-detail-name">Chicken</h1>
+      <p class="eyebrow">Animal Profile</p>
+      <h1 id="chicken-detail-name">Animal</h1>
 
       <section id="chicken-form-section">
-        <p class="sec-title" id="chicken-form-title">Add a Chicken</p>
+        <p class="sec-title" id="chicken-form-title">Add an Animal</p>
         <div class="row">
           <div><label>Name</label><input type="text" id="ch-name" placeholder="e.g. Henrietta"></div>
         </div>
@@ -480,12 +480,12 @@
         </div>
         <div class="checkbox-row">
           <input type="checkbox" id="ch-deceased" onchange="onDeceasedToggle()">
-          <label for="ch-deceased">This chicken has died</label>
+          <label for="ch-deceased">This animal has died</label>
         </div>
         <div class="row" id="ch-deceased-date-row" style="display:none;">
           <div><label>Deceased date</label><input type="date" id="ch-deceased-date"></div>
         </div>
-        <button class="btn full" onclick="saveChicken()">Save chicken</button>
+        <button class="btn full" onclick="saveChicken()">Save animal</button>
         <button class="btn secondary full" id="ch-cancel-btn" style="display:none;margin-top:8px;" onclick="cancelEditChicken()">Cancel edit</button>
         <div class="status" id="chicken-status"></div>
       </section>
@@ -1556,7 +1556,7 @@ function resetChickenForm(){
   document.getElementById('ch-deceased').checked = false;
   document.getElementById('ch-deceased-date').value = '';
   document.getElementById('ch-deceased-date-row').style.display = 'none';
-  document.getElementById('chicken-form-title').textContent = 'Add a Chicken';
+  document.getElementById('chicken-form-title').textContent = 'Add an Animal';
   document.getElementById('ch-cancel-btn').style.display = 'none';
 }
 
@@ -1926,7 +1926,7 @@ function editChicken(id){
   document.getElementById('ch-deceased').checked = !!c.isDeceased;
   document.getElementById('ch-deceased-date').value = c.deceasedDate || '';
   document.getElementById('ch-deceased-date-row').style.display = c.isDeceased ? 'flex' : 'none';
-  document.getElementById('chicken-form-title').textContent = 'Edit Chicken';
+  document.getElementById('chicken-form-title').textContent = 'Edit Animal';
   document.getElementById('ch-cancel-btn').style.display = 'block';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -1942,14 +1942,14 @@ function openChickenDetail(id, presetCoopId, returnTab){
   populateCoopSelectOptions();
   if(id){
     const c = state.chickens.find(x => x.id === id);
-    document.getElementById('chicken-detail-name').textContent = c ? c.name : 'Chicken';
+    document.getElementById('chicken-detail-name').textContent = c ? c.name : 'Animal';
     editChicken(id);
     document.getElementById('chicken-detail-history-section').style.display = 'block';
     renderChickenDetailHistory(id);
   } else {
     resetChickenForm();
     if(presetCoopId) document.getElementById('ch-coop').value = presetCoopId;
-    document.getElementById('chicken-detail-name').textContent = 'Add a Chicken';
+    document.getElementById('chicken-detail-name').textContent = 'Add an Animal';
     document.getElementById('chicken-detail-history-section').style.display = 'none';
   }
   switchTab('chicken-detail');
@@ -1969,7 +1969,7 @@ function closeChickenDetail(){
 }
 
 async function deleteChicken(id){
-  if(!confirm('Delete this chicken?')) return;
+  if(!confirm('Delete this animal?')) return;
   const { error } = await sb.from('chickens').delete().eq('id', id);
   if(error){ setStatus('chicken-status', error.message, true); return; }
   if(editingChickenId === id) resetChickenForm();
