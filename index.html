@@ -115,6 +115,8 @@
   /* Chickens */
   .chicken-card{background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;cursor:pointer;}
   .chicken-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;}
+  .chicken-card-head-main{display:flex;align-items:flex-start;gap:8px;}
+  .bird-select-checkbox{width:auto;flex-shrink:0;margin-top:3px;}
   .chicken-name{font-family:'Oswald',sans-serif;font-weight:600;font-size:16px;}
   .chicken-meta{font-size:12px;color:var(--text-dim);margin-top:2px;}
   .chicken-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;font-size:13px;}
@@ -315,7 +317,7 @@
 
       <section>
         <button class="btn full" id="add-chicken-btn" onclick="openChickenDetail(null)">+ Add an Animal</button>
-        <button class="btn secondary full" style="margin-top:8px;" onclick="switchTab('animal-search')">Search All Animals</button>
+        <button class="btn secondary full" style="margin-top:8px;" onclick="openAnimalSearch()">Search All Animals</button>
       </section>
 
       <section id="coop-add-form-section">
@@ -379,6 +381,21 @@
 
       <section>
         <p class="sec-title">Your Chickens</p>
+        <div id="bulk-move-bar" style="display:none;margin-bottom:12px;">
+          <div class="row">
+            <div>
+              <label>Move <span id="bulk-move-count">0</span> selected to</label>
+              <select id="bulk-move-coop-select">
+                <option value="">Unassigned</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div><button type="button" class="btn secondary full" onclick="clearBirdSelection()">Clear selection</button></div>
+            <div><button type="button" class="btn full" onclick="moveSelectedBirdsToCoop('bulk-move-coop-select','bulk-move-status')">Move</button></div>
+          </div>
+          <div class="status" id="bulk-move-status"></div>
+        </div>
         <div id="chicken-list"></div>
       </section>
 
@@ -410,6 +427,21 @@
 
       <section>
         <p class="sec-title">Birds In This Coop</p>
+        <div id="coop-bulk-move-bar" style="display:none;margin-bottom:12px;">
+          <div class="row">
+            <div>
+              <label>Move <span id="coop-bulk-move-count">0</span> selected to</label>
+              <select id="coop-bulk-move-coop-select">
+                <option value="">Unassigned</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div><button type="button" class="btn secondary full" onclick="clearBirdSelection()">Clear selection</button></div>
+            <div><button type="button" class="btn full" onclick="moveSelectedBirdsToCoop('coop-bulk-move-coop-select','coop-bulk-move-status')">Move</button></div>
+          </div>
+          <div class="status" id="coop-bulk-move-status"></div>
+        </div>
         <div id="coop-detail-list"></div>
       </section>
     </div>
@@ -1164,6 +1196,7 @@ function renderAll(){
   renderEggs();
   populateCoopSelectOptions();
   populateHcCoopSelectOptions();
+  selectedBirdIds.clear();
   refreshFlockViews();
   renderTabbar();
   if(document.getElementById('tab-chicken-detail').classList.contains('active')) switchTab('chickens');
@@ -1978,16 +2011,22 @@ async function deleteChicken(id){
   renderHcSetupInfo();
 }
 
-function chickenCardHtml(c, readOnly, returnTab){
+function chickenCardHtml(c, readOnly, returnTab, selectable){
   const isMale = isMaleGender(c.gender);
   const genderClass = isMale ? 'rooster' : 'hen';
   const tagText = [c.tag, c.tagColour].filter(Boolean).join(' &middot; ') || '—';
+  const checkboxHtml = (selectable && !readOnly)
+    ? `<input type="checkbox" class="bird-select-checkbox" onclick="event.stopPropagation();" onchange="toggleBirdSelection('${c.id}', this.checked)" ${selectedBirdIds.has(c.id) ? 'checked' : ''} aria-label="Select ${escapeHtml(c.name)}">`
+    : '';
   return `
     <div class="chicken-card ${c.isDeceased ? 'deceased' : ''}" onclick="openChickenDetail('${c.id}', null, '${returnTab || 'chickens'}')">
       <div class="chicken-card-head">
-        <div>
-          <div class="chicken-name">${escapeHtml(c.name)}<span class="gender-tag ${genderClass}">${escapeHtml(c.gender || 'Hen')}</span>${c.isDeceased ? '<span class="deceased-tag">Lost</span>' : ''}</div>
-          <div class="chicken-meta">${escapeHtml(c.animalType || 'Chicken')} &middot; ${escapeHtml(c.breed || 'Unknown breed')}</div>
+        <div class="chicken-card-head-main">
+          ${checkboxHtml}
+          <div>
+            <div class="chicken-name">${escapeHtml(c.name)}<span class="gender-tag ${genderClass}">${escapeHtml(c.gender || 'Hen')}</span>${c.isDeceased ? '<span class="deceased-tag">Lost</span>' : ''}</div>
+            <div class="chicken-meta">${escapeHtml(c.animalType || 'Chicken')} &middot; ${escapeHtml(c.breed || 'Unknown breed')}</div>
+          </div>
         </div>
         ${readOnly ? '' : `
         <div class="icon-row">
@@ -2020,6 +2059,7 @@ function renderChickens(){
 
   populateTagColourFilterOptions();
   populateAnimalFilterOptions();
+  populateBulkMoveCoopOptions();
 
   const readOnly = isReadOnly();
 
@@ -2029,7 +2069,7 @@ function renderChickens(){
     const filters = getChickenFilters();
     const filtered = sortChickens(activeChickens.filter(c => chickenMatchesFilters(c, filters)));
     listEl.innerHTML = filtered.length
-      ? filtered.map(c => chickenCardHtml(c, readOnly, 'animal-search')).join('')
+      ? filtered.map(c => chickenCardHtml(c, readOnly, 'animal-search', true)).join('')
       : '<p class="empty">No chickens match these filters.</p>';
   }
 
@@ -2037,6 +2077,7 @@ function renderChickens(){
   lossesEl.innerHTML = deceasedChickens.length
     ? sortChickens(deceasedChickens).map(c => chickenCardHtml(c, readOnly, 'animal-search')).join('')
     : '<p class="empty">No losses recorded.</p>';
+  renderBulkMoveBars();
 }
 
 function sortByTagAsc(list){
@@ -2059,6 +2100,58 @@ function populateCoopSelectOptions(){
   const current = sel.value;
   sel.innerHTML = '<option value="">Unassigned</option>' + state.coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
   sel.value = state.coops.some(c => c.id === current) ? current : '';
+}
+
+let selectedBirdIds = new Set();
+
+function toggleBirdSelection(id, checked){
+  if(checked) selectedBirdIds.add(id); else selectedBirdIds.delete(id);
+  renderBulkMoveBars();
+}
+
+function clearBirdSelection(){
+  selectedBirdIds.clear();
+  renderBulkMoveBars();
+  refreshFlockViews();
+}
+
+function renderBulkMoveBars(){
+  const count = selectedBirdIds.size;
+  ['bulk-move-bar', 'coop-bulk-move-bar'].forEach(id => {
+    const bar = document.getElementById(id);
+    if(bar) bar.style.display = count ? 'block' : 'none';
+  });
+  ['bulk-move-count', 'coop-bulk-move-count'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.textContent = count;
+  });
+}
+
+function populateBulkMoveCoopOptions(){
+  const html = '<option value="">Unassigned</option>' + state.coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  ['bulk-move-coop-select', 'coop-bulk-move-coop-select'].forEach(id => {
+    const sel = document.getElementById(id);
+    if(sel) sel.innerHTML = html;
+  });
+}
+
+async function moveSelectedBirdsToCoop(selectElId, statusElId){
+  if(!selectedBirdIds.size) return;
+  const coopVal = document.getElementById(selectElId).value;
+  const ids = Array.from(selectedBirdIds);
+  const { error } = await sb.from('chickens').update({ coop_id: coopVal || null }).in('id', ids);
+  if(error){ setStatus(statusElId, error.message, true); return; }
+  selectedBirdIds.clear();
+  await loadFlockData();
+  renderBulkMoveBars();
+  refreshFlockViews();
+  setStatus(statusElId, `Moved ${ids.length} bird${ids.length > 1 ? 's' : ''}.`, false);
+}
+
+function openAnimalSearch(){
+  selectedBirdIds.clear();
+  switchTab('animal-search');
+  renderChickens();
 }
 
 function coopCardHtml(coop, count, readOnly){
@@ -2104,12 +2197,15 @@ function renderCoopDetailList(){
   const readOnly = isReadOnly();
   const matches = state.chickens.filter(c => !c.isDeceased && (isUnassigned ? !c.coopId : c.coopId === currentCoopDetailId));
   el.innerHTML = matches.length
-    ? sortByTagAsc(matches).map(c => chickenCardHtml(c, readOnly, 'coop-detail')).join('')
+    ? sortByTagAsc(matches).map(c => chickenCardHtml(c, readOnly, 'coop-detail', true)).join('')
     : '<p class="empty">No birds in this coop.</p>';
+  populateBulkMoveCoopOptions();
+  renderBulkMoveBars();
 }
 
 function openCoopDetail(id){
   currentCoopDetailId = id;
+  selectedBirdIds.clear();
   const isUnassigned = id === '__unassigned';
   const coop = isUnassigned ? null : state.coops.find(c => c.id === id);
   document.getElementById('coop-detail-name').textContent = isUnassigned ? 'Unassigned' : (coop ? coop.name : 'Coop');
