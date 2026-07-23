@@ -116,6 +116,19 @@ create table if not exists coops (
 
 alter table chickens add column if not exists coop_id uuid references coops(id) on delete set null;
 
+-- ---------- Breeds ----------
+-- User-defined breed presets per animal type, shown alongside the app's
+-- built-in chicken breed list when picking a breed on the animal form.
+create table if not exists breeds (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  animal_type text not null default 'Chicken',
+  name text not null,
+  expected_eggs_per_year int not null default 0,
+  egg_colour text,
+  created_at timestamptz not null default now()
+);
+
 -- ---------- Sales ----------
 create table if not exists customers (
   id uuid primary key default gen_random_uuid(),
@@ -176,6 +189,7 @@ alter table eggs enable row level security;
 alter table chickens enable row level security;
 alter table health_checks enable row level security;
 alter table coops enable row level security;
+alter table breeds enable row level security;
 alter table customers enable row level security;
 alter table sales enable row level security;
 alter table sales_settings enable row level security;
@@ -239,6 +253,15 @@ drop policy if exists "coops update" on coops;
 create policy "coops update" on coops for update using (has_flock_access(owner_id, 'editor'));
 drop policy if exists "coops delete" on coops;
 create policy "coops delete" on coops for delete using (has_flock_access(owner_id, 'editor'));
+
+drop policy if exists "breeds read" on breeds;
+create policy "breeds read" on breeds for select using (has_flock_access(owner_id));
+drop policy if exists "breeds write" on breeds;
+create policy "breeds write" on breeds for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "breeds update" on breeds;
+create policy "breeds update" on breeds for update using (has_flock_access(owner_id, 'editor'));
+drop policy if exists "breeds delete" on breeds;
+create policy "breeds delete" on breeds for delete using (has_flock_access(owner_id, 'editor'));
 
 drop policy if exists "customers read" on customers;
 create policy "customers read" on customers for select using (has_flock_access(owner_id));

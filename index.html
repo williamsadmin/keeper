@@ -594,6 +594,50 @@
       </section>
     </div>
 
+    <!-- BREEDS TAB -->
+    <div id="tab-breeds" class="tab-panel">
+      <p class="eyebrow">Reference</p>
+      <h1>Breeds</h1>
+      <p class="sub">Add and edit breed presets per animal type — typical eggs per year and egg colour.</p>
+
+      <section id="breed-form-section">
+        <p class="sec-title" id="breed-form-title">Add A Breed</p>
+        <div class="row">
+          <div><label>Name</label><input type="text" id="breed-name" placeholder="e.g. Cream Legbar"></div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Animal</label>
+            <select id="breed-animal" onchange="onBreedAnimalChange()">
+              <option value="Chicken">Chicken</option>
+              <option value="Duck">Duck</option>
+              <option value="Quail">Quail</option>
+              <option value="Goose">Goose</option>
+              <option value="Turkey">Turkey</option>
+              <option value="Guinea Fowl">Guinea Fowl</option>
+              <option value="Swan">Swan</option>
+              <option value="__custom">Other (type below)</option>
+            </select>
+          </div>
+        </div>
+        <div class="row" id="breed-animal-custom-row" style="display:none;">
+          <div><label>Animal name</label><input type="text" id="breed-animal-custom" placeholder="e.g. Peacock"></div>
+        </div>
+        <div class="row">
+          <div><label>Expected eggs / year</label><input type="number" min="0" id="breed-expected" placeholder="e.g. 250"></div>
+          <div><label>Egg colour</label><input type="text" id="breed-egg-colour" placeholder="e.g. Blue"></div>
+        </div>
+        <button class="btn full" onclick="saveBreed()">Save breed</button>
+        <button class="btn secondary full" id="breed-cancel-btn" style="display:none;margin-top:8px;" onclick="cancelEditBreed()">Cancel edit</button>
+        <div class="status" id="breed-status"></div>
+      </section>
+
+      <section>
+        <p class="sec-title">Your Breeds</p>
+        <div id="breeds-list"></div>
+      </section>
+    </div>
+
     <!-- SALES TAB -->
     <div id="tab-sales" class="tab-panel">
       <p class="eyebrow">Sales</p>
@@ -748,8 +792,14 @@
 
       <section>
         <p class="sec-title">Top Tabs</p>
-        <p class="share-note" style="margin-bottom:10px;">Choose the 3 tabs shown along the top. Everything else moves into the &#9776; menu.</p>
-        <div id="tab-layout-options"></div>
+        <p class="share-note" style="margin-bottom:10px;">Choose which tab shows in each spot along the top. Everything else moves into the &#9776; menu.</p>
+        <div class="row">
+          <div><label>Tab 1</label><select id="tabpos-0" onchange="onTabPositionChange(0)"></select></div>
+          <div><label>Tab 2</label><select id="tabpos-1" onchange="onTabPositionChange(1)"></select></div>
+        </div>
+        <div class="row">
+          <div><label>Tab 3</label><select id="tabpos-2" onchange="onTabPositionChange(2)"></select></div>
+        </div>
         <div class="status" id="tab-layout-status"></div>
       </section>
 
@@ -831,7 +881,8 @@ let isSignup = false;
 let flocks = []; // [{ ownerId, label, role: 'owner'|'editor'|'viewer' }]
 let currentFlockOwnerId = null;
 let currentRole = 'owner';
-let state = { eggs: [], chickens: [], healthChecks: [], coops: [], customers: [], sales: [], salesSettings: null };
+let state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], salesSettings: null };
+let editingBreedId = null;
 let currentCustomerDetailId = null;
 let editingCustomerId = null;
 let editingSaleId = null;
@@ -880,6 +931,7 @@ const ALL_TABS = [
   { id: 'eggs', label: 'Egg Count' },
   { id: 'chickens', label: 'My Flock' },
   { id: 'health', label: 'Health Checks' },
+  { id: 'breeds', label: 'Breeds' },
   { id: 'sales', label: 'Sales' },
   { id: 'sharing', label: 'Share & View' },
   { id: 'account', label: 'Account' }
@@ -932,31 +984,42 @@ function renderTabbar(){
   switchTab(validTab);
 }
 
-function renderTabLayoutOptions(){
-  const el = document.getElementById('tab-layout-options');
-  if(!el) return;
-  el.innerHTML = visibleAllTabs().map(t => {
-    const checked = topTabs.includes(t.id);
-    const disable = !checked && topTabs.length >= 3;
-    return `
-    <div class="checkbox-row">
-      <input type="checkbox" id="tabopt-${t.id}" ${checked ? 'checked' : ''} ${disable ? 'disabled' : ''} onchange="onTabLayoutCheckboxChange('${t.id}', this.checked)">
-      <label for="tabopt-${t.id}">${t.label}</label>
-    </div>`;
-  }).join('');
+function ensureThreeTopTabs(){
+  const ids = visibleAllTabs().map(t => t.id);
+  const filled = topTabs.filter(id => ids.includes(id));
+  for(const id of ids){
+    if(filled.length >= 3) break;
+    if(!filled.includes(id)) filled.push(id);
+  }
+  topTabs = filled.slice(0, 3);
 }
 
-function onTabLayoutCheckboxChange(tabId, checked){
-  if(checked){
-    if(!topTabs.includes(tabId) && topTabs.length < 3) topTabs.push(tabId);
-  } else {
-    topTabs = topTabs.filter(id => id !== tabId);
+function renderTabLayoutOptions(){
+  const sel0 = document.getElementById('tabpos-0');
+  if(!sel0) return;
+  ensureThreeTopTabs();
+  const tabs = visibleAllTabs();
+  const optionsHtml = tabs.map(t => `<option value="${t.id}">${t.label}</option>`).join('');
+  for(let i = 0; i < 3; i++){
+    const sel = document.getElementById('tabpos-' + i);
+    if(!sel) continue;
+    sel.innerHTML = optionsHtml;
+    sel.value = topTabs[i];
   }
+}
+
+function onTabPositionChange(index){
+  const sel = document.getElementById('tabpos-' + index);
+  const newVal = sel.value;
+  const existingIndex = topTabs.indexOf(newVal);
+  if(existingIndex !== -1 && existingIndex !== index){
+    topTabs[existingIndex] = topTabs[index];
+  }
+  topTabs[index] = newVal;
   saveTabLayout();
   renderTabLayoutOptions();
   renderTabbar();
-  const remaining = 3 - topTabs.length;
-  setStatus('tab-layout-status', remaining > 0 ? `Pick ${remaining} more tab${remaining === 1 ? '' : 's'}.` : 'Saved.', remaining > 0);
+  setStatus('tab-layout-status', 'Saved.', false);
 }
 
 function switchTab(tab){
@@ -965,6 +1028,7 @@ function switchTab(tab){
   const menuBtn = document.getElementById('menu-toggle-btn');
   if(menuBtn) menuBtn.classList.toggle('active', MENU_TABS.includes(tab));
   closeMenu();
+  if(tab === 'breeds') renderBreedsList();
   if(tab === 'sales') renderSalesTab();
   if(tab === 'sharing') renderSharingTab();
   if(tab === 'account') renderAccountTab();
@@ -1194,6 +1258,7 @@ function applyRolePermissions(){
   document.getElementById('add-customer-btn').style.display = readOnly ? 'none' : 'block';
   document.getElementById('sales-settings-section').style.display = readOnly ? 'none' : 'block';
   document.getElementById('customer-form-section').style.display = readOnly ? 'none' : 'block';
+  document.getElementById('breed-form-section').style.display = readOnly ? 'none' : 'block';
 }
 
 function renderHcSetupInfo(){
@@ -1242,6 +1307,12 @@ function rowToChicken(r){
 }
 function rowToHealthCheck(r){ return { id: r.id, date: r.date, chickenId: r.chicken_id, items: r.items || [] }; }
 function rowToCoop(r){ return { id: r.id, name: r.name }; }
+function rowToBreed(r){
+  return {
+    id: r.id, name: r.name, animalType: r.animal_type,
+    expectedEggsPerYear: Number(r.expected_eggs_per_year) || 0, eggColour: r.egg_colour || ''
+  };
+}
 function rowToCustomer(r){ return { id: r.id, name: r.name, notes: r.notes || '' }; }
 function rowToSale(r){
   return {
@@ -1258,11 +1329,12 @@ function rowToSalesSettings(r){
 }
 
 async function loadFlockData(){
-  const [eggsRes, chickensRes, hcRes, coopsRes, customersRes, salesRes, salesSettingsRes] = await Promise.all([
+  const [eggsRes, chickensRes, hcRes, coopsRes, breedsRes, customersRes, salesRes, salesSettingsRes] = await Promise.all([
     sb.from('eggs').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
     sb.from('chickens').select('*').eq('owner_id', currentFlockOwnerId).order('created_at'),
     sb.from('health_checks').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
     sb.from('coops').select('*').eq('owner_id', currentFlockOwnerId).order('name'),
+    sb.from('breeds').select('*').eq('owner_id', currentFlockOwnerId).order('name'),
     sb.from('customers').select('*').eq('owner_id', currentFlockOwnerId).order('name'),
     sb.from('sales').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
     sb.from('sales_settings').select('*').eq('owner_id', currentFlockOwnerId).maybeSingle()
@@ -1271,6 +1343,7 @@ async function loadFlockData(){
   state.chickens = (chickensRes.data || []).map(rowToChicken);
   state.healthChecks = (hcRes.data || []).map(rowToHealthCheck);
   state.coops = (coopsRes.data || []).map(rowToCoop);
+  state.breeds = (breedsRes.data || []).map(rowToBreed);
   state.customers = (customersRes.data || []).map(rowToCustomer);
   state.sales = (salesRes.data || []).map(rowToSale);
   state.salesSettings = rowToSalesSettings(salesSettingsRes.data);
@@ -1489,12 +1562,22 @@ const BREED_PRESETS = {
   'Hybrid / Warren / ISA Brown': 300
 };
 
-function populateBreedOptions(){
+function allBreedsForAnimal(animalType){
+  const builtin = animalType === 'Chicken'
+    ? Object.keys(BREED_PRESETS).map(name => ({ name, animalType: 'Chicken', expectedEggsPerYear: BREED_PRESETS[name], eggColour: '', builtin: true }))
+    : [];
+  const custom = state.breeds.filter(b => b.animalType === animalType);
+  return [...builtin, ...custom];
+}
+
+function populateBreedOptions(animalType, preferredValue){
   const sel = document.getElementById('ch-breed');
+  const breeds = allBreedsForAnimal(animalType || 'Chicken');
   let html = '<option value="">Select breed…</option>';
-  Object.keys(BREED_PRESETS).forEach(b => { html += `<option value="${escapeHtml(b)}">${escapeHtml(b)} (~${BREED_PRESETS[b]}/yr)</option>`; });
+  breeds.forEach(b => { html += `<option value="${escapeHtml(b.name)}">${escapeHtml(b.name)}${b.expectedEggsPerYear ? ' (~' + b.expectedEggsPerYear + '/yr)' : ''}</option>`; });
   html += '<option value="__custom">Other (type below)</option>';
   sel.innerHTML = html;
+  sel.value = breeds.some(b => b.name === preferredValue) ? preferredValue : '';
 }
 
 function onBreedChange(){
@@ -1502,9 +1585,121 @@ function onBreedChange(){
   const customRow = document.getElementById('ch-breed-custom-row');
   if(sel === '__custom'){ customRow.style.display = 'flex'; return; }
   customRow.style.display = 'none';
-  if(sel && BREED_PRESETS[sel] != null){
-    document.getElementById('ch-expected').value = BREED_PRESETS[sel];
+  if(!sel) return;
+  const animalSel = document.getElementById('ch-animal').value;
+  const animalType = animalSel === '__custom' ? (document.getElementById('ch-animal-custom').value.trim() || 'Chicken') : animalSel;
+  const match = allBreedsForAnimal(animalType).find(b => b.name === sel);
+  if(match){
+    if(match.expectedEggsPerYear) document.getElementById('ch-expected').value = match.expectedEggsPerYear;
+    if(match.eggColour) document.getElementById('ch-egg-colour').value = match.eggColour;
   }
+}
+
+// ---------- BREEDS TAB ----------
+function onBreedAnimalChange(){
+  const sel = document.getElementById('breed-animal').value;
+  document.getElementById('breed-animal-custom-row').style.display = sel === '__custom' ? 'flex' : 'none';
+}
+
+function resetBreedForm(){
+  editingBreedId = null;
+  document.getElementById('breed-name').value = '';
+  document.getElementById('breed-animal').value = 'Chicken';
+  document.getElementById('breed-animal-custom-row').style.display = 'none';
+  document.getElementById('breed-animal-custom').value = '';
+  document.getElementById('breed-expected').value = '';
+  document.getElementById('breed-egg-colour').value = '';
+  document.getElementById('breed-form-title').textContent = 'Add A Breed';
+  document.getElementById('breed-cancel-btn').style.display = 'none';
+}
+
+async function saveBreed(){
+  const name = document.getElementById('breed-name').value.trim();
+  if(!name){ setStatus('breed-status', 'Enter a breed name.', true); return; }
+  const animalSel = document.getElementById('breed-animal').value;
+  const animalType = animalSel === '__custom' ? (document.getElementById('breed-animal-custom').value.trim() || 'Chicken') : animalSel;
+  const payload = {
+    name,
+    animal_type: animalType,
+    expected_eggs_per_year: Number(document.getElementById('breed-expected').value) || 0,
+    egg_colour: document.getElementById('breed-egg-colour').value.trim()
+  };
+  let error;
+  if(editingBreedId){
+    ({ error } = await sb.from('breeds').update(payload).eq('id', editingBreedId));
+  } else {
+    ({ error } = await sb.from('breeds').insert({ ...payload, owner_id: currentFlockOwnerId }));
+  }
+  if(error){ setStatus('breed-status', error.message, true); return; }
+  await loadFlockData();
+  resetBreedForm();
+  renderBreedsList();
+  setStatus('breed-status', 'Saved.', false);
+}
+
+function editBreed(id){
+  const b = state.breeds.find(x => x.id === id);
+  if(!b) return;
+  editingBreedId = id;
+  document.getElementById('breed-name').value = b.name;
+  const animalSel = document.getElementById('breed-animal');
+  const hasPreset = Array.from(animalSel.options).some(o => o.value === b.animalType);
+  if(hasPreset){
+    animalSel.value = b.animalType;
+    document.getElementById('breed-animal-custom-row').style.display = 'none';
+  } else {
+    animalSel.value = '__custom';
+    document.getElementById('breed-animal-custom-row').style.display = 'flex';
+    document.getElementById('breed-animal-custom').value = b.animalType;
+  }
+  document.getElementById('breed-expected').value = b.expectedEggsPerYear || '';
+  document.getElementById('breed-egg-colour').value = b.eggColour || '';
+  document.getElementById('breed-form-title').textContent = 'Edit Breed';
+  document.getElementById('breed-cancel-btn').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelEditBreed(){
+  resetBreedForm();
+}
+
+async function deleteBreed(id){
+  if(!confirm('Delete this breed?')) return;
+  const { error } = await sb.from('breeds').delete().eq('id', id);
+  if(error){ setStatus('breed-status', error.message, true); return; }
+  if(editingBreedId === id) resetBreedForm();
+  await loadFlockData();
+  renderBreedsList();
+}
+
+function breedCardHtml(b, readOnly){
+  const isBuiltin = !!b.builtin;
+  return `
+    <div class="chicken-card" ${isBuiltin ? 'style="cursor:default;"' : `onclick="editBreed('${b.id}')"`}>
+      <div class="chicken-card-head">
+        <div>
+          <div class="chicken-name">${escapeHtml(b.name)}${isBuiltin ? '<span class="gender-tag hen">Built-in</span>' : ''}</div>
+          <div class="chicken-meta">${escapeHtml(b.animalType)}</div>
+        </div>
+        ${(!isBuiltin && !readOnly) ? `
+        <div class="icon-row">
+          <button class="icon-btn danger" onclick="event.stopPropagation(); deleteBreed('${b.id}')" aria-label="Delete">&#10005;</button>
+        </div>` : ''}
+      </div>
+      <div class="chicken-grid">
+        <div><span class="chicken-label">Expected eggs / yr</span><span>${b.expectedEggsPerYear || '—'}</span></div>
+        <div><span class="chicken-label">Egg colour</span><span>${escapeHtml(b.eggColour) || '—'}</span></div>
+      </div>
+    </div>`;
+}
+
+function renderBreedsList(){
+  const el = document.getElementById('breeds-list');
+  if(!el) return;
+  const readOnly = isReadOnly();
+  const builtin = Object.keys(BREED_PRESETS).map(name => ({ id: 'builtin-' + name, name, animalType: 'Chicken', expectedEggsPerYear: BREED_PRESETS[name], eggColour: '', builtin: true }));
+  const all = [...builtin, ...state.breeds].sort((a, b) => a.animalType === b.animalType ? a.name.localeCompare(b.name) : a.animalType.localeCompare(b.animalType));
+  el.innerHTML = all.length ? all.map(b => breedCardHtml(b, readOnly)).join('') : '<p class="empty">No breeds yet.</p>';
 }
 
 const GENDER_OPTIONS = {
@@ -1559,6 +1754,9 @@ function onAnimalChange(){
   const animalType = sel === '__custom' ? (document.getElementById('ch-animal-custom').value.trim() || 'Chicken') : sel;
   populateGenderOptions(animalType, document.getElementById('ch-gender').value);
   onGenderChange();
+  populateBreedOptions(animalType, '');
+  document.getElementById('ch-breed-custom-row').style.display = 'none';
+  document.getElementById('ch-breed-custom').value = '';
 }
 
 function calcAge(dobStr){
@@ -1590,7 +1788,7 @@ function resetChickenForm(){
   document.getElementById('ch-animal').value = 'Chicken';
   document.getElementById('ch-animal-custom-row').style.display = 'none';
   document.getElementById('ch-animal-custom').value = '';
-  document.getElementById('ch-breed').value = '';
+  populateBreedOptions('Chicken', '');
   document.getElementById('ch-breed-custom-row').style.display = 'none';
   document.getElementById('ch-breed-custom').value = '';
   populateGenderOptions('Chicken', 'Hen');
@@ -1949,17 +2147,13 @@ function editChicken(id){
     document.getElementById('ch-animal-custom').value = animalValue;
   }
 
+  populateBreedOptions(animalValue, c.breed || '');
   const breedSel = document.getElementById('ch-breed');
-  const hasPreset = Array.from(breedSel.options).some(o => o.value === c.breed);
-  if(c.breed && hasPreset){
-    breedSel.value = c.breed;
-    document.getElementById('ch-breed-custom-row').style.display = 'none';
-  } else if(c.breed){
+  if(c.breed && breedSel.value !== c.breed){
     breedSel.value = '__custom';
     document.getElementById('ch-breed-custom-row').style.display = 'flex';
     document.getElementById('ch-breed-custom').value = c.breed;
   } else {
-    breedSel.value = '';
     document.getElementById('ch-breed-custom-row').style.display = 'none';
   }
 
@@ -3327,7 +3521,7 @@ document.getElementById('pwa-install-btn').addEventListener('click', async () =>
 function init(){
   document.getElementById('egg-date').value = todayStr();
   document.getElementById('hc-date').value = todayStr();
-  populateBreedOptions();
+  populateBreedOptions('Chicken', '');
   populateGenderOptions('Chicken', 'Hen');
   onGenderChange();
   registerSW();
