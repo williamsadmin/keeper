@@ -97,6 +97,7 @@
   /* Egg count */
   .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;}
   .stat-card{background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;padding:12px;}
+  .reminder-banner{background:var(--amber-dim);border:1px solid var(--amber);color:var(--amber);border-radius:8px;padding:12px 14px;font-weight:600;font-size:14px;margin-bottom:16px;}
   .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin-bottom:6px;}
   .stat-main{font-family:'Oswald',sans-serif;font-size:28px;font-weight:600;color:var(--amber);line-height:1;}
   .stat-sub{font-size:11px;color:var(--text-dim);margin:2px 0 8px;}
@@ -248,6 +249,8 @@
       <p class="eyebrow">Egg Count</p>
       <h1>Daily Eggs</h1>
       <p class="sub">Log today's total and any cracked or deformed eggs. Totals and averages update automatically.</p>
+
+      <div class="reminder-banner" id="egg-today-reminder" style="display:none;">Egg count needs doing today! &#x1F95A;</div>
 
       <section id="egg-form-section">
         <p class="sec-title">Log Eggs</p>
@@ -1019,10 +1022,18 @@ function renderEggLog(){
 }
 
 function renderEggs(){
+  renderEggReminder();
   renderEggStats();
   renderEggLog();
   initHistoryDefaults();
   renderHistoryStats();
+}
+
+function renderEggReminder(){
+  const el = document.getElementById('egg-today-reminder');
+  if(!el) return;
+  const hasToday = state.eggs.some(e => e.date === todayStr());
+  el.style.display = hasToday ? 'none' : 'block';
 }
 
 // ---------- EGG HISTORY BROWSER ----------
