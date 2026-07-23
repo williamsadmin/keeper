@@ -298,7 +298,7 @@
       </section>
     </div>
 
-    <!-- CHICKENS TAB -->
+    <!-- CHICKENS TAB (MY FLOCK LANDING) -->
     <div id="tab-chickens" class="tab-panel">
       <p class="eyebrow">The Flock</p>
       <h1>My Flock</h1>
@@ -315,7 +315,30 @@
 
       <section>
         <button class="btn full" id="add-chicken-btn" onclick="openChickenDetail(null)">+ Add a Chicken</button>
+        <button class="btn secondary full" style="margin-top:8px;" onclick="switchTab('animal-search')">Search All Animals</button>
       </section>
+
+      <section id="coop-add-form-section">
+        <p class="sec-title">Add A Coop</p>
+        <div class="row">
+          <div><input type="text" id="new-coop-name" placeholder="e.g. Main Coop"></div>
+        </div>
+        <button class="btn full" onclick="addCoop()">+ Add Coop</button>
+        <div class="status" id="coop-status"></div>
+      </section>
+
+      <section>
+        <p class="sec-title">Coops</p>
+        <div id="coops-list"></div>
+      </section>
+    </div>
+
+    <!-- ALL ANIMALS SEARCH PAGE -->
+    <div id="tab-animal-search" class="tab-panel">
+      <button type="button" class="btn secondary" style="margin-bottom:14px;" onclick="switchTab('chickens')">&larr; Back to My Flock</button>
+      <p class="eyebrow">All Animals</p>
+      <h1>Search &amp; Filter</h1>
+      <p class="sub">Every bird across every coop, filterable and sortable.</p>
 
       <section id="chicken-filter-section">
         <p class="sec-title">Filter &amp; Sort</p>
@@ -367,9 +390,33 @@
       </section>
     </div>
 
+    <!-- COOP DETAIL PAGE -->
+    <div id="tab-coop-detail" class="tab-panel">
+      <button type="button" class="btn secondary" style="margin-bottom:14px;" onclick="closeCoopDetail()">&larr; Back to My Flock</button>
+      <p class="eyebrow">Coop</p>
+      <h1 id="coop-detail-name">Coop</h1>
+
+      <section id="coop-rename-section">
+        <div class="row">
+          <div><label>Coop name</label><input type="text" id="coop-detail-name-input"></div>
+        </div>
+        <button class="btn secondary full" onclick="renameCoop()">Rename coop</button>
+        <div class="status" id="coop-detail-status"></div>
+      </section>
+
+      <section>
+        <button class="btn full" id="add-chicken-to-coop-btn" onclick="addChickenToThisCoop()">+ Add a Chicken</button>
+      </section>
+
+      <section>
+        <p class="sec-title">Birds In This Coop</p>
+        <div id="coop-detail-list"></div>
+      </section>
+    </div>
+
     <!-- CHICKEN DETAIL PAGE -->
     <div id="tab-chicken-detail" class="tab-panel">
-      <button type="button" class="btn secondary" style="margin-bottom:14px;" onclick="closeChickenDetail()">&larr; Back to Chickens</button>
+      <button type="button" class="btn secondary" style="margin-bottom:14px;" onclick="closeChickenDetail()">&larr; Back</button>
       <p class="eyebrow">Chicken Profile</p>
       <h1 id="chicken-detail-name">Chicken</h1>
 
@@ -381,6 +428,14 @@
         <div class="row">
           <div><label>Leg / tag number</label><input type="text" id="ch-tag" placeholder="e.g. 14"></div>
           <div><label>Tag colour</label><input type="text" id="ch-tag-colour" placeholder="e.g. Red"></div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Coop</label>
+            <select id="ch-coop">
+              <option value="">Unassigned</option>
+            </select>
+          </div>
         </div>
         <div class="row">
           <div>
@@ -608,9 +663,11 @@ let isSignup = false;
 let flocks = []; // [{ ownerId, label, role: 'owner'|'editor'|'viewer' }]
 let currentFlockOwnerId = null;
 let currentRole = 'owner';
-let state = { eggs: [], chickens: [], healthChecks: [] };
+let state = { eggs: [], chickens: [], healthChecks: [], coops: [] };
 let editingChickenId = null;
 let currentDetailChickenId = null;
+let currentCoopDetailId = null; // real coop id, '__unassigned', or null
+let chickenDetailReturnTab = 'chickens';
 let editingHc = null; // { prefix, recordId, chickenId, items: {key: {status, note}} } | null
 let pendingImportPayloads = [];
 let hcSession = null; // { date, pool: [{id,name,tag}], completed: [{chickenId,chickenName,items}], current: {chickenId,chickenName,items} | null }
@@ -945,6 +1002,8 @@ function applyRolePermissions(){
   document.getElementById('chicken-import-section').style.display = readOnly ? 'none' : 'block';
   document.getElementById('chicken-form-section').style.display = readOnly ? 'none' : 'block';
   document.getElementById('add-chicken-btn').style.display = readOnly ? 'none' : 'block';
+  document.getElementById('add-chicken-to-coop-btn').style.display = readOnly ? 'none' : 'block';
+  document.getElementById('coop-add-form-section').style.display = readOnly ? 'none' : 'block';
   document.getElementById('hc-setup-section').style.display = readOnly ? 'none' : 'block';
   if(readOnly){
     document.getElementById('hc-picker-section').style.display = 'none';
@@ -962,9 +1021,12 @@ function renderHcSetupInfo(){
 function renderAll(){
   applyRolePermissions();
   renderEggs();
-  renderChickens();
+  populateCoopSelectOptions();
+  refreshFlockViews();
   if(document.getElementById('tab-chicken-detail').classList.contains('active')) switchTab('chickens');
+  if(document.getElementById('tab-coop-detail').classList.contains('active')) switchTab('chickens');
   currentDetailChickenId = null;
+  currentCoopDetailId = null;
   editingHc = null;
   hcSession = null;
   document.getElementById('hc-setup-section').style.display = isReadOnly() ? 'none' : 'block';
@@ -983,20 +1045,24 @@ function rowToChicken(r){
     id: r.id, name: r.name, tag: r.tag, tagColour: r.tag_colour, breed: r.breed,
     animalType: r.animal_type, gender: r.gender, dob: r.dob, expectedEggsPerYear: r.expected_eggs_per_year,
     eggColour: r.egg_colour, notes: r.notes,
-    isDeceased: r.is_deceased, deceasedDate: r.deceased_date
+    isDeceased: r.is_deceased, deceasedDate: r.deceased_date,
+    coopId: r.coop_id || null
   };
 }
 function rowToHealthCheck(r){ return { id: r.id, date: r.date, chickenId: r.chicken_id, items: r.items || [] }; }
+function rowToCoop(r){ return { id: r.id, name: r.name }; }
 
 async function loadFlockData(){
-  const [eggsRes, chickensRes, hcRes] = await Promise.all([
+  const [eggsRes, chickensRes, hcRes, coopsRes] = await Promise.all([
     sb.from('eggs').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
     sb.from('chickens').select('*').eq('owner_id', currentFlockOwnerId).order('created_at'),
-    sb.from('health_checks').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false })
+    sb.from('health_checks').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
+    sb.from('coops').select('*').eq('owner_id', currentFlockOwnerId).order('name')
   ]);
   state.eggs = (eggsRes.data || []).map(rowToEgg);
   state.chickens = (chickensRes.data || []).map(rowToChicken);
   state.healthChecks = (hcRes.data || []).map(rowToHealthCheck);
+  state.coops = (coopsRes.data || []).map(rowToCoop);
 }
 
 // ---------- EGG COUNT ----------
@@ -1309,6 +1375,7 @@ function resetChickenForm(){
   document.getElementById('ch-name').value = '';
   document.getElementById('ch-tag').value = '';
   document.getElementById('ch-tag-colour').value = '';
+  document.getElementById('ch-coop').value = '';
   document.getElementById('ch-animal').value = 'Chicken';
   document.getElementById('ch-animal-custom-row').style.display = 'none';
   document.getElementById('ch-animal-custom').value = '';
@@ -1354,6 +1421,7 @@ async function saveChicken(){
     name,
     tag,
     tag_colour: document.getElementById('ch-tag-colour').value.trim(),
+    coop_id: document.getElementById('ch-coop').value || null,
     animal_type: animalType,
     breed,
     gender: document.getElementById('ch-gender').value,
@@ -1374,7 +1442,6 @@ async function saveChicken(){
   if(error){ setStatus('chicken-status', error.message, true); return; }
 
   await loadFlockData();
-  renderChickens();
   renderHcSetupInfo();
   closeChickenDetail();
 }
@@ -1499,7 +1566,7 @@ async function confirmImportList(){
   pendingImportPayloads = [];
   setStatus('import-status', `Imported ${count} chicken${count > 1 ? 's' : ''}.`, false);
   await loadFlockData();
-  renderChickens();
+  refreshFlockViews();
   renderHcSetupInfo();
 }
 
@@ -1656,6 +1723,8 @@ function editChicken(id){
   document.getElementById('ch-name').value = c.name || '';
   document.getElementById('ch-tag').value = c.tag || '';
   document.getElementById('ch-tag-colour').value = c.tagColour || '';
+  populateCoopSelectOptions();
+  document.getElementById('ch-coop').value = c.coopId || '';
 
   const animalSel = document.getElementById('ch-animal');
   const animalValue = c.animalType || 'Chicken';
@@ -1701,9 +1770,11 @@ function cancelEditChicken(){
   closeChickenDetail();
 }
 
-function openChickenDetail(id){
+function openChickenDetail(id, presetCoopId, returnTab){
   editingHc = null;
   currentDetailChickenId = id;
+  chickenDetailReturnTab = returnTab || 'chickens';
+  populateCoopSelectOptions();
   if(id){
     const c = state.chickens.find(x => x.id === id);
     document.getElementById('chicken-detail-name').textContent = c ? c.name : 'Chicken';
@@ -1712,6 +1783,7 @@ function openChickenDetail(id){
     renderChickenDetailHistory(id);
   } else {
     resetChickenForm();
+    if(presetCoopId) document.getElementById('ch-coop').value = presetCoopId;
     document.getElementById('chicken-detail-name').textContent = 'Add a Chicken';
     document.getElementById('chicken-detail-history-section').style.display = 'none';
   }
@@ -1719,11 +1791,16 @@ function openChickenDetail(id){
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+function addChickenToThisCoop(){
+  openChickenDetail(null, currentCoopDetailId === '__unassigned' ? '' : currentCoopDetailId, 'coop-detail');
+}
+
 function closeChickenDetail(){
   currentDetailChickenId = null;
   editingHc = null;
   resetChickenForm();
-  switchTab('chickens');
+  refreshFlockViews();
+  switchTab(chickenDetailReturnTab);
 }
 
 async function deleteChicken(id){
@@ -1732,16 +1809,16 @@ async function deleteChicken(id){
   if(error){ setStatus('chicken-status', error.message, true); return; }
   if(editingChickenId === id) resetChickenForm();
   await loadFlockData();
-  renderChickens();
+  refreshFlockViews();
   renderHcSetupInfo();
 }
 
-function chickenCardHtml(c, readOnly){
+function chickenCardHtml(c, readOnly, returnTab){
   const isMale = isMaleGender(c.gender);
   const genderClass = isMale ? 'rooster' : 'hen';
   const tagText = [c.tag, c.tagColour].filter(Boolean).join(' &middot; ') || '—';
   return `
-    <div class="chicken-card ${c.isDeceased ? 'deceased' : ''}" onclick="openChickenDetail('${c.id}')">
+    <div class="chicken-card ${c.isDeceased ? 'deceased' : ''}" onclick="openChickenDetail('${c.id}', null, '${returnTab || 'chickens'}')">
       <div class="chicken-card-head">
         <div>
           <div class="chicken-name">${escapeHtml(c.name)}<span class="gender-tag ${genderClass}">${escapeHtml(c.gender || 'Hen')}</span>${c.isDeceased ? '<span class="deceased-tag">Lost</span>' : ''}</div>
@@ -1787,14 +1864,134 @@ function renderChickens(){
     const filters = getChickenFilters();
     const filtered = sortChickens(activeChickens.filter(c => chickenMatchesFilters(c, filters)));
     listEl.innerHTML = filtered.length
-      ? filtered.map(c => chickenCardHtml(c, readOnly)).join('')
+      ? filtered.map(c => chickenCardHtml(c, readOnly, 'animal-search')).join('')
       : '<p class="empty">No chickens match these filters.</p>';
   }
 
   document.getElementById('losses-summary').textContent = deceasedChickens.length;
   lossesEl.innerHTML = deceasedChickens.length
-    ? sortChickens(deceasedChickens).map(c => chickenCardHtml(c, readOnly)).join('')
+    ? sortChickens(deceasedChickens).map(c => chickenCardHtml(c, readOnly, 'animal-search')).join('')
     : '<p class="empty">No losses recorded.</p>';
+}
+
+function sortByTagAsc(list){
+  return list.slice().sort((a, b) => {
+    const at = hasNumericTag(a), bt = hasNumericTag(b);
+    if(at && bt) return Number(a.tag) - Number(b.tag);
+    return at ? -1 : (bt ? 1 : 0);
+  });
+}
+
+function refreshFlockViews(){
+  renderChickens();
+  renderCoopsList();
+  if(currentCoopDetailId) renderCoopDetailList();
+}
+
+function populateCoopSelectOptions(){
+  const sel = document.getElementById('ch-coop');
+  if(!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Unassigned</option>' + state.coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  sel.value = state.coops.some(c => c.id === current) ? current : '';
+}
+
+function coopCardHtml(coop, count, readOnly){
+  return `
+    <div class="chicken-card" onclick="openCoopDetail('${coop.id}')">
+      <div class="chicken-card-head">
+        <div>
+          <div class="chicken-name">${escapeHtml(coop.name)}</div>
+          <div class="chicken-meta">${count} bird${count === 1 ? '' : 's'}</div>
+        </div>
+        ${readOnly ? '' : `
+        <div class="icon-row">
+          <button class="icon-btn danger" onclick="event.stopPropagation(); deleteCoop('${coop.id}')" aria-label="Delete">&#10005;</button>
+        </div>`}
+      </div>
+    </div>`;
+}
+
+function renderCoopsList(){
+  const el = document.getElementById('coops-list');
+  if(!el) return;
+  const readOnly = isReadOnly();
+  const living = state.chickens.filter(c => !c.isDeceased);
+  const countFor = (coopId) => living.filter(c => (c.coopId || null) === coopId).length;
+  const coopsHtml = state.coops.map(c => coopCardHtml(c, countFor(c.id), readOnly)).join('');
+  const unassignedCount = countFor(null);
+  const unassignedHtml = `
+    <div class="chicken-card" onclick="openCoopDetail('__unassigned')">
+      <div class="chicken-card-head">
+        <div>
+          <div class="chicken-name">Unassigned</div>
+          <div class="chicken-meta">${unassignedCount} bird${unassignedCount === 1 ? '' : 's'}</div>
+        </div>
+      </div>
+    </div>`;
+  el.innerHTML = coopsHtml + unassignedHtml;
+}
+
+function renderCoopDetailList(){
+  const el = document.getElementById('coop-detail-list');
+  if(!el || !currentCoopDetailId) return;
+  const isUnassigned = currentCoopDetailId === '__unassigned';
+  const readOnly = isReadOnly();
+  const matches = state.chickens.filter(c => !c.isDeceased && (isUnassigned ? !c.coopId : c.coopId === currentCoopDetailId));
+  el.innerHTML = matches.length
+    ? sortByTagAsc(matches).map(c => chickenCardHtml(c, readOnly, 'coop-detail')).join('')
+    : '<p class="empty">No birds in this coop.</p>';
+}
+
+function openCoopDetail(id){
+  currentCoopDetailId = id;
+  const isUnassigned = id === '__unassigned';
+  const coop = isUnassigned ? null : state.coops.find(c => c.id === id);
+  document.getElementById('coop-detail-name').textContent = isUnassigned ? 'Unassigned' : (coop ? coop.name : 'Coop');
+  document.getElementById('coop-rename-section').style.display = (isUnassigned || isReadOnly()) ? 'none' : 'block';
+  if(!isUnassigned && coop) document.getElementById('coop-detail-name-input').value = coop.name;
+  renderCoopDetailList();
+  switchTab('coop-detail');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function closeCoopDetail(){
+  currentCoopDetailId = null;
+  switchTab('chickens');
+}
+
+async function addCoop(){
+  const name = document.getElementById('new-coop-name').value.trim();
+  if(!name){ setStatus('coop-status', 'Enter a coop name.', true); return; }
+  const { error } = await sb.from('coops').insert({ name, owner_id: currentFlockOwnerId });
+  if(error){ setStatus('coop-status', error.message, true); return; }
+  document.getElementById('new-coop-name').value = '';
+  await loadFlockData();
+  renderCoopsList();
+  populateCoopSelectOptions();
+  setStatus('coop-status', 'Added.', false);
+}
+
+async function deleteCoop(id){
+  if(!confirm('Delete this coop? Birds in it will become Unassigned.')) return;
+  const { error } = await sb.from('coops').delete().eq('id', id);
+  if(error){ setStatus('coop-status', error.message, true); return; }
+  await loadFlockData();
+  renderCoopsList();
+  populateCoopSelectOptions();
+}
+
+async function renameCoop(){
+  if(!currentCoopDetailId || currentCoopDetailId === '__unassigned') return;
+  const name = document.getElementById('coop-detail-name-input').value.trim();
+  if(!name){ setStatus('coop-detail-status', 'Enter a coop name.', true); return; }
+  const { error } = await sb.from('coops').update({ name }).eq('id', currentCoopDetailId);
+  if(error){ setStatus('coop-detail-status', error.message, true); return; }
+  await loadFlockData();
+  document.getElementById('coop-detail-name').textContent = name;
+  renderCoopsList();
+  populateCoopSelectOptions();
+  setStatus('coop-detail-status', 'Saved.', false);
 }
 
 // ---------- HEALTH CHECKS ----------
