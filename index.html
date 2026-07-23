@@ -1647,7 +1647,7 @@ function renderChickens(){
 // ---------- HEALTH CHECKS ----------
 const HEALTH_ITEMS = [
   { key: 'wings', name: 'Wings', normal: 'Held tight to the body, symmetrical.', issue: 'Look out for abnormalities in wing position (one drooping) — this can be a sign of injury or trauma.' },
-  { key: 'bodyscore', name: 'Body Condition Score', normal: 'Aim for a score of around 3 out of 5.', issue: 'A score of 1–2 means underweight, often from a lack of nutrition. A score of 4–5 means overweight.', scoreOptions: [1, 2, 3, 4, 5] },
+  { key: 'bodyscore', name: 'Body Condition Score', normal: 'Aim for a score of around 3 out of 5.', issue: 'A score of 1–2 means underweight, often from a lack of nutrition. A score of 4–5 means overweight.', scoreOptions: [1, 2, 3, 4, 5], scoreGoodValue: 3 },
   { key: 'gait', name: 'Gait', normal: 'No limping, fluid motion, high activity levels.', issue: 'Look out for limping or favouring one leg over the other — this can be a sign of pain or injury.' },
   { key: 'behaviour', name: 'Behaviour', normal: 'Preening, active, foraging.', issue: 'Look out for chickens that isolate themselves from the flock — this can be a sign of illness.' },
   { key: 'eyes', name: 'Eyes', normal: 'Clear, bright, no foreign objects.', issue: 'Look out for swelling or puffiness — could be from trauma or infection.' },
@@ -1657,7 +1657,7 @@ const HEALTH_ITEMS = [
   { key: 'oral', name: 'Oral cavity', normal: 'Pink in colour, no odour, clean.', issue: 'Look out for excessive drooling and open-mouth breathing — could be a sign of fowl pox.' },
   { key: 'comb', name: 'Comb', normal: 'Red in colour, smooth.', issue: 'Look out for pale or white combs — can be a sign of anaemia.' },
   { key: 'wattles', name: 'Wattles', normal: 'Warm to the touch, smooth, red in colour.', issue: 'Look out for the wattle being purple or blue in colour — this can be a sign of lack of oxygen or poor circulation.' },
-  { key: 'feathers', name: 'Feathers / skin', normal: 'Shiny, smooth, full coverage, no mites, no crust.', issue: 'Look out for bald patches or missing feathers — can be a sign of feather plucking or parasite infestation.' },
+  { key: 'feathers', name: 'Feathers / skin', normal: 'Score out of 5 — higher is better.', issue: 'A score of 1–2 means poor condition — bald patches, missing feathers, mites or crust. A score of 4–5 means shiny, smooth, full coverage.', scoreOptions: [1, 2, 3, 4, 5] },
   { key: 'legs', name: 'Legs', normal: 'Smooth scales, flexible, no discolouration.', issue: 'Look out for swollen joints, especially around the hock or feet — this can be a sign of bumblefoot.' },
   { key: 'scales', name: 'Scales', normal: 'Flat, no crust, no swelling.', issue: 'Look out for raised or lifted scales — this can be a sign of scaly leg mites.' },
   { key: 'claws', name: 'Claws', normal: 'Correct length, not twisted, no blood.', issue: 'Look out for overly long, curled claws — this can cause pain, injury or even infection.' },
@@ -1750,13 +1750,25 @@ function renderHcCurrentBird(){
 }
 
 function hcIsIssueStatus(item, status){
-  if(item.scoreOptions) return status != null && status !== '' && Number(status) !== 3;
+  if(item.scoreOptions){
+    if(status == null || status === '') return false;
+    const n = Number(status);
+    return item.scoreGoodValue != null ? n !== item.scoreGoodValue : n <= 2;
+  }
   return status === 'issue';
 }
 
 function hcIsGoodStatus(item, status){
-  if(item.scoreOptions) return Number(status) === 3;
+  if(item.scoreOptions){
+    if(status == null || status === '') return false;
+    const n = Number(status);
+    return item.scoreGoodValue != null ? n === item.scoreGoodValue : n >= 4;
+  }
   return status === 'good';
+}
+
+function hcNoteAlwaysVisible(item){
+  return !!item.scoreOptions;
 }
 
 function renderHealthItems(itemState){
@@ -1782,7 +1794,7 @@ function renderHealthItems(itemState){
       <div class="hc-item-normal">${item.normal}</div>
       <div class="hc-info" id="info-${item.key}">${item.issue}</div>
       ${toggleHtml}
-      <textarea class="hc-note" id="note-${item.key}" placeholder="What did you notice?" style="display:${isIssue ? 'block' : 'none'};" oninput="hcNoteInput('${item.key}')">${escapeHtml(current.note || '')}</textarea>
+      <textarea class="hc-note" id="note-${item.key}" placeholder="What did you notice?" style="display:${(isIssue || hcNoteAlwaysVisible(item)) ? 'block' : 'none'};" oninput="hcNoteInput('${item.key}')">${escapeHtml(current.note || '')}</textarea>
     </div>
     `;
   }).join('');
@@ -1806,7 +1818,7 @@ function hcSetItemStatus(key, val){
   const isIssue = hcIsIssueStatus(item, val);
   const isGood = hcIsGoodStatus(item, val);
   const noteEl = document.getElementById('note-' + key);
-  noteEl.style.display = isIssue ? 'block' : 'none';
+  noteEl.style.display = (isIssue || hcNoteAlwaysVisible(item)) ? 'block' : 'none';
   card.classList.toggle('flag-issue', isIssue);
   card.classList.toggle('flag-good', isGood);
 }
@@ -1879,8 +1891,9 @@ async function finishHealthCheckSession(){
 }
 
 function historyItemIsIssue(i){
+  if(i.status == null || i.status === '' || i.status === 'unchecked') return false;
   const item = HEALTH_ITEMS.find(h => h.key === i.key);
-  if(item && item.scoreOptions) return i.status != null && i.status !== '' && i.status !== 'unchecked' && Number(i.status) !== 3;
+  if(item && item.scoreOptions) return hcIsIssueStatus(item, i.status);
   return i.status === 'issue';
 }
 
@@ -1888,7 +1901,7 @@ function historyItemDisplay(i){
   const item = HEALTH_ITEMS.find(h => h.key === i.key);
   if(item && item.scoreOptions){
     if(i.status == null || i.status === '' || i.status === 'unchecked') return { cls: 'unchecked-text', label: 'Not checked' };
-    return { cls: Number(i.status) === 3 ? 'good-text' : 'issue-text', label: 'Score: ' + i.status };
+    return { cls: hcIsIssueStatus(item, i.status) ? 'issue-text' : 'good-text', label: 'Score: ' + i.status };
   }
   const cls = i.status === 'issue' ? 'issue-text' : (i.status === 'good' ? 'good-text' : 'unchecked-text');
   const label = i.status === 'issue' ? 'Issue' : (i.status === 'good' ? 'All good' : 'Not checked');
