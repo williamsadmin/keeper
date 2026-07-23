@@ -2182,7 +2182,7 @@ function pluralizeAnimalType(type){
   return t + 's';
 }
 
-function animalTypeGroupsHtml(birds, readOnly){
+function animalTypeGroupsHtml(birds, readOnly, selectable){
   const groups = {};
   birds.forEach(c => {
     const type = (c.animalType || 'Chicken').trim() || 'Chicken';
@@ -2192,9 +2192,9 @@ function animalTypeGroupsHtml(birds, readOnly){
   return types.map(type => {
     const group = sortChickens(groups[type]);
     return `
-      <details class="animal-type-group" open>
+      <details class="animal-type-group">
         <summary class="sec-title">${escapeHtml(pluralizeAnimalType(type))} (${group.length})</summary>
-        <div>${group.map(c => chickenCardHtml(c, readOnly, 'animal-search', true)).join('')}</div>
+        <div>${group.map(c => chickenCardHtml(c, readOnly, 'animal-search', !!selectable)).join('')}</div>
       </details>`;
   }).join('');
 }
@@ -2350,13 +2350,13 @@ function renderChickens(){
     const filters = getChickenFilters();
     const filtered = activeChickens.filter(c => chickenMatchesFilters(c, filters));
     listEl.innerHTML = filtered.length
-      ? animalTypeGroupsHtml(filtered, readOnly)
+      ? animalTypeGroupsHtml(filtered, readOnly, true)
       : '<p class="empty">No animals match these filters.</p>';
   }
 
   document.getElementById('losses-summary').textContent = deceasedChickens.length;
   lossesEl.innerHTML = deceasedChickens.length
-    ? sortChickens(deceasedChickens).map(c => chickenCardHtml(c, readOnly, 'animal-search')).join('')
+    ? animalTypeGroupsHtml(deceasedChickens, readOnly, false)
     : '<p class="empty">No losses recorded.</p>';
   renderBulkMoveBars();
 }
