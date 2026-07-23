@@ -551,6 +551,93 @@
       </section>
     </div>
 
+    <!-- SALES TAB -->
+    <div id="tab-sales" class="tab-panel">
+      <p class="eyebrow">Sales</p>
+      <h1>Egg Sales</h1>
+      <p class="sub">Log sales to customers and keep track of who owes what.</p>
+
+      <section id="sale-log-section">
+        <p class="sec-title">Log A Sale</p>
+        <div class="row">
+          <div><label>Date</label><input type="date" id="sale-date"></div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Customer</label>
+            <select id="sale-customer" onchange="onSaleCustomerChange()">
+              <option value="">Select a customer…</option>
+            </select>
+          </div>
+        </div>
+        <p class="share-note" id="sale-customer-flag" style="display:none;margin-bottom:10px;"></p>
+        <div class="row">
+          <div>
+            <label>Unit</label>
+            <select id="sale-unit" onchange="onSaleUnitOrQtyChange()">
+              <option value="egg">Single egg(s)</option>
+              <option value="half_dozen">Half dozen box(es)</option>
+              <option value="dozen">Dozen box(es)</option>
+            </select>
+          </div>
+          <div><label>Quantity</label><input type="number" min="0" step="1" id="sale-quantity" oninput="onSaleUnitOrQtyChange()" placeholder="e.g. 2"></div>
+        </div>
+        <p class="share-note">Standard charge: <strong id="sale-standard-charge">£0.00</strong></p>
+        <div class="row">
+          <div><label>Amount paid</label><input type="number" min="0" step="0.01" id="sale-paid" oninput="onSalePaidChange()"></div>
+        </div>
+        <p class="share-note" id="sale-paid-status" style="margin-bottom:10px;"></p>
+        <button class="btn full" onclick="saveSale()">Log sale</button>
+        <div class="status" id="sale-status"></div>
+      </section>
+
+      <section>
+        <button class="btn secondary full" id="add-customer-btn" onclick="openCustomerDetail(null)">+ Add Customer</button>
+      </section>
+
+      <section>
+        <p class="sec-title">Customers</p>
+        <div id="customers-list"></div>
+      </section>
+    </div>
+
+    <!-- CUSTOMER DETAIL PAGE -->
+    <div id="tab-customer-detail" class="tab-panel">
+      <button type="button" class="btn secondary" style="margin-bottom:14px;" onclick="closeCustomerDetail()">&larr; Back to Sales</button>
+      <p class="eyebrow">Customer</p>
+      <h1 id="customer-detail-name">Customer</h1>
+
+      <section id="customer-form-section">
+        <p class="sec-title" id="customer-form-title">Add Customer</p>
+        <div class="row">
+          <div><label>Name</label><input type="text" id="cust-name" placeholder="e.g. Jane Smith"></div>
+        </div>
+        <div class="row">
+          <div><label>Notes</label><textarea id="cust-notes" placeholder="e.g. Prefers blue eggs"></textarea></div>
+        </div>
+        <button class="btn full" onclick="saveCustomer()">Save customer</button>
+        <button class="btn secondary full" id="cust-cancel-btn" style="display:none;margin-top:8px;" onclick="closeCustomerDetail()">Cancel edit</button>
+        <div class="status" id="customer-status"></div>
+      </section>
+
+      <section id="customer-balance-section" style="display:none;">
+        <p class="sec-title">Balance</p>
+        <div class="stat-card">
+          <div class="stat-label" id="customer-balance-label">All settled</div>
+          <div class="stat-main" id="customer-balance-amount">£0.00</div>
+        </div>
+      </section>
+
+      <section id="customer-sales-section" style="display:none;">
+        <p class="sec-title">Sales History</p>
+        <div id="customer-sales-list"></div>
+      </section>
+
+      <section id="customer-danger-section" style="display:none;">
+        <button class="btn danger full" onclick="deleteCustomer(currentCustomerDetailId)">Delete customer</button>
+      </section>
+    </div>
+
     <!-- SHARING TAB -->
     <div id="tab-sharing" class="tab-panel">
       <p class="eyebrow">Access</p>
@@ -623,6 +710,35 @@
         <div class="status" id="tab-layout-status"></div>
       </section>
 
+      <section id="sales-settings-section">
+        <p class="sec-title">Sales Tracking</p>
+        <div class="checkbox-row">
+          <input type="checkbox" id="sales-enabled" onchange="onSalesEnabledToggle()">
+          <label for="sales-enabled">Track egg sales to customers</label>
+        </div>
+        <div id="sales-settings-fields" style="display:none;">
+          <div class="row">
+            <div>
+              <label>Standard unit</label>
+              <select id="sales-standard-unit">
+                <option value="egg">Single egg</option>
+                <option value="half_dozen">Half dozen box</option>
+                <option value="dozen">Dozen box</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div><label>Price per egg</label><input type="number" min="0" step="0.01" id="sales-price-egg" placeholder="0.00"></div>
+            <div><label>Price per half dozen</label><input type="number" min="0" step="0.01" id="sales-price-half-dozen" placeholder="0.00"></div>
+          </div>
+          <div class="row">
+            <div><label>Price per dozen</label><input type="number" min="0" step="0.01" id="sales-price-dozen" placeholder="0.00"></div>
+          </div>
+          <button class="btn full" onclick="saveSalesSettings()">Save sales settings</button>
+        </div>
+        <div class="status" id="sales-settings-status"></div>
+      </section>
+
       <section id="chicken-import-section">
         <p class="sec-title">Import Chickens</p>
         <p class="share-note" style="margin-bottom:10px;">Paste one chicken (or duck, quail, etc.) per line. Just a name works, or add details separated by commas: <code>Name, Tag, Tag Colour, Animal, Breed, Gender, DOB (YYYY-MM-DD), Expected Eggs/Year, Egg Colour, Notes</code>. Animal defaults to Chicken if left blank. Anything after the Egg Colour is treated as notes, commas and all.</p>
@@ -672,7 +788,10 @@ let isSignup = false;
 let flocks = []; // [{ ownerId, label, role: 'owner'|'editor'|'viewer' }]
 let currentFlockOwnerId = null;
 let currentRole = 'owner';
-let state = { eggs: [], chickens: [], healthChecks: [], coops: [] };
+let state = { eggs: [], chickens: [], healthChecks: [], coops: [], customers: [], sales: [], salesSettings: null };
+let currentCustomerDetailId = null;
+let editingCustomerId = null;
+let editingSaleId = null;
 let editingChickenId = null;
 let currentDetailChickenId = null;
 let currentCoopDetailId = null; // real coop id, '__unassigned', or null
@@ -718,11 +837,17 @@ const ALL_TABS = [
   { id: 'eggs', label: 'Egg Count' },
   { id: 'chickens', label: 'My Flock' },
   { id: 'health', label: 'Health Checks' },
+  { id: 'sales', label: 'Sales' },
   { id: 'sharing', label: 'Share & View' },
   { id: 'account', label: 'Account' }
 ];
 const DEFAULT_TOP_TABS = ['eggs', 'chickens', 'health'];
 let topTabs = DEFAULT_TOP_TABS.slice();
+
+function visibleAllTabs(){
+  const salesOn = !!(state.salesSettings && state.salesSettings.enabled);
+  return ALL_TABS.filter(t => t.id !== 'sales' || salesOn);
+}
 
 function tabLayoutStorageKey(){
   return 'chickenKeeperTopTabs_' + (currentUser ? currentUser.id : 'anon');
@@ -749,23 +874,25 @@ function renderTabbar(){
   const activeEl = document.querySelector('.tab-panel.active');
   const activeTab = activeEl ? activeEl.id.replace('tab-', '') : 'eggs';
 
-  const menuTabIds = ALL_TABS.filter(t => !topTabs.includes(t.id)).map(t => t.id);
+  const tabs = visibleAllTabs();
+  const shownTop = topTabs.filter(id => tabs.some(t => t.id === id));
+  const menuTabIds = tabs.filter(t => !shownTop.includes(t.id)).map(t => t.id);
   MENU_TABS.length = 0;
   MENU_TABS.push(...menuTabIds);
 
   const tabButtonHtml = (t) => `<button class="tab-btn" data-tab="${t.id}" onclick="switchTab('${t.id}')">${t.label}</button>`;
 
-  document.getElementById('tabbar-buttons').innerHTML = topTabs.map(id => tabButtonHtml(ALL_TABS.find(t => t.id === id))).join('');
-  document.getElementById('menu-panel').innerHTML = menuTabIds.map(id => tabButtonHtml(ALL_TABS.find(t => t.id === id))).join('');
+  document.getElementById('tabbar-buttons').innerHTML = shownTop.map(id => tabButtonHtml(tabs.find(t => t.id === id))).join('');
+  document.getElementById('menu-panel').innerHTML = menuTabIds.map(id => tabButtonHtml(tabs.find(t => t.id === id))).join('');
 
-  const validTab = topTabs.includes(activeTab) || menuTabIds.includes(activeTab) ? activeTab : (topTabs[0] || 'eggs');
+  const validTab = shownTop.includes(activeTab) || menuTabIds.includes(activeTab) ? activeTab : (shownTop[0] || 'eggs');
   switchTab(validTab);
 }
 
 function renderTabLayoutOptions(){
   const el = document.getElementById('tab-layout-options');
   if(!el) return;
-  el.innerHTML = ALL_TABS.map(t => {
+  el.innerHTML = visibleAllTabs().map(t => {
     const checked = topTabs.includes(t.id);
     const disable = !checked && topTabs.length >= 3;
     return `
@@ -795,6 +922,7 @@ function switchTab(tab){
   const menuBtn = document.getElementById('menu-toggle-btn');
   if(menuBtn) menuBtn.classList.toggle('active', MENU_TABS.includes(tab));
   closeMenu();
+  if(tab === 'sales') renderSalesTab();
   if(tab === 'sharing') renderSharingTab();
   if(tab === 'account') renderAccountTab();
 }
@@ -1018,6 +1146,10 @@ function applyRolePermissions(){
     document.getElementById('hc-picker-section').style.display = 'none';
     document.getElementById('hc-session-section').style.display = 'none';
   }
+  document.getElementById('sale-log-section').style.display = readOnly ? 'none' : 'block';
+  document.getElementById('add-customer-btn').style.display = readOnly ? 'none' : 'block';
+  document.getElementById('sales-settings-section').style.display = readOnly ? 'none' : 'block';
+  document.getElementById('customer-form-section').style.display = readOnly ? 'none' : 'block';
 }
 
 function renderHcSetupInfo(){
@@ -1033,10 +1165,15 @@ function renderAll(){
   populateCoopSelectOptions();
   populateHcCoopSelectOptions();
   refreshFlockViews();
+  renderTabbar();
   if(document.getElementById('tab-chicken-detail').classList.contains('active')) switchTab('chickens');
   if(document.getElementById('tab-coop-detail').classList.contains('active')) switchTab('chickens');
+  if(document.getElementById('tab-customer-detail').classList.contains('active')) switchTab('sales');
   currentDetailChickenId = null;
   currentCoopDetailId = null;
+  currentCustomerDetailId = null;
+  editingCustomerId = null;
+  editingSaleId = null;
   editingHc = null;
   hcSession = null;
   document.getElementById('hc-setup-section').style.display = isReadOnly() ? 'none' : 'block';
@@ -1044,8 +1181,6 @@ function renderAll(){
   document.getElementById('hc-session-section').style.display = 'none';
   renderHcSetupInfo();
   renderHealthHistory();
-  if(document.getElementById('tab-sharing').classList.contains('active')) renderSharingTab();
-  if(document.getElementById('tab-account').classList.contains('active')) renderAccountTab();
 }
 
 // ---------- DATA LOADING ----------
@@ -1061,18 +1196,38 @@ function rowToChicken(r){
 }
 function rowToHealthCheck(r){ return { id: r.id, date: r.date, chickenId: r.chicken_id, items: r.items || [] }; }
 function rowToCoop(r){ return { id: r.id, name: r.name }; }
+function rowToCustomer(r){ return { id: r.id, name: r.name, notes: r.notes || '' }; }
+function rowToSale(r){
+  return {
+    id: r.id, customerId: r.customer_id, date: r.date, unit: r.unit,
+    quantity: Number(r.quantity) || 0, charged: Number(r.charged) || 0, paid: Number(r.paid) || 0
+  };
+}
+function rowToSalesSettings(r){
+  if(!r) return { enabled: false, standardUnit: 'dozen', priceEgg: 0, priceHalfDozen: 0, priceDozen: 0 };
+  return {
+    enabled: !!r.enabled, standardUnit: r.standard_unit || 'dozen',
+    priceEgg: Number(r.price_egg) || 0, priceHalfDozen: Number(r.price_half_dozen) || 0, priceDozen: Number(r.price_dozen) || 0
+  };
+}
 
 async function loadFlockData(){
-  const [eggsRes, chickensRes, hcRes, coopsRes] = await Promise.all([
+  const [eggsRes, chickensRes, hcRes, coopsRes, customersRes, salesRes, salesSettingsRes] = await Promise.all([
     sb.from('eggs').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
     sb.from('chickens').select('*').eq('owner_id', currentFlockOwnerId).order('created_at'),
     sb.from('health_checks').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
-    sb.from('coops').select('*').eq('owner_id', currentFlockOwnerId).order('name')
+    sb.from('coops').select('*').eq('owner_id', currentFlockOwnerId).order('name'),
+    sb.from('customers').select('*').eq('owner_id', currentFlockOwnerId).order('name'),
+    sb.from('sales').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
+    sb.from('sales_settings').select('*').eq('owner_id', currentFlockOwnerId).maybeSingle()
   ]);
   state.eggs = (eggsRes.data || []).map(rowToEgg);
   state.chickens = (chickensRes.data || []).map(rowToChicken);
   state.healthChecks = (hcRes.data || []).map(rowToHealthCheck);
   state.coops = (coopsRes.data || []).map(rowToCoop);
+  state.customers = (customersRes.data || []).map(rowToCustomer);
+  state.sales = (salesRes.data || []).map(rowToSale);
+  state.salesSettings = rowToSalesSettings(salesSettingsRes.data);
 }
 
 // ---------- EGG COUNT ----------
@@ -2550,6 +2705,317 @@ async function deleteHealthCheck(id){
   renderChickens();
 }
 
+// ---------- SALES SETTINGS (ACCOUNT TAB) ----------
+function onSalesEnabledToggle(){
+  document.getElementById('sales-settings-fields').style.display = document.getElementById('sales-enabled').checked ? 'block' : 'none';
+}
+
+function renderSalesSettingsForm(){
+  const s = state.salesSettings || { enabled: false, standardUnit: 'dozen', priceEgg: 0, priceHalfDozen: 0, priceDozen: 0 };
+  document.getElementById('sales-enabled').checked = !!s.enabled;
+  document.getElementById('sales-standard-unit').value = s.standardUnit || 'dozen';
+  document.getElementById('sales-price-egg').value = s.priceEgg || '';
+  document.getElementById('sales-price-half-dozen').value = s.priceHalfDozen || '';
+  document.getElementById('sales-price-dozen').value = s.priceDozen || '';
+  onSalesEnabledToggle();
+}
+
+async function saveSalesSettings(){
+  const payload = {
+    owner_id: currentFlockOwnerId,
+    enabled: document.getElementById('sales-enabled').checked,
+    standard_unit: document.getElementById('sales-standard-unit').value,
+    price_egg: Number(document.getElementById('sales-price-egg').value) || 0,
+    price_half_dozen: Number(document.getElementById('sales-price-half-dozen').value) || 0,
+    price_dozen: Number(document.getElementById('sales-price-dozen').value) || 0
+  };
+  const { error } = await sb.from('sales_settings').upsert(payload, { onConflict: 'owner_id' });
+  if(error){ setStatus('sales-settings-status', error.message, true); return; }
+  await loadFlockData();
+  renderTabbar();
+  renderTabLayoutOptions();
+  setStatus('sales-settings-status', 'Saved.', false);
+}
+
+// ---------- SALES ----------
+const SALE_UNIT_LABELS = { egg: 'Single egg', half_dozen: 'Half dozen box', dozen: 'Dozen box' };
+
+function saleUnitPrice(unit){
+  const s = state.salesSettings || {};
+  if(unit === 'half_dozen') return s.priceHalfDozen || 0;
+  if(unit === 'dozen') return s.priceDozen || 0;
+  return s.priceEgg || 0;
+}
+
+function formatMoney(n){
+  return '£' + (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2);
+}
+
+function customerBalance(customerId){
+  return state.sales.filter(s => s.customerId === customerId).reduce((sum, s) => sum + (s.charged - s.paid), 0);
+}
+
+function populateSaleCustomerOptions(){
+  const sel = document.getElementById('sale-customer');
+  if(!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Select a customer…</option>' + state.customers.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  sel.value = state.customers.some(c => c.id === current) ? current : '';
+}
+
+function onSaleCustomerChange(){
+  const id = document.getElementById('sale-customer').value;
+  const flagEl = document.getElementById('sale-customer-flag');
+  if(!id){ flagEl.style.display = 'none'; return; }
+  const bal = customerBalance(id);
+  if(Math.abs(bal) < 0.005){ flagEl.style.display = 'none'; return; }
+  flagEl.style.display = 'block';
+  flagEl.textContent = bal > 0
+    ? `Heads up: this customer already owes ${formatMoney(bal)}.`
+    : `Heads up: you already owe this customer ${formatMoney(-bal)}.`;
+}
+
+function onSaleUnitOrQtyChange(){
+  const unit = document.getElementById('sale-unit').value;
+  const qty = Number(document.getElementById('sale-quantity').value) || 0;
+  const charge = qty * saleUnitPrice(unit);
+  document.getElementById('sale-standard-charge').textContent = formatMoney(charge);
+  document.getElementById('sale-paid').value = charge ? charge.toFixed(2) : '';
+  onSalePaidChange();
+}
+
+function onSalePaidChange(){
+  const unit = document.getElementById('sale-unit').value;
+  const qty = Number(document.getElementById('sale-quantity').value) || 0;
+  const charge = qty * saleUnitPrice(unit);
+  const paid = Number(document.getElementById('sale-paid').value) || 0;
+  const diff = paid - charge;
+  const statusEl = document.getElementById('sale-paid-status');
+  if(!qty){ statusEl.textContent = ''; return; }
+  if(Math.abs(diff) < 0.005) statusEl.textContent = 'Paying in full.';
+  else if(diff > 0) statusEl.textContent = `Paying ${formatMoney(diff)} more than standard.`;
+  else statusEl.textContent = `Paying ${formatMoney(-diff)} less than standard.`;
+}
+
+async function saveSale(){
+  const customerId = document.getElementById('sale-customer').value;
+  if(!customerId){ setStatus('sale-status', 'Pick a customer.', true); return; }
+  const date = document.getElementById('sale-date').value;
+  if(!date){ setStatus('sale-status', 'Pick a date.', true); return; }
+  const unit = document.getElementById('sale-unit').value;
+  const quantity = Number(document.getElementById('sale-quantity').value) || 0;
+  if(!quantity){ setStatus('sale-status', 'Enter a quantity.', true); return; }
+  const charged = quantity * saleUnitPrice(unit);
+  const paid = Number(document.getElementById('sale-paid').value) || 0;
+
+  const { error } = await sb.from('sales').insert({
+    owner_id: currentFlockOwnerId, customer_id: customerId, date, unit, quantity, charged, paid
+  });
+  if(error){ setStatus('sale-status', error.message, true); return; }
+
+  document.getElementById('sale-quantity').value = '';
+  document.getElementById('sale-paid').value = '';
+  setStatus('sale-status', 'Sale logged.', false);
+  await loadFlockData();
+  renderSalesTab();
+}
+
+function customerCardHtml(c){
+  const bal = customerBalance(c.id);
+  const settled = Math.abs(bal) < 0.005;
+  const balLabel = settled ? 'Settled' : (bal > 0 ? `Owes ${formatMoney(bal)}` : `You owe ${formatMoney(-bal)}`);
+  return `
+    <div class="chicken-card" onclick="openCustomerDetail('${c.id}')">
+      <div class="chicken-card-head">
+        <div>
+          <div class="chicken-name">${escapeHtml(c.name)}</div>
+        </div>
+        <span class="${settled ? 'ok-badge' : 'issue-badge'}">${balLabel}</span>
+      </div>
+    </div>`;
+}
+
+function renderCustomersList(){
+  const el = document.getElementById('customers-list');
+  if(!el) return;
+  el.innerHTML = state.customers.length
+    ? state.customers.map(c => customerCardHtml(c)).join('')
+    : '<p class="empty">No customers yet.</p>';
+}
+
+function renderSalesTab(){
+  if(!document.getElementById('sale-date').value) document.getElementById('sale-date').value = todayStr();
+  populateSaleCustomerOptions();
+  onSaleCustomerChange();
+  onSaleUnitOrQtyChange();
+  renderCustomersList();
+}
+
+function openCustomerDetail(id){
+  currentCustomerDetailId = id;
+  editingCustomerId = id;
+  editingSaleId = null;
+  if(id){
+    const c = state.customers.find(x => x.id === id);
+    document.getElementById('customer-detail-name').textContent = c ? c.name : 'Customer';
+    document.getElementById('customer-form-title').textContent = 'Edit Customer';
+    document.getElementById('cust-name').value = c ? c.name : '';
+    document.getElementById('cust-notes').value = c ? c.notes : '';
+    document.getElementById('cust-cancel-btn').style.display = 'block';
+    document.getElementById('customer-balance-section').style.display = 'block';
+    document.getElementById('customer-sales-section').style.display = 'block';
+    document.getElementById('customer-danger-section').style.display = isReadOnly() ? 'none' : 'block';
+    renderCustomerBalance(id);
+    renderCustomerSalesList(id);
+  } else {
+    document.getElementById('customer-detail-name').textContent = 'Add Customer';
+    document.getElementById('customer-form-title').textContent = 'Add Customer';
+    document.getElementById('cust-name').value = '';
+    document.getElementById('cust-notes').value = '';
+    document.getElementById('cust-cancel-btn').style.display = 'none';
+    document.getElementById('customer-balance-section').style.display = 'none';
+    document.getElementById('customer-sales-section').style.display = 'none';
+    document.getElementById('customer-danger-section').style.display = 'none';
+  }
+  switchTab('customer-detail');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function closeCustomerDetail(){
+  currentCustomerDetailId = null;
+  editingCustomerId = null;
+  editingSaleId = null;
+  switchTab('sales');
+  renderSalesTab();
+}
+
+async function saveCustomer(){
+  const name = document.getElementById('cust-name').value.trim();
+  if(!name){ setStatus('customer-status', 'Enter a name.', true); return; }
+  const payload = { name, notes: document.getElementById('cust-notes').value.trim() };
+  let error;
+  if(editingCustomerId){
+    ({ error } = await sb.from('customers').update(payload).eq('id', editingCustomerId));
+  } else {
+    ({ error } = await sb.from('customers').insert({ ...payload, owner_id: currentFlockOwnerId }));
+  }
+  if(error){ setStatus('customer-status', error.message, true); return; }
+  await loadFlockData();
+  closeCustomerDetail();
+}
+
+async function deleteCustomer(id){
+  if(!id) return;
+  if(!confirm('Delete this customer? Their past sales are kept but unlinked from a customer.')) return;
+  const { error } = await sb.from('customers').delete().eq('id', id);
+  if(error){ setStatus('customer-status', error.message, true); return; }
+  await loadFlockData();
+  closeCustomerDetail();
+}
+
+function renderCustomerBalance(id){
+  const bal = customerBalance(id);
+  const labelEl = document.getElementById('customer-balance-label');
+  const amountEl = document.getElementById('customer-balance-amount');
+  if(Math.abs(bal) < 0.005){ labelEl.textContent = 'All settled'; amountEl.textContent = formatMoney(0); return; }
+  if(bal > 0){ labelEl.textContent = 'Owes you'; amountEl.textContent = formatMoney(bal); }
+  else { labelEl.textContent = 'You owe them'; amountEl.textContent = formatMoney(-bal); }
+}
+
+function customerSalesForList(id){
+  return state.sales.filter(s => s.customerId === id).sort((a, b) => a.date < b.date ? 1 : -1);
+}
+
+function saleRowHtml(s, readOnly){
+  if(editingSaleId === s.id){
+    return `
+    <div class="hc-record" style="padding:12px;">
+      <div class="row">
+        <div><label>Date</label><input type="date" id="edit-sale-date-${s.id}" value="${s.date}"></div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Unit</label>
+          <select id="edit-sale-unit-${s.id}">
+            <option value="egg" ${s.unit === 'egg' ? 'selected' : ''}>Single egg</option>
+            <option value="half_dozen" ${s.unit === 'half_dozen' ? 'selected' : ''}>Half dozen box</option>
+            <option value="dozen" ${s.unit === 'dozen' ? 'selected' : ''}>Dozen box</option>
+          </select>
+        </div>
+        <div><label>Quantity</label><input type="number" min="0" id="edit-sale-qty-${s.id}" value="${s.quantity}"></div>
+      </div>
+      <div class="row">
+        <div><label>Amount charged</label><input type="number" min="0" step="0.01" id="edit-sale-charged-${s.id}" value="${s.charged.toFixed(2)}"></div>
+        <div><label>Amount paid</label><input type="number" min="0" step="0.01" id="edit-sale-paid-${s.id}" value="${s.paid.toFixed(2)}"></div>
+      </div>
+      <div class="row">
+        <div><button type="button" class="btn secondary full" onclick="cancelEditSale()">Cancel</button></div>
+        <div><button type="button" class="btn full" onclick="saveEditedSale('${s.id}')">Save changes</button></div>
+      </div>
+      <div class="status" id="edit-sale-status-${s.id}"></div>
+    </div>`;
+  }
+  const diff = s.paid - s.charged;
+  const settled = Math.abs(diff) < 0.005;
+  const diffLabel = settled ? 'Paid in full' : (diff > 0 ? `Overpaid by ${formatMoney(diff)}` : `Underpaid by ${formatMoney(-diff)}`);
+  return `
+    <div class="log-item" style="align-items:flex-start;flex-direction:column;gap:6px;">
+      <div style="display:flex;justify-content:space-between;width:100%;">
+        <strong>${formatDateNice(s.date)}</strong>
+        <span class="${settled ? 'good-text' : 'issue-text'}">${diffLabel}</span>
+      </div>
+      <div class="text-dim" style="font-size:12px;">${s.quantity} &times; ${escapeHtml(SALE_UNIT_LABELS[s.unit] || s.unit)} &middot; Charged ${formatMoney(s.charged)} &middot; Paid ${formatMoney(s.paid)}</div>
+      ${readOnly ? '' : `
+      <div class="row" style="margin-top:4px;width:100%;">
+        <div><button type="button" class="btn secondary full" onclick="startEditSale('${s.id}')">Edit</button></div>
+        <div><button type="button" class="btn danger full" onclick="deleteSale('${s.id}')">Delete</button></div>
+      </div>`}
+    </div>`;
+}
+
+function renderCustomerSalesList(id){
+  const el = document.getElementById('customer-sales-list');
+  if(!el) return;
+  const readOnly = isReadOnly();
+  const sales = customerSalesForList(id);
+  el.innerHTML = sales.length ? sales.map(s => saleRowHtml(s, readOnly)).join('') : '<p class="empty">No sales recorded yet.</p>';
+}
+
+function startEditSale(id){
+  editingSaleId = id;
+  renderCustomerSalesList(currentCustomerDetailId);
+}
+
+function cancelEditSale(){
+  editingSaleId = null;
+  renderCustomerSalesList(currentCustomerDetailId);
+}
+
+async function saveEditedSale(id){
+  const date = document.getElementById('edit-sale-date-' + id).value;
+  const unit = document.getElementById('edit-sale-unit-' + id).value;
+  const quantity = Number(document.getElementById('edit-sale-qty-' + id).value) || 0;
+  const charged = Number(document.getElementById('edit-sale-charged-' + id).value) || 0;
+  const paid = Number(document.getElementById('edit-sale-paid-' + id).value) || 0;
+  const { error } = await sb.from('sales').update({ date, unit, quantity, charged, paid }).eq('id', id);
+  if(error){ setStatus('edit-sale-status-' + id, error.message, true); return; }
+  editingSaleId = null;
+  await loadFlockData();
+  renderCustomerBalance(currentCustomerDetailId);
+  renderCustomerSalesList(currentCustomerDetailId);
+  renderCustomersList();
+}
+
+async function deleteSale(id){
+  if(!confirm('Delete this sale record?')) return;
+  const { error } = await sb.from('sales').delete().eq('id', id);
+  if(error) return;
+  await loadFlockData();
+  renderCustomerBalance(currentCustomerDetailId);
+  renderCustomerSalesList(currentCustomerDetailId);
+  renderCustomersList();
+}
+
 // ---------- SHARING ----------
 function renderSharingTab(){
   const ownFlock = currentFlockOwnerId === currentUser.id;
@@ -2647,6 +3113,7 @@ async function removeCollaborator(id){
 function renderAccountTab(){
   document.getElementById('account-email-display').textContent = currentUser ? currentUser.email : '';
   renderTabLayoutOptions();
+  renderSalesSettingsForm();
 }
 
 async function changePassword(){
