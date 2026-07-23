@@ -435,6 +435,43 @@
         </div>
       </section>
 
+      <section id="coop-filter-section">
+        <p class="sec-title">Filter &amp; Sort</p>
+        <div class="row">
+          <div>
+            <label>Sort by</label>
+            <select id="coop-filter-sort" onchange="onChickenFilterChange('coop-')">
+              <option value="tag-asc">Tag number (ascending)</option>
+              <option value="tag-desc">Tag number (descending)</option>
+              <option value="age-oldest">Oldest first</option>
+              <option value="age-youngest">Youngest first</option>
+              <option value="breed">Breed (A&ndash;Z)</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div><label>Name</label><input type="text" id="coop-filter-name" oninput="onChickenFilterChange('coop-')" placeholder="e.g. Henrietta"></div>
+        </div>
+        <div class="row">
+          <div><label>Animal</label><select id="coop-filter-animal" onchange="onChickenFilterChange('coop-')"><option value="">All</option></select></div>
+          <div><label>Gender</label><select id="coop-filter-gender" onchange="onChickenFilterChange('coop-')"><option value="">All</option><option value="Female">Female</option><option value="Male">Male</option></select></div>
+        </div>
+        <div class="row">
+          <div><label>Tag colour</label><select id="coop-filter-tag-colour" onchange="onChickenFilterChange('coop-')"><option value="">All</option></select></div>
+          <div id="coop-filter-tag-exact-wrap"><label>Tag number</label><input type="number" id="coop-filter-tag-exact" oninput="onChickenFilterChange('coop-')" placeholder="e.g. 14"></div>
+        </div>
+        <div class="row" id="coop-filter-tag-range-row" style="display:none;">
+          <div><label>Tag number from</label><input type="number" id="coop-filter-tag-from" oninput="onChickenFilterChange('coop-')" placeholder="e.g. 1"></div>
+          <div><label>Tag number to</label><input type="number" id="coop-filter-tag-to" oninput="onChickenFilterChange('coop-')" placeholder="e.g. 50"></div>
+        </div>
+        <button type="button" class="btn secondary full" style="margin-bottom:10px;" onclick="toggleTagRangeMode('coop-')" id="coop-tag-range-toggle-btn">Search a range instead</button>
+        <div class="row">
+          <div><label>Age (weeks) from</label><input type="number" min="0" id="coop-filter-age-from" oninput="onChickenFilterChange('coop-')" placeholder="e.g. 0"></div>
+          <div><label>Age (weeks) to</label><input type="number" min="0" id="coop-filter-age-to" oninput="onChickenFilterChange('coop-')" placeholder="e.g. 100"></div>
+        </div>
+        <button class="btn secondary full" onclick="clearChickenFilters('coop-')">Clear filters</button>
+      </section>
+
       <section>
         <p class="sec-title">Birds In This Coop</p>
         <div id="coop-bulk-move-bar" style="display:none;margin-bottom:12px;">
@@ -1989,50 +2026,59 @@ function ageInWeeks(dobStr){
   return diffDays / 7;
 }
 
-function populateTagColourFilterOptions(){
-  const sel = document.getElementById('filter-tag-colour');
+function populateTagColourFilterOptions(prefix, birds){
+  prefix = prefix || '';
+  const sel = document.getElementById(prefix + 'filter-tag-colour');
+  if(!sel) return;
   const current = sel.value;
-  const colours = Array.from(new Set(state.chickens.filter(c => !c.isDeceased).map(c => c.tagColour).filter(Boolean))).sort();
+  const source = birds || state.chickens.filter(c => !c.isDeceased);
+  const colours = Array.from(new Set(source.map(c => c.tagColour).filter(Boolean))).sort();
   sel.innerHTML = '<option value="">All</option>' + colours.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
   sel.value = colours.includes(current) ? current : '';
 }
 
-function populateAnimalFilterOptions(){
-  const sel = document.getElementById('filter-animal');
+function populateAnimalFilterOptions(prefix, birds){
+  prefix = prefix || '';
+  const sel = document.getElementById(prefix + 'filter-animal');
+  if(!sel) return;
   const current = sel.value;
-  const animals = Array.from(new Set(state.chickens.filter(c => !c.isDeceased).map(c => c.animalType || 'Chicken').filter(Boolean))).sort();
+  const source = birds || state.chickens.filter(c => !c.isDeceased);
+  const animals = Array.from(new Set(source.map(c => c.animalType || 'Chicken').filter(Boolean))).sort();
   sel.innerHTML = '<option value="">All</option>' + animals.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('');
   sel.value = animals.includes(current) ? current : '';
 }
 
-let tagRangeMode = false;
+let tagRangeMode = { '': false, 'coop-': false };
 
-function toggleTagRangeMode(){
-  tagRangeMode = !tagRangeMode;
-  document.getElementById('filter-tag-exact-wrap').style.display = tagRangeMode ? 'none' : 'block';
-  document.getElementById('filter-tag-range-row').style.display = tagRangeMode ? 'flex' : 'none';
-  document.getElementById('tag-range-toggle-btn').textContent = tagRangeMode ? 'Search a single tag instead' : 'Search a range instead';
-  if(tagRangeMode){
-    document.getElementById('filter-tag-exact').value = '';
+function toggleTagRangeMode(prefix){
+  prefix = prefix || '';
+  tagRangeMode[prefix] = !tagRangeMode[prefix];
+  const mode = tagRangeMode[prefix];
+  document.getElementById(prefix + 'filter-tag-exact-wrap').style.display = mode ? 'none' : 'block';
+  document.getElementById(prefix + 'filter-tag-range-row').style.display = mode ? 'flex' : 'none';
+  document.getElementById(prefix + 'tag-range-toggle-btn').textContent = mode ? 'Search a single tag instead' : 'Search a range instead';
+  if(mode){
+    document.getElementById(prefix + 'filter-tag-exact').value = '';
   } else {
-    document.getElementById('filter-tag-from').value = '';
-    document.getElementById('filter-tag-to').value = '';
+    document.getElementById(prefix + 'filter-tag-from').value = '';
+    document.getElementById(prefix + 'filter-tag-to').value = '';
   }
-  onChickenFilterChange();
+  onChickenFilterChange(prefix);
 }
 
-function getChickenFilters(){
+function getChickenFilters(prefix){
+  prefix = prefix || '';
   const num = (id) => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
   return {
-    name: document.getElementById('filter-name').value.trim().toLowerCase(),
-    animalType: document.getElementById('filter-animal').value,
-    gender: document.getElementById('filter-gender').value,
-    tagColour: document.getElementById('filter-tag-colour').value,
-    tagExact: num('filter-tag-exact'),
-    tagFrom: num('filter-tag-from'),
-    tagTo: num('filter-tag-to'),
-    ageFrom: num('filter-age-from'),
-    ageTo: num('filter-age-to')
+    name: document.getElementById(prefix + 'filter-name').value.trim().toLowerCase(),
+    animalType: document.getElementById(prefix + 'filter-animal').value,
+    gender: document.getElementById(prefix + 'filter-gender').value,
+    tagColour: document.getElementById(prefix + 'filter-tag-colour').value,
+    tagExact: num(prefix + 'filter-tag-exact'),
+    tagFrom: num(prefix + 'filter-tag-from'),
+    tagTo: num(prefix + 'filter-tag-to'),
+    ageFrom: num(prefix + 'filter-age-from'),
+    ageTo: num(prefix + 'filter-age-to')
   };
 }
 
@@ -2061,26 +2107,28 @@ function chickenMatchesFilters(c, f){
   return true;
 }
 
-function onChickenFilterChange(){
-  renderChickens();
+function onChickenFilterChange(prefix){
+  if(prefix === 'coop-') renderCoopDetailList();
+  else renderChickens();
 }
 
-function clearChickenFilters(){
-  document.getElementById('filter-sort').value = 'tag-asc';
-  document.getElementById('filter-name').value = '';
-  document.getElementById('filter-animal').value = '';
-  document.getElementById('filter-gender').value = '';
-  document.getElementById('filter-tag-colour').value = '';
-  document.getElementById('filter-tag-exact').value = '';
-  document.getElementById('filter-tag-from').value = '';
-  document.getElementById('filter-tag-to').value = '';
-  document.getElementById('filter-age-from').value = '';
-  document.getElementById('filter-age-to').value = '';
-  tagRangeMode = false;
-  document.getElementById('filter-tag-exact-wrap').style.display = 'block';
-  document.getElementById('filter-tag-range-row').style.display = 'none';
-  document.getElementById('tag-range-toggle-btn').textContent = 'Search a range instead';
-  renderChickens();
+function clearChickenFilters(prefix){
+  prefix = prefix || '';
+  document.getElementById(prefix + 'filter-sort').value = 'tag-asc';
+  document.getElementById(prefix + 'filter-name').value = '';
+  document.getElementById(prefix + 'filter-animal').value = '';
+  document.getElementById(prefix + 'filter-gender').value = '';
+  document.getElementById(prefix + 'filter-tag-colour').value = '';
+  document.getElementById(prefix + 'filter-tag-exact').value = '';
+  document.getElementById(prefix + 'filter-tag-from').value = '';
+  document.getElementById(prefix + 'filter-tag-to').value = '';
+  document.getElementById(prefix + 'filter-age-from').value = '';
+  document.getElementById(prefix + 'filter-age-to').value = '';
+  tagRangeMode[prefix] = false;
+  document.getElementById(prefix + 'filter-tag-exact-wrap').style.display = 'block';
+  document.getElementById(prefix + 'filter-tag-range-row').style.display = 'none';
+  document.getElementById(prefix + 'tag-range-toggle-btn').textContent = 'Search a range instead';
+  onChickenFilterChange(prefix);
 }
 
 function hasNumericTag(c){ return c.tag !== '' && c.tag != null && !isNaN(Number(c.tag)); }
@@ -2094,8 +2142,8 @@ function compareDob(a, b, oldestFirst){
   return oldestFirst ? earlierFirst : -earlierFirst;
 }
 
-function sortChickens(list){
-  const mode = document.getElementById('filter-sort').value;
+function sortChickens(list, prefix){
+  const mode = document.getElementById((prefix || '') + 'filter-sort').value;
   const arr = list.slice();
   if(mode === 'tag-desc'){
     arr.sort((a, b) => {
@@ -2287,14 +2335,6 @@ function renderChickens(){
   renderBulkMoveBars();
 }
 
-function sortByTagAsc(list){
-  return list.slice().sort((a, b) => {
-    const at = hasNumericTag(a), bt = hasNumericTag(b);
-    if(at && bt) return Number(a.tag) - Number(b.tag);
-    return at ? -1 : (bt ? 1 : 0);
-  });
-}
-
 function refreshFlockViews(){
   renderChickens();
   renderCoopsList();
@@ -2342,7 +2382,8 @@ function birdsInCurrentCoop(){
 }
 
 function toggleSelectAllInCoop(){
-  const matches = birdsInCurrentCoop();
+  const filters = getChickenFilters('coop-');
+  const matches = birdsInCurrentCoop().filter(c => chickenMatchesFilters(c, filters));
   const allSelected = matches.length > 0 && matches.every(c => selectedBirdIds.has(c.id));
   matches.forEach(c => { if(allSelected) selectedBirdIds.delete(c.id); else selectedBirdIds.add(c.id); });
   renderCoopDetailList();
@@ -2430,16 +2471,20 @@ function renderCoopDetailList(){
   const el = document.getElementById('coop-detail-list');
   if(!el || !currentCoopDetailId) return;
   const readOnly = isReadOnly();
-  const matches = birdsInCurrentCoop();
-  el.innerHTML = matches.length
-    ? sortByTagAsc(matches).map(c => chickenCardHtml(c, readOnly, 'coop-detail', coopSelectionMode)).join('')
-    : '<p class="empty">No birds in this coop.</p>';
+  const allBirds = birdsInCurrentCoop();
+  populateTagColourFilterOptions('coop-', allBirds);
+  populateAnimalFilterOptions('coop-', allBirds);
+  const filters = getChickenFilters('coop-');
+  const filtered = sortChickens(allBirds.filter(c => chickenMatchesFilters(c, filters)), 'coop-');
+  el.innerHTML = filtered.length
+    ? filtered.map(c => chickenCardHtml(c, readOnly, 'coop-detail', coopSelectionMode)).join('')
+    : (allBirds.length ? '<p class="empty">No birds match these filters.</p>' : '<p class="empty">No birds in this coop.</p>');
   populateBulkMoveCoopOptions();
   const massMoveBtn = document.getElementById('coop-mass-move-btn');
-  if(massMoveBtn) massMoveBtn.style.display = (!readOnly && matches.length) ? 'block' : 'none';
+  if(massMoveBtn) massMoveBtn.style.display = (!readOnly && allBirds.length) ? 'block' : 'none';
   const selectAllBtn = document.getElementById('coop-select-all-btn');
   if(selectAllBtn){
-    const allSelected = matches.length > 0 && matches.every(c => selectedBirdIds.has(c.id));
+    const allSelected = filtered.length > 0 && filtered.every(c => selectedBirdIds.has(c.id));
     selectAllBtn.textContent = allSelected ? 'Deselect all' : 'Select all';
   }
   renderBulkMoveBars();
@@ -2454,7 +2499,7 @@ function openCoopDetail(id){
   document.getElementById('coop-detail-name').textContent = isUnassigned ? 'Unassigned' : (coop ? coop.name : 'Coop');
   document.getElementById('coop-rename-section').style.display = (isUnassigned || isReadOnly()) ? 'none' : 'block';
   if(!isUnassigned && coop) document.getElementById('coop-detail-name-input').value = coop.name;
-  renderCoopDetailList();
+  clearChickenFilters('coop-');
   switchTab('coop-detail');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
