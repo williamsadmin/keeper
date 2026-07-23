@@ -1,5 +1,5 @@
 // Chicken Keeper service worker — makes the app installable and works offline.
-const CACHE = 'chicken-keeper-v2';
+const CACHE = 'chicken-keeper-v3';
 const SHELL = [
   './',
   './index.html',
