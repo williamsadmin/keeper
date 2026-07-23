@@ -429,12 +429,19 @@
       </section>
 
       <section>
-        <button class="btn full" id="add-chicken-to-coop-btn" onclick="addChickenToThisCoop()">+ Add an Animal</button>
+        <div class="row">
+          <div><button class="btn full" id="add-chicken-to-coop-btn" onclick="addChickenToThisCoop()">+ Add an Animal</button></div>
+          <div><button class="btn secondary full" id="coop-mass-move-btn" onclick="toggleCoopSelectionMode()">Mass Move</button></div>
+        </div>
       </section>
 
       <section>
         <p class="sec-title">Birds In This Coop</p>
         <div id="coop-bulk-move-bar" style="display:none;margin-bottom:12px;">
+          <div class="row">
+            <div><button type="button" class="btn secondary full" id="coop-select-all-btn" onclick="toggleSelectAllInCoop()">Select all</button></div>
+            <div><button type="button" class="btn secondary full" onclick="exitCoopSelectionMode()">Cancel</button></div>
+          </div>
           <div class="row">
             <div>
               <label>Move <span id="coop-bulk-move-count">0</span> selected to</label>
@@ -443,10 +450,7 @@
               </select>
             </div>
           </div>
-          <div class="row">
-            <div><button type="button" class="btn secondary full" onclick="clearBirdSelection()">Clear selection</button></div>
-            <div><button type="button" class="btn full" onclick="moveSelectedBirdsToCoop('coop-bulk-move-coop-select','coop-bulk-move-status')">Move</button></div>
-          </div>
+          <button type="button" class="btn full" onclick="moveSelectedBirdsToCoop('coop-bulk-move-coop-select','coop-bulk-move-status')">Move</button>
           <div class="status" id="coop-bulk-move-status"></div>
         </div>
         <div id="coop-detail-list"></div>
@@ -1179,6 +1183,7 @@ function applyRolePermissions(){
   document.getElementById('chicken-form-section').style.display = readOnly ? 'none' : 'block';
   document.getElementById('add-animal-box').style.display = readOnly ? 'none' : 'block';
   document.getElementById('add-chicken-to-coop-btn').style.display = readOnly ? 'none' : 'block';
+  document.getElementById('coop-mass-move-btn').style.display = readOnly ? 'none' : 'block';
   document.getElementById('coop-add-form-section').style.display = readOnly ? 'none' : 'block';
   document.getElementById('hc-setup-section').style.display = readOnly ? 'none' : 'block';
   if(readOnly){
@@ -1204,6 +1209,7 @@ function renderAll(){
   populateCoopSelectOptions();
   populateHcCoopSelectOptions();
   selectedBirdIds.clear();
+  coopSelectionMode = false;
   refreshFlockViews();
   renderTabbar();
   if(document.getElementById('tab-chicken-detail').classList.contains('active')) switchTab('chickens');
@@ -2110,6 +2116,7 @@ function populateCoopSelectOptions(){
 }
 
 let selectedBirdIds = new Set();
+let coopSelectionMode = false;
 
 function toggleBirdSelection(id, checked){
   if(checked) selectedBirdIds.add(id); else selectedBirdIds.delete(id);
@@ -2122,16 +2129,43 @@ function clearBirdSelection(){
   refreshFlockViews();
 }
 
+function toggleCoopSelectionMode(){
+  coopSelectionMode = !coopSelectionMode;
+  if(!coopSelectionMode) selectedBirdIds.clear();
+  renderCoopDetailList();
+}
+
+function exitCoopSelectionMode(){
+  coopSelectionMode = false;
+  selectedBirdIds.clear();
+  renderCoopDetailList();
+}
+
+function birdsInCurrentCoop(){
+  if(!currentCoopDetailId) return [];
+  const isUnassigned = currentCoopDetailId === '__unassigned';
+  return state.chickens.filter(c => !c.isDeceased && (isUnassigned ? !c.coopId : c.coopId === currentCoopDetailId));
+}
+
+function toggleSelectAllInCoop(){
+  const matches = birdsInCurrentCoop();
+  const allSelected = matches.length > 0 && matches.every(c => selectedBirdIds.has(c.id));
+  matches.forEach(c => { if(allSelected) selectedBirdIds.delete(c.id); else selectedBirdIds.add(c.id); });
+  renderCoopDetailList();
+}
+
 function renderBulkMoveBars(){
   const count = selectedBirdIds.size;
-  ['bulk-move-bar', 'coop-bulk-move-bar'].forEach(id => {
-    const bar = document.getElementById(id);
-    if(bar) bar.style.display = count ? 'block' : 'none';
-  });
-  ['bulk-move-count', 'coop-bulk-move-count'].forEach(id => {
-    const el = document.getElementById(id);
-    if(el) el.textContent = count;
-  });
+
+  const bar = document.getElementById('bulk-move-bar');
+  if(bar) bar.style.display = count ? 'block' : 'none';
+  const countEl = document.getElementById('bulk-move-count');
+  if(countEl) countEl.textContent = count;
+
+  const coopBar = document.getElementById('coop-bulk-move-bar');
+  if(coopBar) coopBar.style.display = coopSelectionMode ? 'block' : 'none';
+  const coopCountEl = document.getElementById('coop-bulk-move-count');
+  if(coopCountEl) coopCountEl.textContent = count;
 }
 
 function populateBulkMoveCoopOptions(){
@@ -2149,6 +2183,7 @@ async function moveSelectedBirdsToCoop(selectElId, statusElId){
   const { error } = await sb.from('chickens').update({ coop_id: coopVal || null }).in('id', ids);
   if(error){ setStatus(statusElId, error.message, true); return; }
   selectedBirdIds.clear();
+  coopSelectionMode = false;
   await loadFlockData();
   renderBulkMoveBars();
   refreshFlockViews();
@@ -2200,19 +2235,26 @@ function renderCoopsList(){
 function renderCoopDetailList(){
   const el = document.getElementById('coop-detail-list');
   if(!el || !currentCoopDetailId) return;
-  const isUnassigned = currentCoopDetailId === '__unassigned';
   const readOnly = isReadOnly();
-  const matches = state.chickens.filter(c => !c.isDeceased && (isUnassigned ? !c.coopId : c.coopId === currentCoopDetailId));
+  const matches = birdsInCurrentCoop();
   el.innerHTML = matches.length
-    ? sortByTagAsc(matches).map(c => chickenCardHtml(c, readOnly, 'coop-detail', true)).join('')
+    ? sortByTagAsc(matches).map(c => chickenCardHtml(c, readOnly, 'coop-detail', coopSelectionMode)).join('')
     : '<p class="empty">No birds in this coop.</p>';
   populateBulkMoveCoopOptions();
+  const massMoveBtn = document.getElementById('coop-mass-move-btn');
+  if(massMoveBtn) massMoveBtn.style.display = (!readOnly && matches.length) ? 'block' : 'none';
+  const selectAllBtn = document.getElementById('coop-select-all-btn');
+  if(selectAllBtn){
+    const allSelected = matches.length > 0 && matches.every(c => selectedBirdIds.has(c.id));
+    selectAllBtn.textContent = allSelected ? 'Deselect all' : 'Select all';
+  }
   renderBulkMoveBars();
 }
 
 function openCoopDetail(id){
   currentCoopDetailId = id;
   selectedBirdIds.clear();
+  coopSelectionMode = false;
   const isUnassigned = id === '__unassigned';
   const coop = isUnassigned ? null : state.coops.find(c => c.id === id);
   document.getElementById('coop-detail-name').textContent = isUnassigned ? 'Unassigned' : (coop ? coop.name : 'Coop');
