@@ -232,15 +232,10 @@
   </div>
 
   <div class="tabbar">
-    <button class="tab-btn active" data-tab="eggs" onclick="switchTab('eggs')">Egg Count</button>
-    <button class="tab-btn" data-tab="chickens" onclick="switchTab('chickens')">Chickens</button>
-    <button class="tab-btn" data-tab="health" onclick="switchTab('health')">Health Checks</button>
+    <div id="tabbar-buttons" style="display:contents;"></div>
     <button class="menu-toggle-btn" id="menu-toggle-btn" onclick="toggleMenu()" aria-label="More">&#9776;</button>
   </div>
-  <div class="menu-panel" id="menu-panel">
-    <button class="tab-btn" data-tab="sharing" onclick="switchTab('sharing')">Sharing</button>
-    <button class="tab-btn" data-tab="account" onclick="switchTab('account')">Account</button>
-  </div>
+  <div class="menu-panel" id="menu-panel"></div>
 
   <div class="wrap">
 
@@ -548,6 +543,13 @@
         <div class="status" id="account-status"></div>
       </section>
 
+      <section>
+        <p class="sec-title">Top Tabs</p>
+        <p class="share-note" style="margin-bottom:10px;">Choose the 3 tabs shown along the top. Everything else moves into the &#9776; menu.</p>
+        <div id="tab-layout-options"></div>
+        <div class="status" id="tab-layout-status"></div>
+      </section>
+
       <section id="chicken-import-section">
         <p class="sec-title">Import Chickens</p>
         <p class="share-note" style="margin-bottom:10px;">Paste one chicken (or duck, quail, etc.) per line. Just a name works, or add details separated by commas: <code>Name, Tag, Tag Colour, Animal, Breed, Gender, DOB (YYYY-MM-DD), Expected Eggs/Year, Egg Colour, Notes</code>. Animal defaults to Chicken if left blank. Anything after the Egg Colour is treated as notes, commas and all.</p>
@@ -635,7 +637,82 @@ function setStatus(id, msg, isError){
 
 function isReadOnly(){ return currentRole === 'viewer'; }
 
-const MENU_TABS = ['sharing', 'account'];
+const MENU_TABS = [];
+
+const ALL_TABS = [
+  { id: 'eggs', label: 'Egg Count' },
+  { id: 'chickens', label: 'Chickens' },
+  { id: 'health', label: 'Health Checks' },
+  { id: 'sharing', label: 'Sharing' },
+  { id: 'account', label: 'Account' }
+];
+const DEFAULT_TOP_TABS = ['eggs', 'chickens', 'health'];
+let topTabs = DEFAULT_TOP_TABS.slice();
+
+function tabLayoutStorageKey(){
+  return 'chickenKeeperTopTabs_' + (currentUser ? currentUser.id : 'anon');
+}
+
+function loadTabLayout(){
+  topTabs = DEFAULT_TOP_TABS.slice();
+  try{
+    const raw = localStorage.getItem(tabLayoutStorageKey());
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(Array.isArray(parsed) && parsed.length && parsed.every(id => ALL_TABS.some(t => t.id === id))){
+        topTabs = parsed.slice(0, 3);
+      }
+    }
+  } catch(e){}
+}
+
+function saveTabLayout(){
+  try{ localStorage.setItem(tabLayoutStorageKey(), JSON.stringify(topTabs)); } catch(e){}
+}
+
+function renderTabbar(){
+  const activeEl = document.querySelector('.tab-panel.active');
+  const activeTab = activeEl ? activeEl.id.replace('tab-', '') : 'eggs';
+
+  const menuTabIds = ALL_TABS.filter(t => !topTabs.includes(t.id)).map(t => t.id);
+  MENU_TABS.length = 0;
+  MENU_TABS.push(...menuTabIds);
+
+  const tabButtonHtml = (t) => `<button class="tab-btn" data-tab="${t.id}" onclick="switchTab('${t.id}')">${t.label}</button>`;
+
+  document.getElementById('tabbar-buttons').innerHTML = topTabs.map(id => tabButtonHtml(ALL_TABS.find(t => t.id === id))).join('');
+  document.getElementById('menu-panel').innerHTML = menuTabIds.map(id => tabButtonHtml(ALL_TABS.find(t => t.id === id))).join('');
+
+  const validTab = topTabs.includes(activeTab) || menuTabIds.includes(activeTab) ? activeTab : (topTabs[0] || 'eggs');
+  switchTab(validTab);
+}
+
+function renderTabLayoutOptions(){
+  const el = document.getElementById('tab-layout-options');
+  if(!el) return;
+  el.innerHTML = ALL_TABS.map(t => {
+    const checked = topTabs.includes(t.id);
+    const disable = !checked && topTabs.length >= 3;
+    return `
+    <div class="checkbox-row">
+      <input type="checkbox" id="tabopt-${t.id}" ${checked ? 'checked' : ''} ${disable ? 'disabled' : ''} onchange="onTabLayoutCheckboxChange('${t.id}', this.checked)">
+      <label for="tabopt-${t.id}">${t.label}</label>
+    </div>`;
+  }).join('');
+}
+
+function onTabLayoutCheckboxChange(tabId, checked){
+  if(checked){
+    if(!topTabs.includes(tabId) && topTabs.length < 3) topTabs.push(tabId);
+  } else {
+    topTabs = topTabs.filter(id => id !== tabId);
+  }
+  saveTabLayout();
+  renderTabLayoutOptions();
+  renderTabbar();
+  const remaining = 3 - topTabs.length;
+  setStatus('tab-layout-status', remaining > 0 ? `Pick ${remaining} more tab${remaining === 1 ? '' : 's'}.` : 'Saved.', remaining > 0);
+}
 
 function switchTab(tab){
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
@@ -735,6 +812,7 @@ async function logout(){
   currentFlockOwnerId = null;
   currentRole = 'owner';
   state = { eggs: [], chickens: [], healthChecks: [] };
+  topTabs = DEFAULT_TOP_TABS.slice();
   document.getElementById('app-screen').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'block';
 }
@@ -744,6 +822,8 @@ async function onLoggedIn(user){
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app-screen').style.display = 'block';
   document.getElementById('user-email').textContent = user.email;
+  loadTabLayout();
+  renderTabbar();
 
   await ensureProfile();
   await acceptPendingInvites();
@@ -2282,6 +2362,7 @@ async function removeCollaborator(id){
 // ---------- ACCOUNT ----------
 function renderAccountTab(){
   document.getElementById('account-email-display').textContent = currentUser ? currentUser.email : '';
+  renderTabLayoutOptions();
 }
 
 async function changePassword(){
