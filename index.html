@@ -112,17 +112,13 @@
   .icon-row{display:flex;gap:6px;flex-shrink:0;}
 
   /* Chickens */
-  .chicken-card{background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;}
+  .chicken-card{background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px;cursor:pointer;}
   .chicken-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;}
   .chicken-name{font-family:'Oswald',sans-serif;font-weight:600;font-size:16px;}
   .chicken-meta{font-size:12px;color:var(--text-dim);margin-top:2px;}
   .chicken-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;font-size:13px;}
   .chicken-grid > div{overflow:hidden;}
   .chicken-notes{font-size:12px;color:var(--text-dim);font-style:italic;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
-  .chicken-history{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
-  summary.chicken-history-toggle{cursor:pointer;user-select:none;font-size:11px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
-  summary.chicken-history-toggle::marker{color:var(--amber);}
-  .chicken-history-body{margin-top:8px;}
   .chicken-label{display:block;font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);}
   .gender-tag{display:inline-block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:20px;margin-left:6px;vertical-align:middle;}
   .gender-tag.hen{background:var(--amber-dim);color:var(--amber);}
@@ -319,68 +315,8 @@
         </div>
       </section>
 
-      <section id="chicken-form-section">
-        <details id="chicken-form-details">
-          <summary class="sec-title" id="chicken-form-title">Add a Chicken</summary>
-          <div class="row">
-            <div><label>Name</label><input type="text" id="ch-name" placeholder="e.g. Henrietta"></div>
-          </div>
-          <div class="row">
-            <div><label>Leg / tag number</label><input type="text" id="ch-tag" placeholder="e.g. 14"></div>
-            <div><label>Tag colour</label><input type="text" id="ch-tag-colour" placeholder="e.g. Red"></div>
-          </div>
-          <div class="row">
-            <div>
-              <label>Animal</label>
-              <select id="ch-animal" onchange="onAnimalChange()">
-                <option value="Chicken">Chicken</option>
-                <option value="Duck">Duck</option>
-                <option value="Quail">Quail</option>
-                <option value="Goose">Goose</option>
-                <option value="Turkey">Turkey</option>
-                <option value="Guinea Fowl">Guinea Fowl</option>
-                <option value="Swan">Swan</option>
-                <option value="__custom">Other (type below)</option>
-              </select>
-            </div>
-          </div>
-          <div class="row" id="ch-animal-custom-row" style="display:none;">
-            <div><label>Animal name</label><input type="text" id="ch-animal-custom" placeholder="e.g. Peacock"></div>
-          </div>
-          <div class="row">
-            <div>
-              <label>Breed</label>
-              <select id="ch-breed" onchange="onBreedChange()"></select>
-            </div>
-          </div>
-          <div class="row" id="ch-breed-custom-row" style="display:none;">
-            <div><label>Breed name</label><input type="text" id="ch-breed-custom" placeholder="e.g. Cream Legbar"></div>
-          </div>
-          <div class="row">
-            <div>
-              <label>Gender</label>
-              <select id="ch-gender" onchange="onGenderChange()"></select>
-            </div>
-            <div><label>Date of birth</label><input type="date" id="ch-dob"></div>
-          </div>
-          <div class="row" id="ch-eggs-row">
-            <div><label>Expected eggs / year</label><input type="number" min="0" id="ch-expected" placeholder="e.g. 250"></div>
-            <div><label>Egg colour</label><input type="text" id="ch-egg-colour" placeholder="e.g. Blue"></div>
-          </div>
-          <div class="row">
-            <div><label>Notes</label><textarea id="ch-notes" placeholder="e.g. Bent beak, rescued 2024"></textarea></div>
-          </div>
-          <div class="checkbox-row">
-            <input type="checkbox" id="ch-deceased" onchange="onDeceasedToggle()">
-            <label for="ch-deceased">This chicken has died</label>
-          </div>
-          <div class="row" id="ch-deceased-date-row" style="display:none;">
-            <div><label>Deceased date</label><input type="date" id="ch-deceased-date"></div>
-          </div>
-          <button class="btn full" onclick="saveChicken()">Save chicken</button>
-          <button class="btn secondary full" id="ch-cancel-btn" style="display:none;margin-top:8px;" onclick="cancelEditChicken()">Cancel edit</button>
-          <div class="status" id="chicken-status"></div>
-        </details>
+      <section>
+        <button class="btn full" id="add-chicken-btn" onclick="openChickenDetail(null)">+ Add a Chicken</button>
       </section>
 
       <section id="chicken-filter-section">
@@ -398,14 +334,15 @@
           </div>
         </div>
         <div class="row">
+          <div><label>Name</label><input type="text" id="filter-name" oninput="onChickenFilterChange()" placeholder="e.g. Henrietta"></div>
+        </div>
+        <div class="row">
           <div><label>Animal</label><select id="filter-animal" onchange="onChickenFilterChange()"><option value="">All</option></select></div>
           <div><label>Gender</label><select id="filter-gender" onchange="onChickenFilterChange()"><option value="">All</option><option value="Female">Female</option><option value="Male">Male</option></select></div>
         </div>
         <div class="row">
           <div><label>Tag colour</label><select id="filter-tag-colour" onchange="onChickenFilterChange()"><option value="">All</option></select></div>
-        </div>
-        <div class="row" id="filter-tag-single-row">
-          <div><label>Tag number</label><input type="number" id="filter-tag-exact" oninput="onChickenFilterChange()" placeholder="e.g. 14"></div>
+          <div id="filter-tag-exact-wrap"><label>Tag number</label><input type="number" id="filter-tag-exact" oninput="onChickenFilterChange()" placeholder="e.g. 14"></div>
         </div>
         <div class="row" id="filter-tag-range-row" style="display:none;">
           <div><label>Tag number from</label><input type="number" id="filter-tag-from" oninput="onChickenFilterChange()" placeholder="e.g. 1"></div>
@@ -429,6 +366,80 @@
           <summary class="sec-title">Losses (<span id="losses-summary">0</span>)</summary>
           <div id="losses-list"></div>
         </details>
+      </section>
+    </div>
+
+    <!-- CHICKEN DETAIL PAGE -->
+    <div id="tab-chicken-detail" class="tab-panel">
+      <button type="button" class="btn secondary" style="margin-bottom:14px;" onclick="closeChickenDetail()">&larr; Back to Chickens</button>
+      <p class="eyebrow">Chicken Profile</p>
+      <h1 id="chicken-detail-name">Chicken</h1>
+
+      <section id="chicken-form-section">
+        <p class="sec-title" id="chicken-form-title">Add a Chicken</p>
+        <div class="row">
+          <div><label>Name</label><input type="text" id="ch-name" placeholder="e.g. Henrietta"></div>
+        </div>
+        <div class="row">
+          <div><label>Leg / tag number</label><input type="text" id="ch-tag" placeholder="e.g. 14"></div>
+          <div><label>Tag colour</label><input type="text" id="ch-tag-colour" placeholder="e.g. Red"></div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Animal</label>
+            <select id="ch-animal" onchange="onAnimalChange()">
+              <option value="Chicken">Chicken</option>
+              <option value="Duck">Duck</option>
+              <option value="Quail">Quail</option>
+              <option value="Goose">Goose</option>
+              <option value="Turkey">Turkey</option>
+              <option value="Guinea Fowl">Guinea Fowl</option>
+              <option value="Swan">Swan</option>
+              <option value="__custom">Other (type below)</option>
+            </select>
+          </div>
+        </div>
+        <div class="row" id="ch-animal-custom-row" style="display:none;">
+          <div><label>Animal name</label><input type="text" id="ch-animal-custom" placeholder="e.g. Peacock"></div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Breed</label>
+            <select id="ch-breed" onchange="onBreedChange()"></select>
+          </div>
+        </div>
+        <div class="row" id="ch-breed-custom-row" style="display:none;">
+          <div><label>Breed name</label><input type="text" id="ch-breed-custom" placeholder="e.g. Cream Legbar"></div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Gender</label>
+            <select id="ch-gender" onchange="onGenderChange()"></select>
+          </div>
+          <div><label>Date of birth</label><input type="date" id="ch-dob"></div>
+        </div>
+        <div class="row" id="ch-eggs-row">
+          <div><label>Expected eggs / year</label><input type="number" min="0" id="ch-expected" placeholder="e.g. 250"></div>
+          <div><label>Egg colour</label><input type="text" id="ch-egg-colour" placeholder="e.g. Blue"></div>
+        </div>
+        <div class="row">
+          <div><label>Notes</label><textarea id="ch-notes" placeholder="e.g. Bent beak, rescued 2024"></textarea></div>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="ch-deceased" onchange="onDeceasedToggle()">
+          <label for="ch-deceased">This chicken has died</label>
+        </div>
+        <div class="row" id="ch-deceased-date-row" style="display:none;">
+          <div><label>Deceased date</label><input type="date" id="ch-deceased-date"></div>
+        </div>
+        <button class="btn full" onclick="saveChicken()">Save chicken</button>
+        <button class="btn secondary full" id="ch-cancel-btn" style="display:none;margin-top:8px;" onclick="cancelEditChicken()">Cancel edit</button>
+        <div class="status" id="chicken-status"></div>
+      </section>
+
+      <section id="chicken-detail-history-section" style="display:none;">
+        <p class="sec-title">Health Check History</p>
+        <div id="chicken-detail-history"></div>
       </section>
     </div>
 
@@ -585,6 +596,8 @@ let currentFlockOwnerId = null;
 let currentRole = 'owner';
 let state = { eggs: [], chickens: [], healthChecks: [] };
 let editingChickenId = null;
+let currentDetailChickenId = null;
+let editingHc = null; // { prefix, recordId, chickenId, items: {key: {status, note}} } | null
 let pendingImportPayloads = [];
 let hcSession = null; // { date, pool: [{id,name,tag}], completed: [{chickenId,chickenName,items}], current: {chickenId,chickenName,items} | null }
 
@@ -826,6 +839,7 @@ function applyRolePermissions(){
   document.getElementById('egg-form-section').style.display = readOnly ? 'none' : 'block';
   document.getElementById('chicken-import-section').style.display = readOnly ? 'none' : 'block';
   document.getElementById('chicken-form-section').style.display = readOnly ? 'none' : 'block';
+  document.getElementById('add-chicken-btn').style.display = readOnly ? 'none' : 'block';
   document.getElementById('hc-setup-section').style.display = readOnly ? 'none' : 'block';
   if(readOnly){
     document.getElementById('hc-picker-section').style.display = 'none';
@@ -844,6 +858,9 @@ function renderAll(){
   applyRolePermissions();
   renderEggs();
   renderChickens();
+  if(document.getElementById('tab-chicken-detail').classList.contains('active')) switchTab('chickens');
+  currentDetailChickenId = null;
+  editingHc = null;
   hcSession = null;
   document.getElementById('hc-setup-section').style.display = isReadOnly() ? 'none' : 'block';
   document.getElementById('hc-picker-section').style.display = 'none';
@@ -1196,7 +1213,6 @@ function resetChickenForm(){
   document.getElementById('ch-deceased-date-row').style.display = 'none';
   document.getElementById('chicken-form-title').textContent = 'Add a Chicken';
   document.getElementById('ch-cancel-btn').style.display = 'none';
-  document.getElementById('chicken-form-details').open = false;
 }
 
 function onDeceasedToggle(){
@@ -1245,10 +1261,9 @@ async function saveChicken(){
   if(error){ setStatus('chicken-status', error.message, true); return; }
 
   await loadFlockData();
-  resetChickenForm();
-  setStatus('chicken-status', 'Saved.', false);
   renderChickens();
   renderHcSetupInfo();
+  closeChickenDetail();
 }
 
 function findBreedPreset(breedInput){
@@ -1405,7 +1420,7 @@ let tagRangeMode = false;
 
 function toggleTagRangeMode(){
   tagRangeMode = !tagRangeMode;
-  document.getElementById('filter-tag-single-row').style.display = tagRangeMode ? 'none' : 'flex';
+  document.getElementById('filter-tag-exact-wrap').style.display = tagRangeMode ? 'none' : 'block';
   document.getElementById('filter-tag-range-row').style.display = tagRangeMode ? 'flex' : 'none';
   document.getElementById('tag-range-toggle-btn').textContent = tagRangeMode ? 'Search a single tag instead' : 'Search a range instead';
   if(tagRangeMode){
@@ -1420,6 +1435,7 @@ function toggleTagRangeMode(){
 function getChickenFilters(){
   const num = (id) => { const v = document.getElementById(id).value; return v === '' ? null : Number(v); };
   return {
+    name: document.getElementById('filter-name').value.trim().toLowerCase(),
     animalType: document.getElementById('filter-animal').value,
     gender: document.getElementById('filter-gender').value,
     tagColour: document.getElementById('filter-tag-colour').value,
@@ -1432,6 +1448,7 @@ function getChickenFilters(){
 }
 
 function chickenMatchesFilters(c, f){
+  if(f.name && !(c.name || '').toLowerCase().includes(f.name)) return false;
   if(f.animalType && (c.animalType || 'Chicken') !== f.animalType) return false;
   if(f.gender === 'Male' && !isMaleGender(c.gender)) return false;
   if(f.gender === 'Female' && isMaleGender(c.gender)) return false;
@@ -1461,6 +1478,7 @@ function onChickenFilterChange(){
 
 function clearChickenFilters(){
   document.getElementById('filter-sort').value = 'tag-asc';
+  document.getElementById('filter-name').value = '';
   document.getElementById('filter-animal').value = '';
   document.getElementById('filter-gender').value = '';
   document.getElementById('filter-tag-colour').value = '';
@@ -1470,7 +1488,7 @@ function clearChickenFilters(){
   document.getElementById('filter-age-from').value = '';
   document.getElementById('filter-age-to').value = '';
   tagRangeMode = false;
-  document.getElementById('filter-tag-single-row').style.display = 'flex';
+  document.getElementById('filter-tag-exact-wrap').style.display = 'block';
   document.getElementById('filter-tag-range-row').style.display = 'none';
   document.getElementById('tag-range-toggle-btn').textContent = 'Search a range instead';
   renderChickens();
@@ -1563,12 +1581,36 @@ function editChicken(id){
   document.getElementById('ch-deceased-date-row').style.display = c.isDeceased ? 'flex' : 'none';
   document.getElementById('chicken-form-title').textContent = 'Edit Chicken';
   document.getElementById('ch-cancel-btn').style.display = 'block';
-  document.getElementById('chicken-form-details').open = true;
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function cancelEditChicken(){
+  closeChickenDetail();
+}
+
+function openChickenDetail(id){
+  editingHc = null;
+  currentDetailChickenId = id;
+  if(id){
+    const c = state.chickens.find(x => x.id === id);
+    document.getElementById('chicken-detail-name').textContent = c ? c.name : 'Chicken';
+    editChicken(id);
+    document.getElementById('chicken-detail-history-section').style.display = 'block';
+    renderChickenDetailHistory(id);
+  } else {
+    resetChickenForm();
+    document.getElementById('chicken-detail-name').textContent = 'Add a Chicken';
+    document.getElementById('chicken-detail-history-section').style.display = 'none';
+  }
+  switchTab('chicken-detail');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function closeChickenDetail(){
+  currentDetailChickenId = null;
+  editingHc = null;
   resetChickenForm();
+  switchTab('chickens');
 }
 
 async function deleteChicken(id){
@@ -1586,7 +1628,7 @@ function chickenCardHtml(c, readOnly){
   const genderClass = isMale ? 'rooster' : 'hen';
   const tagText = [c.tag, c.tagColour].filter(Boolean).join(' &middot; ') || '—';
   return `
-    <div class="chicken-card ${c.isDeceased ? 'deceased' : ''}">
+    <div class="chicken-card ${c.isDeceased ? 'deceased' : ''}" onclick="openChickenDetail('${c.id}')">
       <div class="chicken-card-head">
         <div>
           <div class="chicken-name">${escapeHtml(c.name)}<span class="gender-tag ${genderClass}">${escapeHtml(c.gender || 'Hen')}</span>${c.isDeceased ? '<span class="deceased-tag">Lost</span>' : ''}</div>
@@ -1594,8 +1636,7 @@ function chickenCardHtml(c, readOnly){
         </div>
         ${readOnly ? '' : `
         <div class="icon-row">
-          <button class="icon-btn" onclick="editChicken('${c.id}')" aria-label="Edit">&#9998;</button>
-          <button class="icon-btn danger" onclick="deleteChicken('${c.id}')" aria-label="Delete">&#10005;</button>
+          <button class="icon-btn danger" onclick="event.stopPropagation(); deleteChicken('${c.id}')" aria-label="Delete">&#10005;</button>
         </div>`}
       </div>
       <div class="chicken-grid">
@@ -1608,7 +1649,6 @@ function chickenCardHtml(c, readOnly){
         ${c.isDeceased ? `<div><span class="chicken-label">Deceased</span><span>${c.deceasedDate ? formatDateNice(c.deceasedDate) : '—'}</span></div>` : ''}
       </div>
       ${c.notes ? `<div class="chicken-notes">${escapeHtml(c.notes)}</div>` : ''}
-      ${chickenHistorySectionHtml(c.id)}
     </div>`;
 }
 
@@ -1886,7 +1926,7 @@ async function finishHealthCheckSession(){
   document.getElementById('hc-date').value = todayStr();
   renderHcSetupInfo();
   setStatus('hc-setup-status', 'Health check saved.', false);
-  renderHealthHistory();
+  refreshHcHistoryViews();
   renderChickens();
 }
 
@@ -1922,36 +1962,153 @@ function getHealthHistoryForChicken(chickenId){
   return out.sort((a, b) => a.date < b.date ? 1 : -1);
 }
 
-function chickenHistorySectionHtml(chickenId){
-  const entries = getHealthHistoryForChicken(chickenId);
-  if(!entries.length) return '';
+function hcEditPrefix(recordId, chickenId){
+  return recordId + '__' + chickenId;
+}
+
+function startEditHcBird(recordId, chickenId){
+  const rec = state.healthChecks.find(r => String(r.id) === String(recordId));
+  if(!rec) return;
+  const isSession = Array.isArray(rec.items) && rec.items.length > 0 && Array.isArray(rec.items[0].items);
+  const rawItems = isSession
+    ? ((rec.items.find(b => String(b.chickenId) === String(chickenId)) || {}).items || [])
+    : rec.items;
+  const items = {};
+  rawItems.forEach(i => { items[i.key] = { status: i.status === 'unchecked' ? '' : i.status, note: i.note || '' }; });
+  editingHc = { prefix: hcEditPrefix(recordId, chickenId), recordId: String(recordId), chickenId: String(chickenId), items };
+  refreshHcHistoryViews();
+}
+
+function cancelEditHcBird(){
+  editingHc = null;
+  refreshHcHistoryViews();
+}
+
+function setEditHcItemStatus(prefix, key, val){
+  if(!editingHc || editingHc.prefix !== prefix) return;
+  const item = HEALTH_ITEMS.find(i => i.key === key);
+  editingHc.items[key] = editingHc.items[key] || {};
+  editingHc.items[key].status = val;
+  const card = document.querySelector('.hc-item[data-editkey="' + prefix + '__' + key + '"]');
+  if(!card) return;
+  card.querySelectorAll('.hc-opt').forEach(b => b.classList.toggle('selected', String(b.dataset.val) === String(val)));
+  const isIssue = hcIsIssueStatus(item, val);
+  const isGood = hcIsGoodStatus(item, val);
+  const noteEl = document.getElementById('edit-note-' + prefix + '__' + key);
+  if(noteEl) noteEl.style.display = (isIssue || hcNoteAlwaysVisible(item)) ? 'block' : 'none';
+  card.classList.toggle('flag-issue', isIssue);
+  card.classList.toggle('flag-good', isGood);
+}
+
+function editHcNoteInput(prefix, key){
+  if(!editingHc || editingHc.prefix !== prefix) return;
+  editingHc.items[key] = editingHc.items[key] || {};
+  editingHc.items[key].note = document.getElementById('edit-note-' + prefix + '__' + key).value;
+}
+
+async function saveEditedHcBird(){
+  if(!editingHc) return;
+  const { recordId, chickenId, items } = editingHc;
+  const rec = state.healthChecks.find(r => String(r.id) === String(recordId));
+  if(!rec) return;
+
+  const newItems = HEALTH_ITEMS.map(i => ({
+    key: i.key,
+    name: i.name,
+    status: (items[i.key] && items[i.key].status) || 'unchecked',
+    note: (items[i.key] && items[i.key].note) || ''
+  }));
+
+  const isSession = Array.isArray(rec.items) && rec.items.length > 0 && Array.isArray(rec.items[0].items);
+  const updatedItems = isSession
+    ? rec.items.map(b => String(b.chickenId) === String(chickenId) ? { ...b, items: newItems } : b)
+    : newItems;
+
+  const { error } = await sb.from('health_checks').update({ items: updatedItems }).eq('id', recordId);
+  if(error){ setStatus('hc-edit-status', error.message, true); return; }
+
+  editingHc = null;
+  await loadFlockData();
+  refreshHcHistoryViews();
+  renderChickens();
+}
+
+function hcEditableItemsHtml(prefix, itemState){
+  return HEALTH_ITEMS.map(item => {
+    const current = itemState[item.key] || {};
+    const isIssue = hcIsIssueStatus(item, current.status);
+    const isGood = hcIsGoodStatus(item, current.status);
+    const editKey = prefix + '__' + item.key;
+    const toggleHtml = item.scoreOptions
+      ? `<div class="hc-toggle hc-score-toggle">${item.scoreOptions.map(n => `
+          <button type="button" class="hc-opt score ${String(current.status) === String(n) ? 'selected' : ''}" data-val="${n}" onclick="setEditHcItemStatus('${prefix}','${item.key}','${n}')">${n}</button>
+        `).join('')}</div>`
+      : `<div class="hc-toggle">
+          <button type="button" class="hc-opt good ${current.status === 'good' ? 'selected' : ''}" data-val="good" onclick="setEditHcItemStatus('${prefix}','${item.key}','good')">&#10003; All good</button>
+          <button type="button" class="hc-opt issue ${current.status === 'issue' ? 'selected' : ''}" data-val="issue" onclick="setEditHcItemStatus('${prefix}','${item.key}','issue')">&#9888; Issue</button>
+        </div>`;
+    return `
+    <div class="hc-item ${isIssue ? 'flag-issue' : (isGood ? 'flag-good' : '')}" data-editkey="${editKey}">
+      <div class="hc-item-head"><span class="hc-item-name">${item.name}</span></div>
+      ${toggleHtml}
+      <textarea class="hc-note" id="edit-note-${editKey}" placeholder="What did you notice?" style="display:${(isIssue || hcNoteAlwaysVisible(item)) ? 'block' : 'none'};" oninput="editHcNoteInput('${prefix}','${item.key}')">${escapeHtml(current.note || '')}</textarea>
+    </div>`;
+  }).join('');
+}
+
+function hcBirdRecordBodyHtml(recordId, chickenId, items){
+  const prefix = hcEditPrefix(recordId, chickenId);
+  if(editingHc && editingHc.prefix === prefix){
+    return `
+      <div class="hc-edit-items">${hcEditableItemsHtml(prefix, editingHc.items)}</div>
+      <div class="row" style="margin-top:8px;">
+        <div><button type="button" class="btn secondary full" onclick="cancelEditHcBird()">Cancel</button></div>
+        <div><button type="button" class="btn full" onclick="saveEditedHcBird()">Save changes</button></div>
+      </div>
+      <div class="status" id="hc-edit-status"></div>`;
+  }
   return `
-    <details class="chicken-history">
-      <summary class="chicken-history-toggle">Health check history (${entries.length})</summary>
-      <div class="chicken-history-body">
-        ${entries.map(entry => {
-          const issues = entry.items.filter(historyItemIsIssue);
-          const badge = issues.length
-            ? `<span class="issue-badge">${issues.length} issue${issues.length > 1 ? 's' : ''}</span>`
-            : `<span class="ok-badge">All good</span>`;
-          return `
-          <details class="hc-record">
-            <summary class="hc-record-summary">
-              <span class="who">${formatDateNice(entry.date)}</span>
-              ${badge}
-            </summary>
-            <div class="hc-record-body">
-              ${entry.items.map(i => {
-                const { cls, label } = historyItemDisplay(i);
-                return `
-                <div class="hc-record-row"><span>${escapeHtml(i.name)}</span><span class="${cls}">${label}</span></div>
-                ${i.note ? `<div class="hc-record-note">${escapeHtml(i.note)}</div>` : ''}`;
-              }).join('')}
-            </div>
-          </details>`;
-        }).join('')}
+    ${items.map(i => {
+      const { cls, label } = historyItemDisplay(i);
+      return `
+      <div class="hc-record-row"><span>${escapeHtml(i.name)}</span><span class="${cls}">${label}</span></div>
+      ${i.note ? `<div class="hc-record-note">${escapeHtml(i.note)}</div>` : ''}`;
+    }).join('')}
+    ${isReadOnly() ? '' : `<button type="button" class="btn secondary" style="margin-top:8px;" onclick="startEditHcBird('${recordId}','${chickenId}')">Edit this check</button>`}
+  `;
+}
+
+function chickenHealthHistoryHtml(chickenId){
+  const entries = getHealthHistoryForChicken(chickenId);
+  if(!entries.length) return '<p class="empty">No health checks recorded yet.</p>';
+  return entries.map(entry => {
+    const issues = entry.items.filter(historyItemIsIssue);
+    const badge = issues.length
+      ? `<span class="issue-badge">${issues.length} issue${issues.length > 1 ? 's' : ''}</span>`
+      : `<span class="ok-badge">All good</span>`;
+    const isOpenForEdit = editingHc && editingHc.prefix === hcEditPrefix(entry.id, chickenId);
+    return `
+    <details class="hc-record" ${isOpenForEdit ? 'open' : ''}>
+      <summary class="hc-record-summary">
+        <span class="who">${formatDateNice(entry.date)}</span>
+        ${badge}
+      </summary>
+      <div class="hc-record-body">
+        ${hcBirdRecordBodyHtml(entry.id, chickenId, entry.items)}
       </div>
     </details>`;
+  }).join('');
+}
+
+function renderChickenDetailHistory(chickenId){
+  const el = document.getElementById('chicken-detail-history');
+  if(!el) return;
+  el.innerHTML = chickenHealthHistoryHtml(chickenId);
+}
+
+function refreshHcHistoryViews(){
+  renderHealthHistory();
+  if(currentDetailChickenId) renderChickenDetailHistory(currentDetailChickenId);
 }
 
 function renderHealthHistory(){
@@ -1968,8 +2125,9 @@ function renderHealthHistory(){
       const badge = totalIssues
         ? `<span class="issue-badge">${totalIssues} issue${totalIssues > 1 ? 's' : ''}</span>`
         : `<span class="ok-badge">All good</span>`;
+      const sessionOpenForEdit = editingHc && editingHc.recordId === String(r.id);
       return `
-      <details class="hc-record">
+      <details class="hc-record" ${sessionOpenForEdit ? 'open' : ''}>
         <summary class="hc-record-summary">
           <span class="who">${formatDateNice(r.date)} &middot; ${birds.length} bird${birds.length > 1 ? 's' : ''} checked</span>
           ${badge}
@@ -1983,12 +2141,7 @@ function renderHealthHistory(){
             return `
             <div class="hc-bird-block">
               <div class="hc-bird-block-name"><span>${escapeHtml(b.chickenName || chickenNameById(b.chickenId))}</span>${birdBadge}</div>
-              ${b.items.map(i => {
-                const { cls, label } = historyItemDisplay(i);
-                return `
-                <div class="hc-record-row"><span>${escapeHtml(i.name)}</span><span class="${cls}">${label}</span></div>
-                ${i.note ? `<div class="hc-record-note">${escapeHtml(i.note)}</div>` : ''}`;
-              }).join('')}
+              ${hcBirdRecordBodyHtml(r.id, b.chickenId, b.items)}
             </div>`;
           }).join('')}
           ${readOnly ? '' : `<button class="btn danger" style="margin-top:10px;" onclick="deleteHealthCheck('${r.id}')">Delete record</button>`}
@@ -2001,19 +2154,15 @@ function renderHealthHistory(){
     const badge = issues.length
       ? `<span class="issue-badge">${issues.length} issue${issues.length > 1 ? 's' : ''}</span>`
       : `<span class="ok-badge">All good</span>`;
+    const recordOpenForEdit = editingHc && editingHc.recordId === String(r.id);
     return `
-    <details class="hc-record">
+    <details class="hc-record" ${recordOpenForEdit ? 'open' : ''}>
       <summary class="hc-record-summary">
         <span class="who">${formatDateNice(r.date)} &middot; ${escapeHtml(chickenNameById(r.chickenId))}</span>
         ${badge}
       </summary>
       <div class="hc-record-body">
-        ${r.items.map(i => {
-          const { cls, label } = historyItemDisplay(i);
-          return `
-          <div class="hc-record-row"><span>${escapeHtml(i.name)}</span><span class="${cls}">${label}</span></div>
-          ${i.note ? `<div class="hc-record-note">${escapeHtml(i.note)}</div>` : ''}`;
-        }).join('')}
+        ${hcBirdRecordBodyHtml(r.id, r.chickenId, r.items)}
         ${readOnly ? '' : `<button class="btn danger" style="margin-top:10px;" onclick="deleteHealthCheck('${r.id}')">Delete record</button>`}
       </div>
     </details>`;
@@ -2024,8 +2173,9 @@ async function deleteHealthCheck(id){
   if(!confirm('Delete this health check record?')) return;
   const { error } = await sb.from('health_checks').delete().eq('id', id);
   if(error){ setStatus('hc-status', error.message, true); return; }
+  if(editingHc && editingHc.recordId === String(id)) editingHc = null;
   await loadFlockData();
-  renderHealthHistory();
+  refreshHcHistoryViews();
   renderChickens();
 }
 
