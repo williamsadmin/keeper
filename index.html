@@ -387,7 +387,6 @@
       </section>
 
       <section>
-        <p class="sec-title">Your Chickens</p>
         <div id="bulk-move-bar" style="display:none;margin-bottom:12px;">
           <div class="row">
             <div>
@@ -2173,6 +2172,33 @@ function sortChickens(list, prefix){
   return arr;
 }
 
+const IRREGULAR_ANIMAL_PLURALS = { 'Goose': 'Geese' };
+
+function pluralizeAnimalType(type){
+  const t = (type || 'Chicken').trim() || 'Chicken';
+  if(IRREGULAR_ANIMAL_PLURALS[t]) return IRREGULAR_ANIMAL_PLURALS[t];
+  if(/[sxz]$|[cs]h$/i.test(t)) return t + 'es';
+  if(/[^aeiou]y$/i.test(t)) return t.slice(0, -1) + 'ies';
+  return t + 's';
+}
+
+function animalTypeGroupsHtml(birds, readOnly){
+  const groups = {};
+  birds.forEach(c => {
+    const type = (c.animalType || 'Chicken').trim() || 'Chicken';
+    (groups[type] = groups[type] || []).push(c);
+  });
+  const types = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+  return types.map(type => {
+    const group = sortChickens(groups[type]);
+    return `
+      <details class="animal-type-group" open>
+        <summary class="sec-title">${escapeHtml(pluralizeAnimalType(type))} (${group.length})</summary>
+        <div>${group.map(c => chickenCardHtml(c, readOnly, 'animal-search', true)).join('')}</div>
+      </details>`;
+  }).join('');
+}
+
 function editChicken(id){
   const c = state.chickens.find(x => x.id === id);
   if(!c) return;
@@ -2319,13 +2345,13 @@ function renderChickens(){
   const readOnly = isReadOnly();
 
   if(!activeChickens.length){
-    listEl.innerHTML = '<p class="empty">No chickens added yet.</p>';
+    listEl.innerHTML = '<p class="empty">No animals added yet.</p>';
   } else {
     const filters = getChickenFilters();
-    const filtered = sortChickens(activeChickens.filter(c => chickenMatchesFilters(c, filters)));
+    const filtered = activeChickens.filter(c => chickenMatchesFilters(c, filters));
     listEl.innerHTML = filtered.length
-      ? filtered.map(c => chickenCardHtml(c, readOnly, 'animal-search', true)).join('')
-      : '<p class="empty">No chickens match these filters.</p>';
+      ? animalTypeGroupsHtml(filtered, readOnly)
+      : '<p class="empty">No animals match these filters.</p>';
   }
 
   document.getElementById('losses-summary').textContent = deceasedChickens.length;
