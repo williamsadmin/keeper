@@ -102,8 +102,8 @@
   .reminder-banner{background:var(--amber-dim);border:1px solid var(--amber);color:var(--amber);border-radius:8px;padding:12px 14px;font-weight:600;font-size:14px;margin-bottom:16px;}
   .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin-bottom:6px;}
   .stat-main{font-family:'Oswald',sans-serif;font-size:28px;font-weight:600;color:var(--amber);line-height:1;}
-  .stat-main.money-main{display:flex;flex-direction:column;align-items:flex-end;line-height:1.05;}
-  .stat-main.money-main .pence{font-size:.55em;}
+  .stat-main.money-main{position:relative;display:inline-block;font-size:22px;padding-bottom:13px;padding-right:2px;white-space:nowrap;}
+  .stat-main.money-main .pence{position:absolute;right:0;bottom:0;font-size:.6em;line-height:1;}
   .stat-sub{font-size:11px;color:var(--text-dim);margin:2px 0 8px;}
   .stat-headline-row{display:flex;}
   .stat-headline-row > div{flex:1;min-width:0;overflow-wrap:anywhere;}
@@ -175,9 +175,10 @@
   summary.hc-record-summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px;font-size:13px;font-weight:600;gap:8px;}
   summary.hc-record-summary::-webkit-details-marker{display:none;}
   summary.hc-record-summary .who{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .issue-badge, .ok-badge{flex-shrink:0;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;}
+  .issue-badge, .ok-badge, .credit-badge{flex-shrink:0;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;}
   .issue-badge{background:var(--danger);color:#203143;}
   .ok-badge{background:var(--teal);color:#203143;}
+  .credit-badge{display:inline-block;margin-top:4px;background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber);}
   .hc-record-body{padding:0 12px 12px;border-top:1px solid var(--border);}
   .hc-record-row{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;gap:8px;}
   .hc-record-note{font-size:11px;color:var(--text-dim);font-style:italic;padding:0 0 6px;}
@@ -3307,9 +3308,9 @@ function formatMoney(n){
 function moneyStatMainHtml(n){
   const str = formatMoney(n);
   const dot = str.lastIndexOf('.');
-  const whole = str.slice(0, dot);
-  const pence = str.slice(dot);
-  return `<div class="stat-main money-main">${whole}<span class="pence">${pence}</span></div>`;
+  const pound = str.slice(0, dot + 1);
+  const pence = str.slice(dot + 1);
+  return `<div class="stat-main money-main">${pound}<span class="pence">${pence}</span></div>`;
 }
 
 function customerBalance(customerId){
@@ -3500,7 +3501,7 @@ function customerCardHtml(c){
         <div>
           <div class="chicken-name">${escapeHtml(c.name)}</div>
           ${customerHasCustomPricing(c) ? '<div class="chicken-meta">Custom pricing</div>' : ''}
-          ${creditText !== 'None' ? `<div class="chicken-meta">Owed: ${escapeHtml(creditText)}</div>` : ''}
+          ${creditText !== 'None' ? `<div class="credit-badge">Owed: ${escapeHtml(creditText)}</div>` : ''}
         </div>
         <span class="${settled ? 'ok-badge' : 'issue-badge'}">${balLabel}</span>
       </div>
