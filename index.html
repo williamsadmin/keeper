@@ -183,6 +183,7 @@
 
   /* Sharing / Account */
   .share-note{font-size:13px;color:var(--text-dim);line-height:1.6;}
+  .alert-banner{background:rgba(226,87,76,.14);border:1px solid var(--danger);color:var(--danger);border-radius:8px;padding:10px 12px;font-weight:700;font-size:13px;line-height:1.5;}
   code{background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:12px;}
 
   /* Import preview */
@@ -686,6 +687,9 @@
           <div><label>Date</label><input type="date" id="sale-date"></div>
         </div>
         <div class="row">
+          <div><label>Search customers</label><input type="text" id="sale-customer-search" oninput="onSaleCustomerSearchChange()" placeholder="Type a name…"></div>
+        </div>
+        <div class="row">
           <div>
             <label>Customer</label>
             <select id="sale-customer" onchange="onSaleCustomerChange()">
@@ -705,8 +709,9 @@
           </div>
           <div><label>Quantity</label><input type="number" min="0" step="1" id="sale-quantity" oninput="onSaleUnitOrQtyChange()" placeholder="e.g. 2"></div>
         </div>
-        <p class="share-note">Standard charge: <strong id="sale-standard-charge">£0.00</strong></p>
+        <p class="share-note">Standard price for this sale: <strong id="sale-standard-charge">£0.00</strong></p>
         <div class="row">
+          <div><label>Amount charged</label><input type="number" min="0" step="0.01" id="sale-charged" oninput="onSaleChargedChange()"></div>
           <div><label>Amount paid</label><input type="number" min="0" step="0.01" id="sale-paid" oninput="onSalePaidChange()"></div>
         </div>
         <p class="share-note" id="sale-paid-status" style="margin-bottom:10px;"></p>
@@ -719,8 +724,13 @@
       </section>
 
       <section>
-        <p class="sec-title">Customers</p>
-        <div id="customers-list"></div>
+        <details id="customers-section">
+          <summary class="sec-title">Customers (<span id="customers-count">0</span>)</summary>
+          <div class="row">
+            <div><label>Search</label><input type="text" id="customers-search" oninput="renderCustomersList()" placeholder="Search by name…"></div>
+          </div>
+          <div id="customers-list"></div>
+        </details>
       </section>
     </div>
 
@@ -758,6 +768,35 @@
           <div class="stat-label" id="customer-balance-label">All settled</div>
           <div class="stat-main" id="customer-balance-amount">£0.00</div>
         </div>
+      </section>
+
+      <section id="customer-credits-section" style="display:none;">
+        <p class="sec-title">Owed Eggs / Boxes</p>
+        <div class="stat-card" style="margin-bottom:12px;">
+          <div class="stat-label">Currently owed</div>
+          <div class="stat-main" id="customer-credit-summary" style="font-size:17px;">None</div>
+        </div>
+        <div id="credit-form-wrap">
+          <p class="share-note" style="margin-bottom:10px;">Log free or promotional stock owed to this customer — e.g. 2 dozen boxes from a referral. Use a negative quantity to record it being claimed.</p>
+          <div class="row">
+            <div>
+              <label>Unit</label>
+              <select id="credit-unit">
+                <option value="egg">Single egg</option>
+                <option value="half_dozen">Half dozen box</option>
+                <option value="dozen">Dozen box</option>
+              </select>
+            </div>
+            <div><label>Quantity</label><input type="number" step="1" id="credit-quantity" placeholder="e.g. 2, or -2 to claim"></div>
+          </div>
+          <div class="row">
+            <div><label>Date</label><input type="date" id="credit-date"></div>
+            <div><label>Note</label><input type="text" id="credit-note" placeholder="e.g. Referral promo"></div>
+          </div>
+          <button class="btn full" onclick="saveCredit()">Add credit</button>
+          <div class="status" id="credit-status"></div>
+        </div>
+        <div id="customer-credits-list" style="margin-top:12px;"></div>
       </section>
 
       <section id="customer-sales-section" style="display:none;">
@@ -926,7 +965,7 @@ let isSignup = false;
 let flocks = []; // [{ ownerId, label, role: 'owner'|'editor'|'viewer' }]
 let currentFlockOwnerId = null;
 let currentRole = 'owner';
-let state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], salesSettings: null };
+let state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null };
 let editingBreedId = null;
 let currentCustomerDetailId = null;
 let editingCustomerId = null;
@@ -1303,6 +1342,7 @@ function applyRolePermissions(){
   document.getElementById('add-customer-btn').style.display = readOnly ? 'none' : 'block';
   document.getElementById('sales-settings-section').style.display = readOnly ? 'none' : 'block';
   document.getElementById('customer-form-section').style.display = readOnly ? 'none' : 'block';
+  document.getElementById('credit-form-wrap').style.display = readOnly ? 'none' : 'block';
   document.getElementById('breed-form-section').style.display = readOnly ? 'none' : 'block';
 }
 
@@ -1372,6 +1412,12 @@ function rowToSale(r){
     quantity: Number(r.quantity) || 0, charged: Number(r.charged) || 0, paid: Number(r.paid) || 0
   };
 }
+function rowToCustomerCredit(r){
+  return {
+    id: r.id, customerId: r.customer_id, unit: r.unit,
+    quantity: Number(r.quantity) || 0, date: r.date, note: r.note || ''
+  };
+}
 function rowToSalesSettings(r){
   if(!r) return { enabled: false, standardUnit: 'dozen', priceEgg: 0, priceHalfDozen: 0, priceDozen: 0 };
   return {
@@ -1381,7 +1427,7 @@ function rowToSalesSettings(r){
 }
 
 async function loadFlockData(){
-  const [eggsRes, chickensRes, hcRes, coopsRes, breedsRes, customersRes, salesRes, salesSettingsRes] = await Promise.all([
+  const [eggsRes, chickensRes, hcRes, coopsRes, breedsRes, customersRes, salesRes, creditsRes, salesSettingsRes] = await Promise.all([
     sb.from('eggs').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
     sb.from('chickens').select('*').eq('owner_id', currentFlockOwnerId).order('created_at'),
     sb.from('health_checks').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
@@ -1389,6 +1435,7 @@ async function loadFlockData(){
     sb.from('breeds').select('*').eq('owner_id', currentFlockOwnerId).order('name'),
     sb.from('customers').select('*').eq('owner_id', currentFlockOwnerId).order('name'),
     sb.from('sales').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
+    sb.from('customer_credits').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
     sb.from('sales_settings').select('*').eq('owner_id', currentFlockOwnerId).maybeSingle()
   ]);
   state.eggs = (eggsRes.data || []).map(rowToEgg);
@@ -1398,6 +1445,7 @@ async function loadFlockData(){
   state.breeds = (breedsRes.data || []).map(rowToBreed);
   state.customers = (customersRes.data || []).map(rowToCustomer);
   state.sales = (salesRes.data || []).map(rowToSale);
+  state.customerCredits = (creditsRes.data || []).map(rowToCustomerCredit);
   state.salesSettings = rowToSalesSettings(salesSettingsRes.data);
 }
 
@@ -3165,6 +3213,7 @@ async function saveSalesSettings(){
 
 // ---------- SALES ----------
 const SALE_UNIT_LABELS = { egg: 'Single egg', half_dozen: 'Half dozen box', dozen: 'Dozen box' };
+const SALE_UNIT_PLURAL_LABELS = { egg: 'egg(s)', half_dozen: 'half dozen box(es)', dozen: 'dozen box(es)' };
 
 function saleUnitPrice(unit, customerId){
   const customer = customerId ? state.customers.find(c => c.id === customerId) : null;
@@ -3190,30 +3239,67 @@ function customerBalance(customerId){
   return state.sales.filter(s => s.customerId === customerId).reduce((sum, s) => sum + (s.charged - s.paid), 0);
 }
 
+function customerCreditTotals(customerId){
+  const totals = { egg: 0, half_dozen: 0, dozen: 0 };
+  state.customerCredits.filter(c => c.customerId === customerId).forEach(c => {
+    totals[c.unit] = (totals[c.unit] || 0) + Number(c.quantity);
+  });
+  return totals;
+}
+
+function formatCreditTotals(totals){
+  const parts = Object.entries(totals)
+    .filter(([, v]) => Math.abs(v) >= 0.001)
+    .map(([unit, v]) => `${v} ${SALE_UNIT_PLURAL_LABELS[unit] || unit}`);
+  return parts.length ? parts.join(', ') : 'None';
+}
+
+function customerHasOwedCredit(customerId){
+  const totals = customerCreditTotals(customerId);
+  return Object.values(totals).some(v => Math.abs(v) >= 0.001);
+}
+
+function filterCustomersByName(list, search){
+  const term = (search || '').trim().toLowerCase();
+  return term ? list.filter(c => c.name.toLowerCase().includes(term)) : list;
+}
+
 function populateSaleCustomerOptions(){
   const sel = document.getElementById('sale-customer');
   if(!sel) return;
   const current = sel.value;
-  sel.innerHTML = '<option value="">Select a customer…</option>' + state.customers.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-  sel.value = state.customers.some(c => c.id === current) ? current : '';
+  const search = document.getElementById('sale-customer-search').value;
+  const filtered = filterCustomersByName(state.customers, search);
+  sel.innerHTML = '<option value="">Select a customer…</option>' + filtered.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  sel.value = filtered.some(c => c.id === current) ? current : '';
+}
+
+function onSaleCustomerSearchChange(){
+  populateSaleCustomerOptions();
+  onSaleCustomerChange();
 }
 
 function onSaleCustomerChange(){
   const id = document.getElementById('sale-customer').value;
   const flagEl = document.getElementById('sale-customer-flag');
   const customer = id ? state.customers.find(c => c.id === id) : null;
-  const messages = [];
+  const alerts = [];
+  const notes = [];
   if(customer){
     const bal = customerBalance(id);
     if(Math.abs(bal) >= 0.005){
-      messages.push(bal > 0
-        ? `Heads up: this customer already owes ${formatMoney(bal)}.`
-        : `Heads up: you already owe this customer ${formatMoney(-bal)}.`);
+      alerts.push(bal > 0
+        ? `This customer already owes ${formatMoney(bal)}.`
+        : `You already owe this customer ${formatMoney(-bal)}.`);
     }
-    if(customerHasCustomPricing(customer)) messages.push('This customer has custom pricing set.');
+    const creditTotals = customerCreditTotals(id);
+    if(customerHasOwedCredit(id)) alerts.push(`They're also owed: ${formatCreditTotals(creditTotals)}.`);
+    if(customerHasCustomPricing(customer)) notes.push('This customer has custom pricing set.');
   }
+  const messages = alerts.concat(notes);
   flagEl.style.display = messages.length ? 'block' : 'none';
   flagEl.textContent = messages.join(' ');
+  flagEl.className = alerts.length ? 'alert-banner' : 'share-note';
   onSaleUnitOrQtyChange();
 }
 
@@ -3221,24 +3307,28 @@ function onSaleUnitOrQtyChange(){
   const unit = document.getElementById('sale-unit').value;
   const customerId = document.getElementById('sale-customer').value;
   const qty = Number(document.getElementById('sale-quantity').value) || 0;
-  const charge = qty * saleUnitPrice(unit, customerId);
-  document.getElementById('sale-standard-charge').textContent = formatMoney(charge);
-  document.getElementById('sale-paid').value = charge ? charge.toFixed(2) : '';
+  const standard = qty * saleUnitPrice(unit, customerId);
+  document.getElementById('sale-standard-charge').textContent = formatMoney(standard);
+  document.getElementById('sale-charged').value = qty ? standard.toFixed(2) : '';
+  onSaleChargedChange();
+}
+
+function onSaleChargedChange(){
+  const charged = Number(document.getElementById('sale-charged').value) || 0;
+  document.getElementById('sale-paid').value = charged ? charged.toFixed(2) : '';
   onSalePaidChange();
 }
 
 function onSalePaidChange(){
-  const unit = document.getElementById('sale-unit').value;
-  const customerId = document.getElementById('sale-customer').value;
   const qty = Number(document.getElementById('sale-quantity').value) || 0;
-  const charge = qty * saleUnitPrice(unit, customerId);
+  const charged = Number(document.getElementById('sale-charged').value) || 0;
   const paid = Number(document.getElementById('sale-paid').value) || 0;
-  const diff = paid - charge;
+  const diff = paid - charged;
   const statusEl = document.getElementById('sale-paid-status');
   if(!qty){ statusEl.textContent = ''; return; }
   if(Math.abs(diff) < 0.005) statusEl.textContent = 'Paying in full.';
-  else if(diff > 0) statusEl.textContent = `Paying ${formatMoney(diff)} more than standard.`;
-  else statusEl.textContent = `Paying ${formatMoney(-diff)} less than standard.`;
+  else if(diff > 0) statusEl.textContent = `Paying ${formatMoney(diff)} more than charged.`;
+  else statusEl.textContent = `Paying ${formatMoney(-diff)} less than charged.`;
 }
 
 async function saveSale(){
@@ -3249,7 +3339,7 @@ async function saveSale(){
   const unit = document.getElementById('sale-unit').value;
   const quantity = Number(document.getElementById('sale-quantity').value) || 0;
   if(!quantity){ setStatus('sale-status', 'Enter a quantity.', true); return; }
-  const charged = quantity * saleUnitPrice(unit, customerId);
+  const charged = Number(document.getElementById('sale-charged').value) || 0;
   const paid = Number(document.getElementById('sale-paid').value) || 0;
 
   const { error } = await sb.from('sales').insert({
@@ -3258,6 +3348,7 @@ async function saveSale(){
   if(error){ setStatus('sale-status', error.message, true); return; }
 
   document.getElementById('sale-quantity').value = '';
+  document.getElementById('sale-charged').value = '';
   document.getElementById('sale-paid').value = '';
   setStatus('sale-status', 'Sale logged.', false);
   await loadFlockData();
@@ -3268,12 +3359,14 @@ function customerCardHtml(c){
   const bal = customerBalance(c.id);
   const settled = Math.abs(bal) < 0.005;
   const balLabel = settled ? 'Settled' : (bal > 0 ? `Owes ${formatMoney(bal)}` : `You owe ${formatMoney(-bal)}`);
+  const creditText = formatCreditTotals(customerCreditTotals(c.id));
   return `
     <div class="chicken-card" onclick="openCustomerDetail('${c.id}')">
       <div class="chicken-card-head">
         <div>
           <div class="chicken-name">${escapeHtml(c.name)}</div>
           ${customerHasCustomPricing(c) ? '<div class="chicken-meta">Custom pricing</div>' : ''}
+          ${creditText !== 'None' ? `<div class="chicken-meta">Owed: ${escapeHtml(creditText)}</div>` : ''}
         </div>
         <span class="${settled ? 'ok-badge' : 'issue-badge'}">${balLabel}</span>
       </div>
@@ -3283,9 +3376,12 @@ function customerCardHtml(c){
 function renderCustomersList(){
   const el = document.getElementById('customers-list');
   if(!el) return;
-  el.innerHTML = state.customers.length
-    ? state.customers.map(c => customerCardHtml(c)).join('')
-    : '<p class="empty">No customers yet.</p>';
+  document.getElementById('customers-count').textContent = state.customers.length;
+  const search = document.getElementById('customers-search').value;
+  const filtered = filterCustomersByName(state.customers, search);
+  el.innerHTML = filtered.length
+    ? filtered.map(c => customerCardHtml(c)).join('')
+    : (state.customers.length ? '<p class="empty">No customers match your search.</p>' : '<p class="empty">No customers yet.</p>');
 }
 
 function renderSalesTab(){
@@ -3318,9 +3414,14 @@ function openCustomerDetail(id){
     document.getElementById('cust-price-dozen').value = c && c.priceDozen != null ? c.priceDozen : '';
     document.getElementById('cust-cancel-btn').style.display = 'block';
     document.getElementById('customer-balance-section').style.display = 'block';
+    document.getElementById('customer-credits-section').style.display = 'block';
     document.getElementById('customer-sales-section').style.display = 'block';
     document.getElementById('customer-danger-section').style.display = isReadOnly() ? 'none' : 'block';
+    document.getElementById('credit-date').value = todayStr();
+    document.getElementById('credit-quantity').value = '';
+    document.getElementById('credit-note').value = '';
     renderCustomerBalance(id);
+    renderCustomerCredits(id);
     renderCustomerSalesList(id);
   } else {
     document.getElementById('customer-detail-name').textContent = 'Add Customer';
@@ -3332,6 +3433,7 @@ function openCustomerDetail(id){
     document.getElementById('cust-price-dozen').value = '';
     document.getElementById('cust-cancel-btn').style.display = 'none';
     document.getElementById('customer-balance-section').style.display = 'none';
+    document.getElementById('customer-credits-section').style.display = 'none';
     document.getElementById('customer-sales-section').style.display = 'none';
     document.getElementById('customer-danger-section').style.display = 'none';
   }
@@ -3388,6 +3490,62 @@ function renderCustomerBalance(id){
   if(Math.abs(bal) < 0.005){ labelEl.textContent = 'All settled'; amountEl.textContent = formatMoney(0); return; }
   if(bal > 0){ labelEl.textContent = 'Owes you'; amountEl.textContent = formatMoney(bal); }
   else { labelEl.textContent = 'You owe them'; amountEl.textContent = formatMoney(-bal); }
+}
+
+function customerCreditsForList(id){
+  return state.customerCredits.filter(c => c.customerId === id).sort((a, b) => a.date < b.date ? 1 : -1);
+}
+
+function creditRowHtml(c, readOnly){
+  const sign = c.quantity > 0 ? '+' : '';
+  return `
+    <div class="chicken-card">
+      <div class="chicken-card-head">
+        <div>
+          <div class="chicken-name">${sign}${c.quantity} ${escapeHtml(SALE_UNIT_PLURAL_LABELS[c.unit] || c.unit)}</div>
+          <div class="chicken-meta">${formatDateNice(c.date)}${c.note ? ' &middot; ' + escapeHtml(c.note) : ''}</div>
+        </div>
+        ${readOnly ? '' : `<div class="icon-row"><button class="icon-btn danger" onclick="deleteCredit('${c.id}')" aria-label="Delete">&#10005;</button></div>`}
+      </div>
+    </div>`;
+}
+
+function renderCustomerCredits(id){
+  document.getElementById('customer-credit-summary').textContent = formatCreditTotals(customerCreditTotals(id));
+  const el = document.getElementById('customer-credits-list');
+  const readOnly = isReadOnly();
+  const list = customerCreditsForList(id);
+  el.innerHTML = list.length
+    ? list.map(c => creditRowHtml(c, readOnly)).join('')
+    : '<p class="empty">No credit history yet.</p>';
+}
+
+async function saveCredit(){
+  if(!currentCustomerDetailId) return;
+  const unit = document.getElementById('credit-unit').value;
+  const quantity = Number(document.getElementById('credit-quantity').value);
+  if(!quantity){ setStatus('credit-status', 'Enter a non-zero quantity.', true); return; }
+  const date = document.getElementById('credit-date').value || todayStr();
+  const note = document.getElementById('credit-note').value.trim();
+  const { error } = await sb.from('customer_credits').insert({
+    owner_id: currentFlockOwnerId, customer_id: currentCustomerDetailId, unit, quantity, date, note
+  });
+  if(error){ setStatus('credit-status', error.message, true); return; }
+  document.getElementById('credit-quantity').value = '';
+  document.getElementById('credit-note').value = '';
+  setStatus('credit-status', 'Saved.', false);
+  await loadFlockData();
+  renderCustomerCredits(currentCustomerDetailId);
+  renderCustomersList();
+}
+
+async function deleteCredit(id){
+  if(!confirm('Delete this credit entry?')) return;
+  const { error } = await sb.from('customer_credits').delete().eq('id', id);
+  if(error){ setStatus('credit-status', error.message, true); return; }
+  await loadFlockData();
+  renderCustomerCredits(currentCustomerDetailId);
+  renderCustomersList();
 }
 
 function customerSalesForList(id){

@@ -159,6 +159,20 @@ create table if not exists sales (
   created_at timestamptz not null default now()
 );
 
+-- Ledger of free/promotional stock owed to a customer, e.g. "2 dozen boxes
+-- from a referral". Positive quantity adds credit owed; negative quantity
+-- records it being claimed. Deleted along with the customer it belongs to.
+create table if not exists customer_credits (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  customer_id uuid not null references customers(id) on delete cascade,
+  unit text not null default 'dozen' check (unit in ('egg','half_dozen','dozen')),
+  quantity numeric not null default 0,
+  date date not null,
+  note text,
+  created_at timestamptz not null default now()
+);
+
 -- One row per flock owner. enabled/standard_unit/prices configured from the
 -- Account tab; readable/writable by anyone with flock access so collaborators
 -- see the same settings as the owner.
@@ -201,6 +215,7 @@ alter table coops enable row level security;
 alter table breeds enable row level security;
 alter table customers enable row level security;
 alter table sales enable row level security;
+alter table customer_credits enable row level security;
 alter table sales_settings enable row level security;
 
 -- profiles: readable by any signed-in user (needed to resolve owner emails
@@ -289,6 +304,15 @@ drop policy if exists "sales update" on sales;
 create policy "sales update" on sales for update using (has_flock_access(owner_id, 'editor'));
 drop policy if exists "sales delete" on sales;
 create policy "sales delete" on sales for delete using (has_flock_access(owner_id, 'editor'));
+
+drop policy if exists "customer_credits read" on customer_credits;
+create policy "customer_credits read" on customer_credits for select using (has_flock_access(owner_id));
+drop policy if exists "customer_credits write" on customer_credits;
+create policy "customer_credits write" on customer_credits for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "customer_credits update" on customer_credits;
+create policy "customer_credits update" on customer_credits for update using (has_flock_access(owner_id, 'editor'));
+drop policy if exists "customer_credits delete" on customer_credits;
+create policy "customer_credits delete" on customer_credits for delete using (has_flock_access(owner_id, 'editor'));
 
 drop policy if exists "sales_settings read" on sales_settings;
 create policy "sales_settings read" on sales_settings for select using (has_flock_access(owner_id));
