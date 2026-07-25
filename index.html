@@ -184,6 +184,7 @@
   /* Sharing / Account */
   .share-note{font-size:13px;color:var(--text-dim);line-height:1.6;}
   .alert-banner{background:rgba(226,87,76,.14);border:1px solid var(--danger);color:var(--danger);border-radius:8px;padding:10px 12px;font-weight:700;font-size:13px;line-height:1.5;}
+  .credit-banner{background:rgba(67,198,172,.14);border:1px solid var(--teal);color:var(--teal);border-radius:8px;padding:10px 12px;font-weight:700;font-size:13px;line-height:1.5;margin-top:8px;}
   code{background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:12px;}
 
   /* Import preview */
@@ -701,9 +702,16 @@
         <div class="row">
           <div>
             <label>Unit</label>
-            <select id="sale-unit" onchange="onSaleUnitOrQtyChange()"></select>
+            <select id="sale-unit" onchange="onSaleUnitChange()"></select>
           </div>
           <div><label>Quantity</label><input type="number" min="0" step="1" id="sale-quantity" oninput="onSaleUnitOrQtyChange()" placeholder="e.g. 2"></div>
+        </div>
+        <div id="sale-credit-section" style="display:none;margin-bottom:10px;">
+          <div class="checkbox-row">
+            <input type="checkbox" id="sale-use-credit" onchange="onSaleUseCreditChange()">
+            <label for="sale-use-credit" id="sale-use-credit-label">Use this customer's owed credit?</label>
+          </div>
+          <p class="credit-banner" id="sale-credit-note" style="display:none;"></p>
         </div>
         <p class="share-note">Standard price for this sale: <strong id="sale-standard-charge">£0.00</strong></p>
         <div class="row">
@@ -3357,14 +3365,57 @@ function onSaleCustomerChange(){
   flagEl.style.display = messages.length ? 'block' : 'none';
   flagEl.textContent = messages.join(' ');
   flagEl.className = alerts.length ? 'alert-banner' : 'share-note';
+  document.getElementById('sale-use-credit').checked = false;
   onSaleUnitOrQtyChange();
+}
+
+function onSaleUnitChange(){
+  document.getElementById('sale-use-credit').checked = false;
+  onSaleUnitOrQtyChange();
+}
+
+function creditOwedForUnit(customerId, unit){
+  if(!customerId) return 0;
+  return Math.max(customerCreditTotals(customerId)[unit] || 0, 0);
+}
+
+function onSaleUseCreditChange(){
+  onSaleUnitOrQtyChange();
+}
+
+function updateSaleCreditSection(customerId, unit, qty){
+  const section = document.getElementById('sale-credit-section');
+  const checkbox = document.getElementById('sale-use-credit');
+  const owed = creditOwedForUnit(customerId, unit);
+  if(!customerId || owed <= 0 || qty <= 0){
+    section.style.display = 'none';
+    checkbox.checked = false;
+    return 0;
+  }
+  section.style.display = 'block';
+  const unitLabel = SALE_UNIT_PLURAL_LABELS[unit] || unit;
+  document.getElementById('sale-use-credit-label').textContent = `Use this customer's owed credit? (${owed} ${unitLabel} available)`;
+  const noteEl = document.getElementById('sale-credit-note');
+  if(!checkbox.checked){
+    noteEl.style.display = 'none';
+    return 0;
+  }
+  const applied = Math.min(owed, qty);
+  const remainder = qty - applied;
+  noteEl.style.display = 'block';
+  noteEl.textContent = remainder > 0.001
+    ? `Claiming ${applied} ${unitLabel} from credit. Charging for the remaining ${remainder} ${unitLabel} below.`
+    : `Claiming all ${applied} ${unitLabel} from credit. Nothing to charge for this sale.`;
+  return applied;
 }
 
 function onSaleUnitOrQtyChange(){
   const unit = document.getElementById('sale-unit').value;
   const customerId = document.getElementById('sale-customer').value;
   const qty = Number(document.getElementById('sale-quantity').value) || 0;
-  const standard = qty * saleUnitPrice(unit, customerId);
+  const appliedCredit = updateSaleCreditSection(customerId, unit, qty);
+  const billableQty = Math.max(qty - appliedCredit, 0);
+  const standard = billableQty * saleUnitPrice(unit, customerId);
   document.getElementById('sale-standard-charge').textContent = formatMoney(standard);
   document.getElementById('sale-charged').value = qty ? standard.toFixed(2) : '';
   onSaleChargedChange();
@@ -3399,6 +3450,17 @@ async function saveSale(){
   const charged = Number(document.getElementById('sale-charged').value) || 0;
   const paid = Number(document.getElementById('sale-paid').value) || 0;
 
+  const useCredit = document.getElementById('sale-use-credit').checked;
+  const appliedCredit = useCredit ? Math.min(creditOwedForUnit(customerId, unit), quantity) : 0;
+
+  if(appliedCredit > 0){
+    const { error: creditError } = await sb.from('customer_credits').insert({
+      owner_id: currentFlockOwnerId, customer_id: customerId, unit,
+      quantity: -appliedCredit, date, note: 'Claimed against a sale'
+    });
+    if(creditError){ setStatus('sale-status', creditError.message, true); return; }
+  }
+
   const { error } = await sb.from('sales').insert({
     owner_id: currentFlockOwnerId, customer_id: customerId, date, unit, quantity, charged, paid
   });
@@ -3407,7 +3469,10 @@ async function saveSale(){
   document.getElementById('sale-quantity').value = '';
   document.getElementById('sale-charged').value = '';
   document.getElementById('sale-paid').value = '';
-  setStatus('sale-status', 'Sale logged.', false);
+  document.getElementById('sale-use-credit').checked = false;
+  setStatus('sale-status', appliedCredit > 0
+    ? `Sale logged — ${appliedCredit} ${SALE_UNIT_PLURAL_LABELS[unit] || unit} claimed from credit.`
+    : 'Sale logged.', false);
   await loadFlockData();
   renderSalesTab();
 }
