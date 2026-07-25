@@ -720,6 +720,46 @@
       </section>
 
       <section>
+        <p class="sec-title">Sales Totals</p>
+        <div class="stat-grid" id="sales-stats"></div>
+      </section>
+
+      <section>
+        <details>
+          <summary class="sec-title">Browse Previous Periods</summary>
+          <div class="row">
+            <div>
+              <label>View</label>
+              <select id="sales-history-period-type" onchange="onSalesHistoryPeriodTypeChange()">
+                <option value="month">Specific month</option>
+                <option value="year">Specific year</option>
+                <option value="lifetime">Lifetime (all-time)</option>
+              </select>
+            </div>
+            <div id="sales-history-month-picker-wrap">
+              <label>Month</label>
+              <input type="month" id="sales-history-month-picker" onchange="renderSalesHistoryPeriodStats()">
+            </div>
+            <div id="sales-history-year-picker-wrap" style="display:none;">
+              <label>Year</label>
+              <input type="number" id="sales-history-year-picker" onchange="renderSalesHistoryPeriodStats()" placeholder="e.g. 2025">
+            </div>
+          </div>
+          <div class="stat-grid" id="sales-history-period-stats" style="margin-top:10px;"></div>
+        </details>
+      </section>
+
+      <section>
+        <details id="sales-history-section">
+          <summary class="sec-title">Sales History (<span id="sales-history-count">0</span>)</summary>
+          <div class="row">
+            <div><label>Search</label><input type="text" id="sales-history-search" oninput="renderSalesHistoryList()" placeholder="Search by customer…"></div>
+          </div>
+          <div id="sales-history-list"></div>
+        </details>
+      </section>
+
+      <section>
         <details id="customers-section">
           <summary class="sec-title">Customers (<span id="customers-count">0</span>)</summary>
           <div class="row">
@@ -3398,12 +3438,139 @@ function renderCustomersList(){
     : (state.customers.length ? '<p class="empty">No customers match your search.</p>' : '<p class="empty">No customers yet.</p>');
 }
 
+// ---------- SALES HISTORY ----------
+function computeSalesPeriodStats(start, end){
+  const rows = state.sales.filter(s => {
+    const t = new Date(s.date + 'T00:00:00');
+    return t >= start && t <= end;
+  });
+  const count = rows.length;
+  const charged = rows.reduce((sum, s) => sum + s.charged, 0);
+  const paid = rows.reduce((sum, s) => sum + s.paid, 0);
+  return { count, charged, paid, outstanding: charged - paid };
+}
+
+function salesStatCardHtml(label, s){
+  return `
+    <div class="stat-card">
+      <div class="stat-label">${escapeHtml(label)}</div>
+      <div class="stat-main">${formatMoney(s.charged)}</div>
+      <div class="stat-sub">${s.count} sale${s.count === 1 ? '' : 's'}</div>
+      <div class="stat-row"><span>Charged</span><strong>${formatMoney(s.charged)}</strong></div>
+      <div class="stat-row"><span>Paid</span><strong>${formatMoney(s.paid)}</strong></div>
+      <div class="stat-row"><span>Outstanding</span><strong>${formatMoney(s.outstanding)}</strong></div>
+    </div>`;
+}
+
+function renderSalesStats(){
+  const el = document.getElementById('sales-stats');
+  if(!el) return;
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const yearStart = new Date(now.getFullYear(), 0, 1);
+  const yearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+  const lifetimeStart = new Date(0);
+  const lifetimeEnd = new Date(8640000000000000);
+  el.innerHTML =
+    salesStatCardHtml('This Month', computeSalesPeriodStats(monthStart, monthEnd)) +
+    salesStatCardHtml('This Year', computeSalesPeriodStats(yearStart, yearEnd)) +
+    salesStatCardHtml('Lifetime', computeSalesPeriodStats(lifetimeStart, lifetimeEnd));
+}
+
+function initSalesHistoryDefaults(){
+  const monthInput = document.getElementById('sales-history-month-picker');
+  const yearInput = document.getElementById('sales-history-year-picker');
+  if(!monthInput.value){
+    const now = new Date();
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    monthInput.value = prevMonth.getFullYear() + '-' + pad(prevMonth.getMonth() + 1);
+  }
+  if(!yearInput.value) yearInput.value = new Date().getFullYear() - 1;
+}
+
+function onSalesHistoryPeriodTypeChange(){
+  const type = document.getElementById('sales-history-period-type').value;
+  document.getElementById('sales-history-month-picker-wrap').style.display = type === 'month' ? 'block' : 'none';
+  document.getElementById('sales-history-year-picker-wrap').style.display = type === 'year' ? 'block' : 'none';
+  renderSalesHistoryPeriodStats();
+}
+
+function renderSalesHistoryPeriodStats(){
+  const el = document.getElementById('sales-history-period-stats');
+  const type = document.getElementById('sales-history-period-type').value;
+  let start, end, label;
+
+  if(type === 'lifetime'){
+    if(!state.sales.length){ el.innerHTML = '<p class="empty">No sales yet.</p>'; return; }
+    const dates = state.sales.map(s => s.date).sort();
+    start = new Date(dates[0] + 'T00:00:00');
+    end = new Date(dates[dates.length - 1] + 'T23:59:59');
+    label = 'Lifetime';
+  } else if(type === 'month'){
+    const val = document.getElementById('sales-history-month-picker').value;
+    if(!val){ el.innerHTML = '<p class="empty">Pick a month.</p>'; return; }
+    const [y, m] = val.split('-').map(Number);
+    start = new Date(y, m - 1, 1);
+    end = new Date(y, m, 0, 23, 59, 59, 999);
+    label = start.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  } else {
+    const y = Number(document.getElementById('sales-history-year-picker').value);
+    if(!y){ el.innerHTML = '<p class="empty">Pick a year.</p>'; return; }
+    start = new Date(y, 0, 1);
+    end = new Date(y, 11, 31, 23, 59, 59, 999);
+    label = String(y);
+  }
+
+  el.innerHTML = salesStatCardHtml(label, computeSalesPeriodStats(start, end));
+}
+
+function customerNameById(id){
+  const c = state.customers.find(x => x.id === id);
+  return c ? c.name : 'Unknown customer';
+}
+
+function allSalesSorted(){
+  return state.sales.slice().sort((a, b) => a.date < b.date ? 1 : -1);
+}
+
+function salesHistoryRowHtml(s){
+  const diff = s.paid - s.charged;
+  const settled = Math.abs(diff) < 0.005;
+  const diffLabel = settled ? 'Paid in full' : (diff > 0 ? `Overpaid by ${formatMoney(diff)}` : `Underpaid by ${formatMoney(-diff)}`);
+  const clickable = !!s.customerId;
+  return `
+    <div class="log-item" style="align-items:flex-start;flex-direction:column;gap:6px;${clickable ? 'cursor:pointer;' : ''}" ${clickable ? `onclick="openCustomerDetail('${s.customerId}')"` : ''}>
+      <div style="display:flex;justify-content:space-between;width:100%;">
+        <strong>${escapeHtml(customerNameById(s.customerId))}</strong>
+        <span class="${settled ? 'good-text' : 'issue-text'}">${diffLabel}</span>
+      </div>
+      <div class="text-dim" style="font-size:12px;">${formatDateNice(s.date)} &middot; ${s.quantity} &times; ${escapeHtml(SALE_UNIT_LABELS[s.unit] || s.unit)} &middot; Charged ${formatMoney(s.charged)} &middot; Paid ${formatMoney(s.paid)}</div>
+    </div>`;
+}
+
+function renderSalesHistoryList(){
+  const el = document.getElementById('sales-history-list');
+  if(!el) return;
+  document.getElementById('sales-history-count').textContent = state.sales.length;
+  const search = (document.getElementById('sales-history-search').value || '').trim().toLowerCase();
+  let list = allSalesSorted();
+  if(search) list = list.filter(s => customerNameById(s.customerId).toLowerCase().includes(search));
+  el.innerHTML = list.length
+    ? list.map(s => salesHistoryRowHtml(s)).join('')
+    : (state.sales.length ? '<p class="empty">No sales match your search.</p>' : '<p class="empty">No sales recorded yet.</p>');
+}
+
 function renderSalesTab(){
   if(!document.getElementById('sale-date').value) document.getElementById('sale-date').value = todayStr();
   populateSaleUnitSelect();
   populateSaleCustomerOptions();
   onSaleCustomerChange();
   renderCustomersList();
+  renderSalesStats();
+  initSalesHistoryDefaults();
+  renderSalesHistoryPeriodStats();
+  renderSalesHistoryList();
 }
 
 function populateCustomerPriceLabels(){
