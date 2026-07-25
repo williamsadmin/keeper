@@ -130,13 +130,22 @@ create table if not exists breeds (
 );
 
 -- ---------- Sales ----------
+-- price_egg/price_half_dozen/price_dozen are per-customer price overrides;
+-- null means "charge this customer the standard price set in sales_settings".
 create table if not exists customers (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
   notes text,
+  price_egg numeric,
+  price_half_dozen numeric,
+  price_dozen numeric,
   created_at timestamptz not null default now()
 );
+
+alter table customers add column if not exists price_egg numeric;
+alter table customers add column if not exists price_half_dozen numeric;
+alter table customers add column if not exists price_dozen numeric;
 
 create table if not exists sales (
   id uuid primary key default gen_random_uuid(),

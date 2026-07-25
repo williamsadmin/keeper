@@ -738,6 +738,15 @@
         <div class="row">
           <div><label>Notes</label><textarea id="cust-notes" placeholder="e.g. Prefers blue eggs"></textarea></div>
         </div>
+        <p class="sec-title" style="margin-top:4px;">Custom Pricing</p>
+        <p class="share-note" style="margin-bottom:10px;">Leave a price blank to charge this customer the standard price for that unit.</p>
+        <div class="row">
+          <div><label id="cust-price-egg-label">Price per egg</label><input type="number" min="0" step="0.01" id="cust-price-egg" placeholder="Standard"></div>
+          <div><label id="cust-price-half-dozen-label">Price per half dozen</label><input type="number" min="0" step="0.01" id="cust-price-half-dozen" placeholder="Standard"></div>
+        </div>
+        <div class="row">
+          <div><label id="cust-price-dozen-label">Price per dozen</label><input type="number" min="0" step="0.01" id="cust-price-dozen" placeholder="Standard"></div>
+        </div>
         <button class="btn full" onclick="saveCustomer()">Save customer</button>
         <button class="btn secondary full" id="cust-cancel-btn" style="display:none;margin-top:8px;" onclick="closeCustomerDetail()">Cancel edit</button>
         <div class="status" id="customer-status"></div>
@@ -1349,7 +1358,14 @@ function rowToBreed(r){
     expectedEggsPerYear: Number(r.expected_eggs_per_year) || 0, eggColour: r.egg_colour || ''
   };
 }
-function rowToCustomer(r){ return { id: r.id, name: r.name, notes: r.notes || '' }; }
+function rowToCustomer(r){
+  return {
+    id: r.id, name: r.name, notes: r.notes || '',
+    priceEgg: r.price_egg != null ? Number(r.price_egg) : null,
+    priceHalfDozen: r.price_half_dozen != null ? Number(r.price_half_dozen) : null,
+    priceDozen: r.price_dozen != null ? Number(r.price_dozen) : null
+  };
+}
 function rowToSale(r){
   return {
     id: r.id, customerId: r.customer_id, date: r.date, unit: r.unit,
@@ -3150,11 +3166,20 @@ async function saveSalesSettings(){
 // ---------- SALES ----------
 const SALE_UNIT_LABELS = { egg: 'Single egg', half_dozen: 'Half dozen box', dozen: 'Dozen box' };
 
-function saleUnitPrice(unit){
+function saleUnitPrice(unit, customerId){
+  const customer = customerId ? state.customers.find(c => c.id === customerId) : null;
+  if(customer){
+    const override = unit === 'half_dozen' ? customer.priceHalfDozen : unit === 'dozen' ? customer.priceDozen : customer.priceEgg;
+    if(override != null) return override;
+  }
   const s = state.salesSettings || {};
   if(unit === 'half_dozen') return s.priceHalfDozen || 0;
   if(unit === 'dozen') return s.priceDozen || 0;
   return s.priceEgg || 0;
+}
+
+function customerHasCustomPricing(c){
+  return c.priceEgg != null || c.priceHalfDozen != null || c.priceDozen != null;
 }
 
 function formatMoney(n){
@@ -3176,19 +3201,27 @@ function populateSaleCustomerOptions(){
 function onSaleCustomerChange(){
   const id = document.getElementById('sale-customer').value;
   const flagEl = document.getElementById('sale-customer-flag');
-  if(!id){ flagEl.style.display = 'none'; return; }
-  const bal = customerBalance(id);
-  if(Math.abs(bal) < 0.005){ flagEl.style.display = 'none'; return; }
-  flagEl.style.display = 'block';
-  flagEl.textContent = bal > 0
-    ? `Heads up: this customer already owes ${formatMoney(bal)}.`
-    : `Heads up: you already owe this customer ${formatMoney(-bal)}.`;
+  const customer = id ? state.customers.find(c => c.id === id) : null;
+  const messages = [];
+  if(customer){
+    const bal = customerBalance(id);
+    if(Math.abs(bal) >= 0.005){
+      messages.push(bal > 0
+        ? `Heads up: this customer already owes ${formatMoney(bal)}.`
+        : `Heads up: you already owe this customer ${formatMoney(-bal)}.`);
+    }
+    if(customerHasCustomPricing(customer)) messages.push('This customer has custom pricing set.');
+  }
+  flagEl.style.display = messages.length ? 'block' : 'none';
+  flagEl.textContent = messages.join(' ');
+  onSaleUnitOrQtyChange();
 }
 
 function onSaleUnitOrQtyChange(){
   const unit = document.getElementById('sale-unit').value;
+  const customerId = document.getElementById('sale-customer').value;
   const qty = Number(document.getElementById('sale-quantity').value) || 0;
-  const charge = qty * saleUnitPrice(unit);
+  const charge = qty * saleUnitPrice(unit, customerId);
   document.getElementById('sale-standard-charge').textContent = formatMoney(charge);
   document.getElementById('sale-paid').value = charge ? charge.toFixed(2) : '';
   onSalePaidChange();
@@ -3196,8 +3229,9 @@ function onSaleUnitOrQtyChange(){
 
 function onSalePaidChange(){
   const unit = document.getElementById('sale-unit').value;
+  const customerId = document.getElementById('sale-customer').value;
   const qty = Number(document.getElementById('sale-quantity').value) || 0;
-  const charge = qty * saleUnitPrice(unit);
+  const charge = qty * saleUnitPrice(unit, customerId);
   const paid = Number(document.getElementById('sale-paid').value) || 0;
   const diff = paid - charge;
   const statusEl = document.getElementById('sale-paid-status');
@@ -3215,7 +3249,7 @@ async function saveSale(){
   const unit = document.getElementById('sale-unit').value;
   const quantity = Number(document.getElementById('sale-quantity').value) || 0;
   if(!quantity){ setStatus('sale-status', 'Enter a quantity.', true); return; }
-  const charged = quantity * saleUnitPrice(unit);
+  const charged = quantity * saleUnitPrice(unit, customerId);
   const paid = Number(document.getElementById('sale-paid').value) || 0;
 
   const { error } = await sb.from('sales').insert({
@@ -3239,6 +3273,7 @@ function customerCardHtml(c){
       <div class="chicken-card-head">
         <div>
           <div class="chicken-name">${escapeHtml(c.name)}</div>
+          ${customerHasCustomPricing(c) ? '<div class="chicken-meta">Custom pricing</div>' : ''}
         </div>
         <span class="${settled ? 'ok-badge' : 'issue-badge'}">${balLabel}</span>
       </div>
@@ -3257,20 +3292,30 @@ function renderSalesTab(){
   if(!document.getElementById('sale-date').value) document.getElementById('sale-date').value = todayStr();
   populateSaleCustomerOptions();
   onSaleCustomerChange();
-  onSaleUnitOrQtyChange();
   renderCustomersList();
+}
+
+function populateCustomerPriceLabels(){
+  const s = state.salesSettings || {};
+  document.getElementById('cust-price-egg-label').textContent = `Price per egg (standard ${formatMoney(s.priceEgg || 0)})`;
+  document.getElementById('cust-price-half-dozen-label').textContent = `Price per half dozen (standard ${formatMoney(s.priceHalfDozen || 0)})`;
+  document.getElementById('cust-price-dozen-label').textContent = `Price per dozen (standard ${formatMoney(s.priceDozen || 0)})`;
 }
 
 function openCustomerDetail(id){
   currentCustomerDetailId = id;
   editingCustomerId = id;
   editingSaleId = null;
+  populateCustomerPriceLabels();
   if(id){
     const c = state.customers.find(x => x.id === id);
     document.getElementById('customer-detail-name').textContent = c ? c.name : 'Customer';
     document.getElementById('customer-form-title').textContent = 'Edit Customer';
     document.getElementById('cust-name').value = c ? c.name : '';
     document.getElementById('cust-notes').value = c ? c.notes : '';
+    document.getElementById('cust-price-egg').value = c && c.priceEgg != null ? c.priceEgg : '';
+    document.getElementById('cust-price-half-dozen').value = c && c.priceHalfDozen != null ? c.priceHalfDozen : '';
+    document.getElementById('cust-price-dozen').value = c && c.priceDozen != null ? c.priceDozen : '';
     document.getElementById('cust-cancel-btn').style.display = 'block';
     document.getElementById('customer-balance-section').style.display = 'block';
     document.getElementById('customer-sales-section').style.display = 'block';
@@ -3282,6 +3327,9 @@ function openCustomerDetail(id){
     document.getElementById('customer-form-title').textContent = 'Add Customer';
     document.getElementById('cust-name').value = '';
     document.getElementById('cust-notes').value = '';
+    document.getElementById('cust-price-egg').value = '';
+    document.getElementById('cust-price-half-dozen').value = '';
+    document.getElementById('cust-price-dozen').value = '';
     document.getElementById('cust-cancel-btn').style.display = 'none';
     document.getElementById('customer-balance-section').style.display = 'none';
     document.getElementById('customer-sales-section').style.display = 'none';
@@ -3299,10 +3347,20 @@ function closeCustomerDetail(){
   renderSalesTab();
 }
 
+function customerPriceFieldValue(id){
+  const raw = document.getElementById(id).value;
+  return raw === '' ? null : Number(raw);
+}
+
 async function saveCustomer(){
   const name = document.getElementById('cust-name').value.trim();
   if(!name){ setStatus('customer-status', 'Enter a name.', true); return; }
-  const payload = { name, notes: document.getElementById('cust-notes').value.trim() };
+  const payload = {
+    name, notes: document.getElementById('cust-notes').value.trim(),
+    price_egg: customerPriceFieldValue('cust-price-egg'),
+    price_half_dozen: customerPriceFieldValue('cust-price-half-dozen'),
+    price_dozen: customerPriceFieldValue('cust-price-dozen')
+  };
   let error;
   if(editingCustomerId){
     ({ error } = await sb.from('customers').update(payload).eq('id', editingCustomerId));
