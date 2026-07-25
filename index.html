@@ -102,6 +102,8 @@
   .reminder-banner{background:var(--amber-dim);border:1px solid var(--amber);color:var(--amber);border-radius:8px;padding:12px 14px;font-weight:600;font-size:14px;margin-bottom:16px;}
   .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin-bottom:6px;}
   .stat-main{font-family:'Oswald',sans-serif;font-size:28px;font-weight:600;color:var(--amber);line-height:1;}
+  .stat-main.money-main{display:flex;flex-direction:column;align-items:flex-end;line-height:1.05;}
+  .stat-main.money-main .pence{font-size:.55em;}
   .stat-sub{font-size:11px;color:var(--text-dim);margin:2px 0 8px;}
   .stat-headline-row{display:flex;}
   .stat-headline-row > div{flex:1;min-width:0;overflow-wrap:anywhere;}
@@ -3302,6 +3304,14 @@ function formatMoney(n){
   return '£' + (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2);
 }
 
+function moneyStatMainHtml(n){
+  const str = formatMoney(n);
+  const dot = str.lastIndexOf('.');
+  const whole = str.slice(0, dot);
+  const pence = str.slice(dot);
+  return `<div class="stat-main money-main">${whole}<span class="pence">${pence}</span></div>`;
+}
+
 function customerBalance(customerId){
   return state.sales.filter(s => s.customerId === customerId).reduce((sum, s) => sum + (s.charged - s.paid), 0);
 }
@@ -3544,7 +3554,7 @@ function salesStatCardHtml(label, s){
       <div class="stat-label">${escapeHtml(label)}</div>
       <div class="stat-headline-row">
         <div>
-          <div class="stat-main">${formatMoney(s.charged)}</div>
+          ${moneyStatMainHtml(s.charged)}
           <div class="stat-sub">charged</div>
         </div>
         <div>
