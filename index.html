@@ -701,11 +701,7 @@
         <div class="row">
           <div>
             <label>Unit</label>
-            <select id="sale-unit" onchange="onSaleUnitOrQtyChange()">
-              <option value="egg">Single egg(s)</option>
-              <option value="half_dozen">Half dozen box(es)</option>
-              <option value="dozen">Dozen box(es)</option>
-            </select>
+            <select id="sale-unit" onchange="onSaleUnitOrQtyChange()"></select>
           </div>
           <div><label>Quantity</label><input type="number" min="0" step="1" id="sale-quantity" oninput="onSaleUnitOrQtyChange()" placeholder="e.g. 2"></div>
         </div>
@@ -750,11 +746,11 @@
         </div>
         <p class="sec-title" style="margin-top:4px;">Custom Pricing</p>
         <p class="share-note" style="margin-bottom:10px;">Leave a price blank to charge this customer the standard price for that unit.</p>
-        <div class="row">
+        <div class="row" id="cust-price-egg-row">
           <div><label id="cust-price-egg-label">Price per egg</label><input type="number" min="0" step="0.01" id="cust-price-egg" placeholder="Standard"></div>
-          <div><label id="cust-price-half-dozen-label">Price per half dozen</label><input type="number" min="0" step="0.01" id="cust-price-half-dozen" placeholder="Standard"></div>
         </div>
         <div class="row">
+          <div><label id="cust-price-half-dozen-label">Price per half dozen</label><input type="number" min="0" step="0.01" id="cust-price-half-dozen" placeholder="Standard"></div>
           <div><label id="cust-price-dozen-label">Price per dozen</label><input type="number" min="0" step="0.01" id="cust-price-dozen" placeholder="Standard"></div>
         </div>
         <button class="btn full" onclick="saveCustomer()">Save customer</button>
@@ -781,11 +777,7 @@
           <div class="row">
             <div>
               <label>Unit</label>
-              <select id="credit-unit">
-                <option value="egg">Single egg</option>
-                <option value="half_dozen">Half dozen box</option>
-                <option value="dozen">Dozen box</option>
-              </select>
+              <select id="credit-unit"></select>
             </div>
             <div><label>Quantity</label><input type="number" step="1" id="credit-quantity" placeholder="e.g. 2, or -2 to claim"></div>
           </div>
@@ -894,21 +886,21 @@
           <label for="sales-enabled">Track egg sales to customers</label>
         </div>
         <div id="sales-settings-fields" style="display:none;">
+          <div class="checkbox-row">
+            <input type="checkbox" id="sales-allow-egg" onchange="onSalesAllowEggToggle()">
+            <label for="sales-allow-egg">Allow charging per single egg</label>
+          </div>
           <div class="row">
             <div>
               <label>Standard unit</label>
-              <select id="sales-standard-unit">
-                <option value="egg">Single egg</option>
-                <option value="half_dozen">Half dozen box</option>
-                <option value="dozen">Dozen box</option>
-              </select>
+              <select id="sales-standard-unit"></select>
             </div>
           </div>
-          <div class="row">
+          <div class="row" id="sales-price-egg-row">
             <div><label>Price per egg</label><input type="number" min="0" step="0.01" id="sales-price-egg" placeholder="0.00"></div>
-            <div><label>Price per half dozen</label><input type="number" min="0" step="0.01" id="sales-price-half-dozen" placeholder="0.00"></div>
           </div>
           <div class="row">
+            <div><label>Price per half dozen</label><input type="number" min="0" step="0.01" id="sales-price-half-dozen" placeholder="0.00"></div>
             <div><label>Price per dozen</label><input type="number" min="0" step="0.01" id="sales-price-dozen" placeholder="0.00"></div>
           </div>
           <button class="btn full" onclick="saveSalesSettings()">Save sales settings</button>
@@ -1419,9 +1411,9 @@ function rowToCustomerCredit(r){
   };
 }
 function rowToSalesSettings(r){
-  if(!r) return { enabled: false, standardUnit: 'dozen', priceEgg: 0, priceHalfDozen: 0, priceDozen: 0 };
+  if(!r) return { enabled: false, allowEggSales: false, standardUnit: 'dozen', priceEgg: 0, priceHalfDozen: 0, priceDozen: 0 };
   return {
-    enabled: !!r.enabled, standardUnit: r.standard_unit || 'dozen',
+    enabled: !!r.enabled, allowEggSales: !!r.allow_egg_sales, standardUnit: r.standard_unit || 'dozen',
     priceEgg: Number(r.price_egg) || 0, priceHalfDozen: Number(r.price_half_dozen) || 0, priceDozen: Number(r.price_dozen) || 0
   };
 }
@@ -3187,17 +3179,33 @@ function onSalesEnabledToggle(){
 function renderSalesSettingsForm(){
   const s = state.salesSettings || { enabled: false, standardUnit: 'dozen', priceEgg: 0, priceHalfDozen: 0, priceDozen: 0 };
   document.getElementById('sales-enabled').checked = !!s.enabled;
-  document.getElementById('sales-standard-unit').value = s.standardUnit || 'dozen';
+  document.getElementById('sales-allow-egg').checked = !!s.allowEggSales;
+  populateSalesStandardUnitOptions(s.standardUnit || 'dozen');
+  document.getElementById('sales-price-egg-row').style.display = s.allowEggSales ? 'flex' : 'none';
   document.getElementById('sales-price-egg').value = s.priceEgg || '';
   document.getElementById('sales-price-half-dozen').value = s.priceHalfDozen || '';
   document.getElementById('sales-price-dozen').value = s.priceDozen || '';
   onSalesEnabledToggle();
 }
 
+function populateSalesStandardUnitOptions(selected){
+  const allow = document.getElementById('sales-allow-egg').checked;
+  const units = allow ? ['egg', 'half_dozen', 'dozen'] : ['half_dozen', 'dozen'];
+  const sel = document.getElementById('sales-standard-unit');
+  sel.innerHTML = units.map(u => `<option value="${u}" ${u === selected ? 'selected' : ''}>${SALE_UNIT_LABELS[u]}</option>`).join('');
+  if(!units.includes(selected)) sel.value = units[0];
+}
+
+function onSalesAllowEggToggle(){
+  populateSalesStandardUnitOptions(document.getElementById('sales-standard-unit').value);
+  document.getElementById('sales-price-egg-row').style.display = document.getElementById('sales-allow-egg').checked ? 'flex' : 'none';
+}
+
 async function saveSalesSettings(){
   const payload = {
     owner_id: currentFlockOwnerId,
     enabled: document.getElementById('sales-enabled').checked,
+    allow_egg_sales: document.getElementById('sales-allow-egg').checked,
     standard_unit: document.getElementById('sales-standard-unit').value,
     price_egg: Number(document.getElementById('sales-price-egg').value) || 0,
     price_half_dozen: Number(document.getElementById('sales-price-half-dozen').value) || 0,
@@ -3213,7 +3221,33 @@ async function saveSalesSettings(){
 
 // ---------- SALES ----------
 const SALE_UNIT_LABELS = { egg: 'Single egg', half_dozen: 'Half dozen box', dozen: 'Dozen box' };
+const SALE_UNIT_DROPDOWN_LABELS = { egg: 'Single egg(s)', half_dozen: 'Half dozen box(es)', dozen: 'Dozen box(es)' };
 const SALE_UNIT_PLURAL_LABELS = { egg: 'egg(s)', half_dozen: 'half dozen box(es)', dozen: 'dozen box(es)' };
+
+function allowEggSales(){
+  return !!(state.salesSettings && state.salesSettings.allowEggSales);
+}
+
+function saleUnitIds(){
+  return allowEggSales() ? ['egg', 'half_dozen', 'dozen'] : ['half_dozen', 'dozen'];
+}
+
+function saleUnitOptionsHtml(labels, selected){
+  let units = saleUnitIds();
+  if(selected && !units.includes(selected)) units = units.concat([selected]);
+  return units.map(u => `<option value="${u}" ${u === selected ? 'selected' : ''}>${labels[u] || u}</option>`).join('');
+}
+
+function populateSaleUnitSelect(){
+  const sel = document.getElementById('sale-unit');
+  sel.innerHTML = saleUnitOptionsHtml(SALE_UNIT_DROPDOWN_LABELS, sel.value);
+}
+
+function populateCreditUnitSelect(){
+  const sel = document.getElementById('credit-unit');
+  if(!sel) return;
+  sel.innerHTML = saleUnitOptionsHtml(SALE_UNIT_LABELS, sel.value);
+}
 
 function saleUnitPrice(unit, customerId){
   const customer = customerId ? state.customers.find(c => c.id === customerId) : null;
@@ -3386,6 +3420,7 @@ function renderCustomersList(){
 
 function renderSalesTab(){
   if(!document.getElementById('sale-date').value) document.getElementById('sale-date').value = todayStr();
+  populateSaleUnitSelect();
   populateSaleCustomerOptions();
   onSaleCustomerChange();
   renderCustomersList();
@@ -3393,6 +3428,7 @@ function renderSalesTab(){
 
 function populateCustomerPriceLabels(){
   const s = state.salesSettings || {};
+  document.getElementById('cust-price-egg-row').style.display = allowEggSales() ? 'flex' : 'none';
   document.getElementById('cust-price-egg-label').textContent = `Price per egg (standard ${formatMoney(s.priceEgg || 0)})`;
   document.getElementById('cust-price-half-dozen-label').textContent = `Price per half dozen (standard ${formatMoney(s.priceHalfDozen || 0)})`;
   document.getElementById('cust-price-dozen-label').textContent = `Price per dozen (standard ${formatMoney(s.priceDozen || 0)})`;
@@ -3403,6 +3439,7 @@ function openCustomerDetail(id){
   editingCustomerId = id;
   editingSaleId = null;
   populateCustomerPriceLabels();
+  populateCreditUnitSelect();
   if(id){
     const c = state.customers.find(x => x.id === id);
     document.getElementById('customer-detail-name').textContent = c ? c.name : 'Customer';
@@ -3562,11 +3599,7 @@ function saleRowHtml(s, readOnly){
       <div class="row">
         <div>
           <label>Unit</label>
-          <select id="edit-sale-unit-${s.id}">
-            <option value="egg" ${s.unit === 'egg' ? 'selected' : ''}>Single egg</option>
-            <option value="half_dozen" ${s.unit === 'half_dozen' ? 'selected' : ''}>Half dozen box</option>
-            <option value="dozen" ${s.unit === 'dozen' ? 'selected' : ''}>Dozen box</option>
-          </select>
+          <select id="edit-sale-unit-${s.id}">${saleUnitOptionsHtml(SALE_UNIT_LABELS, s.unit)}</select>
         </div>
         <div><label>Quantity</label><input type="number" min="0" id="edit-sale-qty-${s.id}" value="${s.quantity}"></div>
       </div>

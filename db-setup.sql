@@ -179,12 +179,16 @@ create table if not exists customer_credits (
 create table if not exists sales_settings (
   owner_id uuid primary key references auth.users(id) on delete cascade,
   enabled boolean not null default false,
+  allow_egg_sales boolean not null default false,
   standard_unit text not null default 'dozen' check (standard_unit in ('egg','half_dozen','dozen')),
   price_egg numeric not null default 0,
   price_half_dozen numeric not null default 0,
   price_dozen numeric not null default 0,
   updated_at timestamptz not null default now()
 );
+
+-- Off by default: charging per single egg is opt-in, hidden everywhere until enabled.
+alter table sales_settings add column if not exists allow_egg_sales boolean not null default false;
 
 -- ---------- Account deletion ----------
 -- Lets a signed-in user permanently delete their own account. All of
