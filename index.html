@@ -1194,7 +1194,10 @@ async function submitAuth(){
   try{
     let result;
     if(isSignup){
-      result = await sb.auth.signUp({ email, password });
+      result = await sb.auth.signUp({
+        email, password,
+        options: { emailRedirectTo: window.location.href.split('#')[0] }
+      });
     } else {
       result = await sb.auth.signInWithPassword({ email, password });
     }
@@ -4014,6 +4017,21 @@ document.getElementById('pwa-install-btn').addEventListener('click', async () =>
 });
 
 // ---------- INIT ----------
+function handleAuthRedirectHash(){
+  const hash = window.location.hash;
+  if(!hash || hash.length < 2) return;
+  const params = new URLSearchParams(hash.slice(1));
+  const error = params.get('error') || params.get('error_code');
+  if(!error) return;
+  const statusEl = document.getElementById('auth-status');
+  statusEl.style.color = 'var(--danger)';
+  statusEl.textContent = params.get('error_description')
+    || 'That link has expired or already been used — please log in below, or sign up again to get a new one.';
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+}
+
+window.addEventListener('hashchange', handleAuthRedirectHash);
+
 function init(){
   document.getElementById('egg-date').value = todayStr();
   document.getElementById('hc-date').value = todayStr();
@@ -4021,6 +4039,7 @@ function init(){
   populateGenderOptions('Chicken', 'Hen');
   onGenderChange();
   registerSW();
+  handleAuthRedirectHash();
   checkExistingSession();
 }
 
