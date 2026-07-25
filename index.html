@@ -103,8 +103,10 @@
   .stat-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-dim);margin-bottom:6px;}
   .stat-main{font-family:'Oswald',sans-serif;font-size:28px;font-weight:600;color:var(--amber);line-height:1;}
   .stat-sub{font-size:11px;color:var(--text-dim);margin:2px 0 8px;}
-  .stat-headline-row{display:flex;gap:14px;}
-  .stat-headline-row > div{flex:1;min-width:0;}
+  .stat-headline-row{display:flex;}
+  .stat-headline-row > div{flex:1;min-width:0;overflow-wrap:anywhere;}
+  .stat-headline-row > div:first-child{padding-right:14px;}
+  .stat-headline-row > div:not(:first-child){border-left:1px solid var(--border);padding-left:14px;}
   .stat-headline-row .stat-sub{white-space:normal;}
   .stat-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text-dim);padding:2px 0;}
   .stat-row strong{color:var(--text);}
