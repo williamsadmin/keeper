@@ -3439,6 +3439,21 @@ function renderCustomersList(){
 }
 
 // ---------- SALES HISTORY ----------
+const UNIT_EGG_EQUIVALENT = { egg: 1, half_dozen: 6, dozen: 12 };
+const UNIT_SINGULAR_LABELS = { egg: 'egg', half_dozen: 'half dozen box', dozen: 'dozen box' };
+const UNIT_PLURAL_LABELS = { egg: 'eggs', half_dozen: 'half dozen boxes', dozen: 'dozen boxes' };
+
+function unitLabelForQty(unit, qty){
+  const singular = UNIT_SINGULAR_LABELS[unit] || unit;
+  const plural = UNIT_PLURAL_LABELS[unit] || unit;
+  return Math.abs(qty - 1) < 0.05 ? singular : plural;
+}
+
+function formatUnitQty(n){
+  const rounded = Math.round(n * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
 function computeSalesPeriodStats(start, end){
   const rows = state.sales.filter(s => {
     const t = new Date(s.date + 'T00:00:00');
@@ -3447,16 +3462,27 @@ function computeSalesPeriodStats(start, end){
   const count = rows.length;
   const charged = rows.reduce((sum, s) => sum + s.charged, 0);
   const paid = rows.reduce((sum, s) => sum + s.paid, 0);
-  return { count, charged, paid, outstanding: charged - paid };
+  const totalEggs = rows.reduce((sum, s) => sum + s.quantity * (UNIT_EGG_EQUIVALENT[s.unit] || 1), 0);
+  const standardUnit = (state.salesSettings && state.salesSettings.standardUnit) || 'dozen';
+  const standardUnitQty = totalEggs / (UNIT_EGG_EQUIVALENT[standardUnit] || 1);
+  return { count, charged, paid, outstanding: charged - paid, standardUnit, standardUnitQty };
 }
 
 function salesStatCardHtml(label, s){
   return `
     <div class="stat-card">
       <div class="stat-label">${escapeHtml(label)}</div>
-      <div class="stat-main">${formatMoney(s.charged)}</div>
-      <div class="stat-sub">${s.count} sale${s.count === 1 ? '' : 's'}</div>
-      <div class="stat-row"><span>Charged</span><strong>${formatMoney(s.charged)}</strong></div>
+      <div class="stat-headline-row">
+        <div>
+          <div class="stat-main">${formatMoney(s.charged)}</div>
+          <div class="stat-sub">charged</div>
+        </div>
+        <div>
+          <div class="stat-main">${formatUnitQty(s.standardUnitQty)}</div>
+          <div class="stat-sub">${escapeHtml(unitLabelForQty(s.standardUnit, s.standardUnitQty))} sold</div>
+        </div>
+      </div>
+      <div class="stat-row"><span>Sales</span><strong>${s.count}</strong></div>
       <div class="stat-row"><span>Paid</span><strong>${formatMoney(s.paid)}</strong></div>
       <div class="stat-row"><span>Outstanding</span><strong>${formatMoney(s.outstanding)}</strong></div>
     </div>`;
@@ -3466,6 +3492,8 @@ function renderSalesStats(){
   const el = document.getElementById('sales-stats');
   if(!el) return;
   const now = new Date();
+  const weekStart = startOfWeek(now);
+  const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 6); weekEnd.setHours(23, 59, 59, 999);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
   const yearStart = new Date(now.getFullYear(), 0, 1);
@@ -3473,6 +3501,7 @@ function renderSalesStats(){
   const lifetimeStart = new Date(0);
   const lifetimeEnd = new Date(8640000000000000);
   el.innerHTML =
+    salesStatCardHtml('This Week', computeSalesPeriodStats(weekStart, weekEnd)) +
     salesStatCardHtml('This Month', computeSalesPeriodStats(monthStart, monthEnd)) +
     salesStatCardHtml('This Year', computeSalesPeriodStats(yearStart, yearEnd)) +
     salesStatCardHtml('Lifetime', computeSalesPeriodStats(lifetimeStart, lifetimeEnd));
