@@ -1640,26 +1640,8 @@ function renderHistoryStats(){
 }
 
 // ---------- CHICKENS ----------
-const BREED_PRESETS = {
-  'Rhode Island Red': 280,
-  'Leghorn': 300,
-  'Sussex': 260,
-  'Plymouth Rock': 240,
-  'Orpington': 190,
-  'Australorp': 270,
-  'Wyandotte': 220,
-  'Marans': 180,
-  'Silkie': 110,
-  'Brahma': 160,
-  'Hybrid / Warren / ISA Brown': 300
-};
-
 function allBreedsForAnimal(animalType){
-  const builtin = animalType === 'Chicken'
-    ? Object.keys(BREED_PRESETS).map(name => ({ name, animalType: 'Chicken', expectedEggsPerYear: BREED_PRESETS[name], eggColour: '', builtin: true }))
-    : [];
-  const custom = state.breeds.filter(b => b.animalType === animalType);
-  return [...builtin, ...custom];
+  return state.breeds.filter(b => b.animalType === animalType);
 }
 
 function populateBreedOptions(animalType, preferredValue){
@@ -1765,15 +1747,14 @@ async function deleteBreed(id){
 }
 
 function breedCardHtml(b, readOnly){
-  const isBuiltin = !!b.builtin;
   return `
-    <div class="chicken-card" ${isBuiltin ? 'style="cursor:default;"' : `onclick="editBreed('${b.id}')"`}>
+    <div class="chicken-card" onclick="editBreed('${b.id}')">
       <div class="chicken-card-head">
         <div>
-          <div class="chicken-name">${escapeHtml(b.name)}${isBuiltin ? '<span class="gender-tag hen">Built-in</span>' : ''}</div>
+          <div class="chicken-name">${escapeHtml(b.name)}</div>
           <div class="chicken-meta">${escapeHtml(b.animalType)}</div>
         </div>
-        ${(!isBuiltin && !readOnly) ? `
+        ${!readOnly ? `
         <div class="icon-row">
           <button class="icon-btn danger" onclick="event.stopPropagation(); deleteBreed('${b.id}')" aria-label="Delete">&#10005;</button>
         </div>` : ''}
@@ -1789,8 +1770,7 @@ function renderBreedsList(){
   const el = document.getElementById('breeds-list');
   if(!el) return;
   const readOnly = isReadOnly();
-  const builtin = Object.keys(BREED_PRESETS).map(name => ({ id: 'builtin-' + name, name, animalType: 'Chicken', expectedEggsPerYear: BREED_PRESETS[name], eggColour: '', builtin: true }));
-  const all = [...builtin, ...state.breeds].sort((a, b) => a.animalType === b.animalType ? a.name.localeCompare(b.name) : a.animalType.localeCompare(b.animalType));
+  const all = state.breeds.slice().sort((a, b) => a.animalType === b.animalType ? a.name.localeCompare(b.name) : a.animalType.localeCompare(b.animalType));
   el.innerHTML = all.length ? all.map(b => breedCardHtml(b, readOnly)).join('') : '<p class="empty">No breeds yet.</p>';
 }
 
@@ -1947,9 +1927,9 @@ async function saveChicken(){
   closeChickenDetail();
 }
 
-function findBreedPreset(breedInput){
+function findBreedMatch(breedInput, animalType){
   if(!breedInput) return null;
-  return Object.keys(BREED_PRESETS).find(k => k.toLowerCase() === breedInput.trim().toLowerCase()) || null;
+  return allBreedsForAnimal(animalType || 'Chicken').find(b => b.name.toLowerCase() === breedInput.trim().toLowerCase()) || null;
 }
 
 function previewImportList(){
@@ -1961,11 +1941,11 @@ function previewImportList(){
     const parts = line.split(',').map(p => p.trim());
     const [name, tag, tagColourInput, animalInput, breedInput, genderInput, dob, expectedInput, eggColourInput] = parts;
     const notes = parts.slice(9).join(', ').trim();
-    const matchedBreed = findBreedPreset(breedInput);
-    const breed = matchedBreed || breedInput || '';
-    const explicitExpected = expectedInput !== undefined && expectedInput !== '' ? Number(expectedInput) : null;
-    const expected = (explicitExpected != null && !isNaN(explicitExpected)) ? explicitExpected : (matchedBreed ? BREED_PRESETS[matchedBreed] : 0);
     const animalType = animalInput || 'Chicken';
+    const matchedBreed = findBreedMatch(breedInput, animalType);
+    const breed = (matchedBreed ? matchedBreed.name : breedInput) || '';
+    const explicitExpected = expectedInput !== undefined && expectedInput !== '' ? Number(expectedInput) : null;
+    const expected = (explicitExpected != null && !isNaN(explicitExpected)) ? explicitExpected : (matchedBreed ? matchedBreed.expectedEggsPerYear : 0);
     return {
       owner_id: currentFlockOwnerId,
       name: name || tag || 'Unnamed',
