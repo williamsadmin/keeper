@@ -62,15 +62,20 @@ as $$
 $$;
 
 -- ---------- App data ----------
+-- Multiple entries per day are allowed (e.g. a morning and evening
+-- collection), so there is no uniqueness constraint on (owner_id, date).
 create table if not exists eggs (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
   date date not null,
   total int not null default 0,
   cracked int not null default 0,
-  created_at timestamptz not null default now(),
-  unique (owner_id, date)
+  created_at timestamptz not null default now()
 );
+
+-- Drops the old one-entry-per-day constraint for installs created before
+-- multiple daily entries were supported.
+alter table eggs drop constraint if exists eggs_owner_id_date_key;
 
 create table if not exists chickens (
   id uuid primary key default gen_random_uuid(),

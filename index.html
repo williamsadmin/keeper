@@ -259,7 +259,8 @@
       <div class="reminder-banner" id="egg-today-reminder" style="display:none;">Egg count needs doing today! &#x1F95A;</div>
 
       <section id="egg-form-section">
-        <p class="sec-title">Log Eggs</p>
+        <p class="sec-title" id="egg-form-title">Log Eggs</p>
+        <p class="share-note" style="margin-bottom:10px;">You can log more than one entry for the same day — e.g. a morning and evening collection.</p>
         <div class="row">
           <div><label>Date</label><input type="date" id="egg-date"></div>
         </div>
@@ -268,6 +269,7 @@
           <div><label>Cracked / deformed</label><input type="number" min="0" inputmode="numeric" id="egg-cracked" placeholder="0"></div>
         </div>
         <button class="btn full" onclick="saveEggEntry()">Save entry</button>
+        <button class="btn secondary full" id="egg-cancel-btn" style="display:none;margin-top:8px;" onclick="cancelEditEggEntry()">Cancel edit</button>
         <div class="status" id="egg-status"></div>
       </section>
 
@@ -1011,6 +1013,7 @@ let flocks = []; // [{ ownerId, label, role: 'owner'|'editor'|'viewer' }]
 let currentFlockOwnerId = null;
 let currentRole = 'owner';
 let state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null };
+let editingEggId = null;
 let editingBreedId = null;
 let currentCustomerDetailId = null;
 let editingCustomerId = null;
@@ -1403,6 +1406,7 @@ function renderHcSetupInfo(){
 
 function renderAll(){
   applyRolePermissions();
+  resetEggForm();
   renderEggs();
   populateCoopSelectOptions();
   populateHcCoopSelectOptions();
@@ -1476,7 +1480,7 @@ function rowToSalesSettings(r){
 
 async function loadFlockData(){
   const [eggsRes, chickensRes, hcRes, coopsRes, breedsRes, customersRes, salesRes, creditsRes, salesSettingsRes] = await Promise.all([
-    sb.from('eggs').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
+    sb.from('eggs').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }).order('created_at', { ascending: false }),
     sb.from('chickens').select('*').eq('owner_id', currentFlockOwnerId).order('created_at'),
     sb.from('health_checks').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
     sb.from('coops').select('*').eq('owner_id', currentFlockOwnerId).order('name'),
@@ -1498,6 +1502,15 @@ async function loadFlockData(){
 }
 
 // ---------- EGG COUNT ----------
+function resetEggForm(){
+  editingEggId = null;
+  document.getElementById('egg-total').value = '';
+  document.getElementById('egg-cracked').value = '';
+  document.getElementById('egg-date').value = todayStr();
+  document.getElementById('egg-form-title').textContent = 'Log Eggs';
+  document.getElementById('egg-cancel-btn').style.display = 'none';
+}
+
 async function saveEggEntry(){
   const date = document.getElementById('egg-date').value;
   const total = parseInt(document.getElementById('egg-total').value, 10);
@@ -1507,31 +1520,41 @@ async function saveEggEntry(){
   if(isNaN(total) || total < 0){ setStatus('egg-status', 'Enter a valid total.', true); return; }
   if(cracked > total){ setStatus('egg-status', "Cracked can't exceed total.", true); return; }
 
-  const { error } = await sb.from('eggs')
-    .upsert({ owner_id: currentFlockOwnerId, date, total, cracked }, { onConflict: 'owner_id,date' });
+  let error;
+  if(editingEggId){
+    ({ error } = await sb.from('eggs').update({ date, total, cracked }).eq('id', editingEggId));
+  } else {
+    ({ error } = await sb.from('eggs').insert({ owner_id: currentFlockOwnerId, date, total, cracked }));
+  }
   if(error){ setStatus('egg-status', error.message, true); return; }
 
   await loadFlockData();
   setStatus('egg-status', 'Saved.', false);
-  document.getElementById('egg-total').value = '';
-  document.getElementById('egg-cracked').value = '';
-  document.getElementById('egg-date').value = todayStr();
+  resetEggForm();
   renderEggs();
 }
 
-function editEggEntry(date){
-  const e = state.eggs.find(x => x.date === date);
+function editEggEntry(id){
+  const e = state.eggs.find(x => x.id === id);
   if(!e) return;
+  editingEggId = id;
   document.getElementById('egg-date').value = e.date;
   document.getElementById('egg-total').value = e.total;
   document.getElementById('egg-cracked').value = e.cracked;
+  document.getElementById('egg-form-title').textContent = 'Edit Entry';
+  document.getElementById('egg-cancel-btn').style.display = 'block';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-async function deleteEggEntry(date){
+function cancelEditEggEntry(){
+  resetEggForm();
+}
+
+async function deleteEggEntry(id){
   if(!confirm('Delete this entry?')) return;
-  const { error } = await sb.from('eggs').delete().eq('owner_id', currentFlockOwnerId).eq('date', date);
+  const { error } = await sb.from('eggs').delete().eq('id', id);
   if(error){ setStatus('egg-status', error.message, true); return; }
+  if(editingEggId === id) resetEggForm();
   await loadFlockData();
   renderEggs();
 }
@@ -1566,7 +1589,7 @@ function computePeriodStats(start, end){
   const total = rows.reduce((s, e) => s + e.total, 0);
   const cracked = rows.reduce((s, e) => s + e.cracked, 0);
   const good = total - cracked;
-  const days = rows.length;
+  const days = new Set(rows.map(e => e.date)).size;
   const avg = days ? total / days : 0;
   return { total, cracked, good, avg, days };
 }
@@ -1615,8 +1638,8 @@ function renderEggLog(){
       </div>
       ${readOnly ? '' : `
       <div class="icon-row">
-        <button class="icon-btn" onclick="editEggEntry('${e.date}')" aria-label="Edit">&#9998;</button>
-        <button class="icon-btn danger" onclick="deleteEggEntry('${e.date}')" aria-label="Delete">&#10005;</button>
+        <button class="icon-btn" onclick="editEggEntry('${e.id}')" aria-label="Edit">&#9998;</button>
+        <button class="icon-btn danger" onclick="deleteEggEntry('${e.id}')" aria-label="Delete">&#10005;</button>
       </div>`}
     </div>`).join('');
 }
