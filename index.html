@@ -276,16 +276,10 @@
       <section>
         <p class="sec-title">Totals &amp; Averages</p>
         <div class="stat-grid" id="egg-stats"></div>
-        <div class="row" style="margin-top:10px;">
-          <div>
-            <label>Also show</label>
-            <select id="egg-period-select" onchange="renderEggCurrentPeriodCard()">
-              <option value="month">This Month</option>
-              <option value="year">This Year</option>
-            </select>
-          </div>
-        </div>
-        <div class="stat-grid" id="egg-current-period-stat"></div>
+        <details>
+          <summary class="sec-title" style="margin-top:10px;">Show More</summary>
+          <div class="stat-grid" id="egg-more-stats"></div>
+        </details>
       </section>
 
       <section>
@@ -1653,25 +1647,20 @@ function renderEggStats(){
     eggStatCardHtml('This Week', w, 'good eggs (Mon&ndash;Sun)') +
     eggStatCardHtml('Running Week', r, 'good eggs (last 7 days)');
 
-  renderEggCurrentPeriodCard();
+  renderEggMoreStats();
 }
 
-function renderEggCurrentPeriodCard(){
-  const el = document.getElementById('egg-current-period-stat');
+function renderEggMoreStats(){
+  const el = document.getElementById('egg-more-stats');
   if(!el) return;
   const now = new Date();
-  const type = document.getElementById('egg-period-select').value;
-  let start, end, label;
-  if(type === 'year'){
-    start = new Date(now.getFullYear(), 0, 1);
-    end = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
-    label = 'This Year';
-  } else {
-    start = new Date(now.getFullYear(), now.getMonth(), 1);
-    end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-    label = 'This Month';
-  }
-  el.innerHTML = eggStatCardHtml(label, computePeriodStats(start, end));
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const yearStart = new Date(now.getFullYear(), 0, 1);
+  const yearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+  const m = computePeriodStats(monthStart, monthEnd);
+  const y = computePeriodStats(yearStart, yearEnd);
+  el.innerHTML = eggStatCardHtml('This Month', m) + eggStatCardHtml('This Year', y);
 }
 
 function renderEggLog(){
