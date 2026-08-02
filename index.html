@@ -73,26 +73,22 @@
   .role-badge{flex-shrink:0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:5px 10px;border-radius:20px;background:var(--surface-alt);color:var(--text-dim);white-space:nowrap;}
   .role-badge.editor{background:var(--amber-dim);color:var(--amber);}
   .role-badge.viewer{background:#3A3F4D;color:var(--teal);}
-  .tabbar{display:flex;overflow-x:auto;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:20;}
+  .section-nav{display:flex;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:21;}
+  .section-btn{
+    flex:1;background:none;border:none;color:var(--text-dim);font-family:inherit;cursor:pointer;
+    display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px 8px;
+    border-bottom:3px solid transparent;
+  }
+  .section-btn .section-icon{font-size:19px;line-height:1;}
+  .section-btn .section-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;}
+  .section-btn.active{color:var(--amber);border-bottom-color:var(--amber);}
+  .tabbar{display:flex;overflow-x:auto;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:45px;z-index:20;}
   .tabbar button{
     flex:1; min-width:100px; background:none;border:none;color:var(--text-dim);
     font-family:inherit;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.03em;
     padding:13px 6px;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;
   }
   .tabbar button.active{color:var(--amber);border-bottom-color:var(--amber);}
-  .menu-toggle-btn{
-    flex:0 0 auto;background:none;border:none;border-left:1px solid var(--border);color:var(--text-dim);
-    font-size:17px;padding:13px 18px;cursor:pointer;
-  }
-  .menu-toggle-btn.active{color:var(--amber);}
-  .menu-panel{display:none;flex-direction:column;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:45px;z-index:19;}
-  .menu-panel button{
-    display:block;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--border);
-    color:var(--text-dim);font-family:inherit;font-size:13px;font-weight:600;text-transform:uppercase;
-    letter-spacing:.03em;padding:14px 16px;cursor:pointer;
-  }
-  .menu-panel button:last-child{border-bottom:none;}
-  .menu-panel button.active{color:var(--amber);}
   .tab-panel{display:none;}
   .tab-panel.active{display:block;}
 
@@ -242,16 +238,38 @@
     <span class="role-badge" id="role-badge" style="display:none;"></span>
   </div>
 
-  <div class="tabbar">
-    <div id="tabbar-buttons" style="display:contents;"></div>
-    <button class="menu-toggle-btn" id="menu-toggle-btn" onclick="toggleMenu()" aria-label="More">&#9776;</button>
+  <div class="section-nav" id="section-nav">
+    <button class="section-btn active" data-section="overall" onclick="switchSection('overall')"><span class="section-icon">&#127968;</span><span class="section-label">Overall</span></button>
+    <button class="section-btn" data-section="account" onclick="switchSection('account')"><span class="section-icon">&#128100;</span><span class="section-label">Account</span></button>
+    <button class="section-btn" data-section="poultry" onclick="switchSection('poultry')"><span class="section-icon">&#128020;</span><span class="section-label">Poultry</span></button>
+    <button class="section-btn" data-section="livestock" onclick="switchSection('livestock')"><span class="section-icon">&#128017;</span><span class="section-label">Sheep &amp; Goats</span></button>
   </div>
-  <div class="menu-panel" id="menu-panel"></div>
+
+  <div class="tabbar" id="subtabbar-wrap" style="display:none;">
+    <div id="tabbar-buttons" style="display:contents;"></div>
+  </div>
 
   <div class="wrap">
 
+    <!-- OVERALL TAB -->
+    <div id="tab-overall" class="tab-panel active">
+      <p class="eyebrow">Overall</p>
+      <h1>Your Farm</h1>
+      <p class="sub">Every coop and group across your flock &mdash; tap one to open it.</p>
+
+      <section>
+        <p class="sec-title">Poultry Coops</p>
+        <div id="overall-poultry-list"></div>
+      </section>
+
+      <section>
+        <p class="sec-title">Sheep &amp; Goats Groups</p>
+        <div id="overall-livestock-list"></div>
+      </section>
+    </div>
+
     <!-- EGG COUNT TAB -->
-    <div id="tab-eggs" class="tab-panel active">
+    <div id="tab-eggs" class="tab-panel">
       <p class="eyebrow">Egg Count</p>
       <h1>Daily Eggs</h1>
       <p class="sub">Log today's total and any cracked or deformed eggs. Totals and averages update automatically.</p>
@@ -317,11 +335,11 @@
 
     <!-- CHICKENS TAB (MY FLOCK LANDING) -->
     <div id="tab-chickens" class="tab-panel">
-      <p class="eyebrow">The Flock</p>
-      <h1>My Flock</h1>
-      <p class="sub">Keep a record of every bird — breed, tag, age and how many eggs you can expect from them.</p>
+      <p class="eyebrow" id="myflock-eyebrow">The Flock</p>
+      <h1 id="myflock-h1">My Flock</h1>
+      <p class="sub" id="myflock-sub">Keep a record of every bird — breed, tag, age and how many eggs you can expect from them.</p>
 
-      <section>
+      <section id="myflock-summary-section">
         <p class="sec-title">Flock Summary</p>
         <div class="stat-card">
           <div class="stat-label">Expected eggs from hens</div>
@@ -340,24 +358,24 @@
           <button class="btn full" style="margin-top:10px;" onclick="openChickenDetail(null)">Continue</button>
         </details>
         <details id="coop-add-form-section">
-          <summary class="sec-title">+ Add A Coop</summary>
+          <summary class="sec-title" id="add-coop-summary">+ Add A Coop</summary>
           <div class="row" style="margin-top:10px;">
             <div><input type="text" id="new-coop-name" placeholder="e.g. Main Coop"></div>
           </div>
-          <button class="btn full" onclick="addCoop()">+ Add Coop</button>
+          <button class="btn full" id="add-coop-submit-btn" onclick="addCoop()">+ Add Coop</button>
           <div class="status" id="coop-status"></div>
         </details>
       </div>
 
       <section>
-        <p class="sec-title">Coops</p>
+        <p class="sec-title" id="coops-section-title">Coops</p>
         <div id="coops-list"></div>
       </section>
     </div>
 
     <!-- ALL ANIMALS SEARCH PAGE -->
     <div id="tab-animal-search" class="tab-panel">
-      <button type="button" class="btn secondary" style="margin-bottom:14px;" onclick="switchTab('chickens')">&larr; Back to My Flock</button>
+      <button type="button" class="btn secondary" style="margin-bottom:14px;" onclick="switchTab('chickens')">&larr; <span id="animal-search-back-label">Back to My Flock</span></button>
       <p class="eyebrow">All Animals</p>
       <h1>Search &amp; Filter</h1>
       <p class="sub">Every bird across every coop, filterable and sortable.</p>
@@ -428,15 +446,15 @@
 
     <!-- COOP DETAIL PAGE -->
     <div id="tab-coop-detail" class="tab-panel">
-      <button type="button" class="btn secondary" style="margin-bottom:14px;" onclick="closeCoopDetail()">&larr; Back to My Flock</button>
-      <p class="eyebrow">Coop</p>
+      <button type="button" class="btn secondary" style="margin-bottom:14px;" onclick="closeCoopDetail()">&larr; <span id="coop-detail-back-label">Back to My Flock</span></button>
+      <p class="eyebrow" id="coop-detail-eyebrow">Coop</p>
       <h1 id="coop-detail-name">Coop</h1>
 
       <section id="coop-rename-section">
         <div class="row">
-          <div><label>Coop name</label><input type="text" id="coop-detail-name-input"></div>
+          <div><label id="coop-detail-name-label">Coop name</label><input type="text" id="coop-detail-name-input"></div>
         </div>
-        <button class="btn secondary full" onclick="renameCoop()">Rename coop</button>
+        <button class="btn secondary full" id="coop-detail-rename-btn" onclick="renameCoop()">Rename coop</button>
         <div class="status" id="coop-detail-status"></div>
       </section>
 
@@ -485,7 +503,7 @@
       </section>
 
       <section>
-        <p class="sec-title">Birds In This Coop</p>
+        <p class="sec-title" id="coop-detail-list-title">Birds In This Coop</p>
         <div id="coop-bulk-move-bar" style="display:none;margin-bottom:12px;">
           <div class="row">
             <div><button type="button" class="btn secondary full" id="coop-select-all-btn" onclick="toggleSelectAllInCoop()">Select all</button></div>
@@ -657,22 +675,13 @@
         <div class="row">
           <div>
             <label>Animal</label>
-            <select id="breed-animal" onchange="onBreedAnimalChange()">
-              <option value="Chicken">Chicken</option>
-              <option value="Duck">Duck</option>
-              <option value="Quail">Quail</option>
-              <option value="Goose">Goose</option>
-              <option value="Turkey">Turkey</option>
-              <option value="Guinea Fowl">Guinea Fowl</option>
-              <option value="Swan">Swan</option>
-              <option value="__custom">Other (type below)</option>
-            </select>
+            <select id="breed-animal" onchange="onBreedAnimalChange()"></select>
           </div>
         </div>
         <div class="row" id="breed-animal-custom-row" style="display:none;">
           <div><label>Animal name</label><input type="text" id="breed-animal-custom" placeholder="e.g. Peacock"></div>
         </div>
-        <div class="row">
+        <div class="row" id="breed-eggs-row">
           <div><label>Expected eggs / year</label><input type="number" min="0" id="breed-expected" placeholder="e.g. 250"></div>
           <div><label>Egg colour</label><input type="text" id="breed-egg-colour" placeholder="e.g. Blue"></div>
         </div>
@@ -791,7 +800,7 @@
 
     <!-- CUSTOMER DETAIL PAGE -->
     <div id="tab-customer-detail" class="tab-panel">
-      <button type="button" class="btn secondary" style="margin-bottom:14px;" onclick="closeCustomerDetail()">&larr; Back to Sales</button>
+      <button type="button" class="btn secondary" style="margin-bottom:14px;" onclick="closeCustomerDetail()"><span id="customer-detail-back-label">&larr; Back to Sales</span></button>
       <p class="eyebrow">Customer</p>
       <h1 id="customer-detail-name">Customer</h1>
 
@@ -851,8 +860,21 @@
       </section>
 
       <section id="customer-sales-section" style="display:none;">
-        <p class="sec-title">Sales History</p>
+        <p class="sec-title">Egg Sales History</p>
         <div id="customer-sales-list"></div>
+      </section>
+
+      <section id="customer-ls-balance-section" style="display:none;">
+        <p class="sec-title">Sheep &amp; Goats Balance</p>
+        <div class="stat-card">
+          <div class="stat-label" id="customer-ls-balance-label">All settled</div>
+          <div class="stat-main" id="customer-ls-balance-amount">£0.00</div>
+        </div>
+      </section>
+
+      <section id="customer-ls-sales-section" style="display:none;">
+        <p class="sec-title">Sheep &amp; Goats Sales History</p>
+        <div id="customer-ls-sales-list"></div>
       </section>
 
       <section id="customer-danger-section" style="display:none;">
@@ -860,11 +882,104 @@
       </section>
     </div>
 
-    <!-- SHARING TAB -->
-    <div id="tab-sharing" class="tab-panel">
-      <p class="eyebrow">Access</p>
-      <h1>Share &amp; View</h1>
-      <p class="sub">Give someone view-only access to your flock, or let them edit it too.</p>
+    <!-- LIVESTOCK SALES TAB -->
+    <div id="tab-livestock-sales" class="tab-panel">
+      <p class="eyebrow">Sales</p>
+      <h1>Sheep &amp; Goats Sales</h1>
+      <p class="sub">Log sales to customers and keep track of who owes what.</p>
+
+      <div id="ls-none-enabled-note" style="display:none;">
+        <p class="empty">Nothing to sell yet — tick at least one option under Sheep &amp; Goats Sales Tracking in your Account tab.</p>
+      </div>
+
+      <div id="ls-sale-section-wrap">
+        <section id="ls-log-section">
+          <p class="sec-title">Log A Sale</p>
+          <div class="row">
+            <div><label>Date</label><input type="date" id="ls-sale-date"></div>
+          </div>
+          <div class="row">
+            <div><label>Search customers</label><input type="text" id="ls-sale-customer-search" oninput="onLsSaleCustomerSearchChange()" placeholder="Type a name…"></div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Customer</label>
+              <select id="ls-sale-customer" onchange="onLsSaleCustomerChange()">
+                <option value="">Select a customer…</option>
+              </select>
+            </div>
+          </div>
+          <p class="share-note" id="ls-sale-customer-flag" style="display:none;margin-bottom:10px;"></p>
+          <div class="row">
+            <div>
+              <label>Type</label>
+              <select id="ls-sale-type" onchange="onLsSaleTypeOrQtyChange()"></select>
+            </div>
+            <div><label>Quantity</label><input type="number" min="0" step="0.01" id="ls-sale-quantity" oninput="onLsSaleTypeOrQtyChange()" placeholder="e.g. 2"></div>
+          </div>
+          <p class="share-note">Standard price for this sale: <strong id="ls-sale-standard-charge">£0.00</strong></p>
+          <div class="row">
+            <div><label>Amount charged</label><input type="number" min="0" step="0.01" id="ls-sale-charged" oninput="onLsSaleChargedChange()"></div>
+            <div><label>Amount paid</label><input type="number" min="0" step="0.01" id="ls-sale-paid" oninput="onLsSalePaidChange()"></div>
+          </div>
+          <p class="share-note" id="ls-sale-paid-status" style="margin-bottom:10px;"></p>
+          <button class="btn full" onclick="saveLivestockSale()">Log sale</button>
+          <div class="status" id="ls-sale-status"></div>
+        </section>
+
+        <section>
+          <button class="btn secondary full" id="ls-add-customer-btn" onclick="openCustomerDetail(null, 'livestock-sales')">+ Add Customer</button>
+        </section>
+
+        <section>
+          <p class="sec-title">Sales Totals</p>
+          <div class="stat-grid" id="ls-sales-stats"></div>
+        </section>
+
+        <section>
+          <details id="ls-sales-history-section">
+            <summary class="sec-title">Sales History (<span id="ls-sales-history-count">0</span>)</summary>
+            <div class="row">
+              <div><label>Search</label><input type="text" id="ls-sales-history-search" oninput="renderLsSalesHistoryList()" placeholder="Search by customer…"></div>
+            </div>
+            <div id="ls-sales-history-list"></div>
+          </details>
+        </section>
+
+        <section>
+          <details id="ls-customers-section">
+            <summary class="sec-title">Customers (<span id="ls-customers-count">0</span>)</summary>
+            <div class="row">
+              <div><label>Search</label><input type="text" id="ls-customers-search" oninput="renderLsCustomersList()" placeholder="Search by name…"></div>
+            </div>
+            <div id="ls-customers-list"></div>
+          </details>
+        </section>
+      </div>
+    </div>
+
+    <!-- ACCOUNT TAB -->
+    <div id="tab-account" class="tab-panel">
+      <p class="eyebrow">Your Account</p>
+      <h1>Account</h1>
+      <p class="sub">Manage your login, sharing, and sales settings.</p>
+
+      <section>
+        <p class="sec-title">Signed In As</p>
+        <p class="share-note" id="account-email-display"></p>
+      </section>
+
+      <section>
+        <p class="sec-title">Change Password</p>
+        <div class="row">
+          <div><label>New password</label><input type="password" id="account-new-password" autocomplete="new-password"></div>
+        </div>
+        <div class="row">
+          <div><label>Confirm new password</label><input type="password" id="account-confirm-password" autocomplete="new-password"></div>
+        </div>
+        <button class="btn full" onclick="changePassword()">Update password</button>
+        <div class="status" id="account-status"></div>
+      </section>
 
       <section id="share-viewing-note" style="display:none;">
         <p class="sec-title">Access</p>
@@ -900,43 +1015,6 @@
         <p class="sec-title">People With Access</p>
         <div id="collaborator-list"></div>
       </section>
-    </div>
-
-    <!-- ACCOUNT TAB -->
-    <div id="tab-account" class="tab-panel">
-      <p class="eyebrow">Your Account</p>
-      <h1>Account</h1>
-      <p class="sub">Manage your login details.</p>
-
-      <section>
-        <p class="sec-title">Signed In As</p>
-        <p class="share-note" id="account-email-display"></p>
-      </section>
-
-      <section>
-        <p class="sec-title">Change Password</p>
-        <div class="row">
-          <div><label>New password</label><input type="password" id="account-new-password" autocomplete="new-password"></div>
-        </div>
-        <div class="row">
-          <div><label>Confirm new password</label><input type="password" id="account-confirm-password" autocomplete="new-password"></div>
-        </div>
-        <button class="btn full" onclick="changePassword()">Update password</button>
-        <div class="status" id="account-status"></div>
-      </section>
-
-      <section>
-        <p class="sec-title">Top Tabs</p>
-        <p class="share-note" style="margin-bottom:10px;">Choose which tab shows in each spot along the top. Everything else moves into the &#9776; menu.</p>
-        <div class="row">
-          <div><label>Tab 1</label><select id="tabpos-0" onchange="onTabPositionChange(0)"></select></div>
-          <div><label>Tab 2</label><select id="tabpos-1" onchange="onTabPositionChange(1)"></select></div>
-        </div>
-        <div class="row">
-          <div><label>Tab 3</label><select id="tabpos-2" onchange="onTabPositionChange(2)"></select></div>
-        </div>
-        <div class="status" id="tab-layout-status"></div>
-      </section>
 
       <section id="sales-settings-section">
         <p class="sec-title">Sales Tracking</p>
@@ -965,6 +1043,41 @@
           <button class="btn full" onclick="saveSalesSettings()">Save sales settings</button>
         </div>
         <div class="status" id="sales-settings-status"></div>
+      </section>
+
+      <section id="livestock-sales-settings-section">
+        <p class="sec-title">Sheep &amp; Goats Sales Tracking</p>
+        <p class="share-note" style="margin-bottom:10px;">Choose what you sell, and set a standard price for each.</p>
+        <div class="checkbox-row">
+          <input type="checkbox" id="ls-sell-wool" onchange="onLsSettingsToggle()">
+          <label for="ls-sell-wool">Sell wool</label>
+        </div>
+        <div class="row" id="ls-price-wool-row" style="display:none;">
+          <div><label>Price per kg of wool</label><input type="number" min="0" step="0.01" id="ls-price-wool" placeholder="0.00"></div>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="ls-sell-milk" onchange="onLsSettingsToggle()">
+          <label for="ls-sell-milk">Sell milk</label>
+        </div>
+        <div class="row" id="ls-price-milk-row" style="display:none;">
+          <div><label>Price per litre of milk</label><input type="number" min="0" step="0.01" id="ls-price-milk" placeholder="0.00"></div>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="ls-sell-meat" onchange="onLsSettingsToggle()">
+          <label for="ls-sell-meat">Sell meat</label>
+        </div>
+        <div class="row" id="ls-price-meat-row" style="display:none;">
+          <div><label>Price per kg of meat</label><input type="number" min="0" step="0.01" id="ls-price-meat" placeholder="0.00"></div>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="ls-sell-live-animals" onchange="onLsSettingsToggle()">
+          <label for="ls-sell-live-animals">Sell live animals</label>
+        </div>
+        <div class="row" id="ls-price-live-animal-row" style="display:none;">
+          <div><label>Price per live animal</label><input type="number" min="0" step="0.01" id="ls-price-live-animal" placeholder="0.00"></div>
+        </div>
+        <button class="btn full" onclick="saveLivestockSalesSettings()">Save sales settings</button>
+        <div class="status" id="livestock-sales-settings-status"></div>
       </section>
 
       <section id="chicken-import-section">
@@ -1016,16 +1129,20 @@ let isSignup = false;
 let flocks = []; // [{ ownerId, label, role: 'owner'|'editor'|'viewer' }]
 let currentFlockOwnerId = null;
 let currentRole = 'owner';
-let state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null };
+let state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null };
 let editingEggId = null;
 let editingBreedId = null;
 let currentCustomerDetailId = null;
+let currentCustomerDetailReturnTab = 'sales';
 let editingCustomerId = null;
 let editingSaleId = null;
+let editingLsSaleId = null;
 let editingChickenId = null;
 let currentDetailChickenId = null;
 let currentCoopDetailId = null; // real coop id, '__unassigned', or null
 let chickenDetailReturnTab = 'chickens';
+let currentCategory = 'poultry'; // 'poultry' | 'livestock' — which section (Poultry / Sheep & Goats) is active
+let currentSection = 'overall'; // 'overall' | 'account' | 'poultry' | 'livestock'
 let editingHc = null; // { prefix, recordId, chickenId, items: {key: {status, note}} } | null
 let pendingImportPayloads = [];
 let hcSession = null; // { date, pool: [{id,name,tag}], completed: [{chickenId,chickenName,items}], current: {chickenId,chickenName,items} | null }
@@ -1061,133 +1178,87 @@ function setStatus(id, msg, isError){
 
 function isReadOnly(){ return currentRole === 'viewer'; }
 
-const MENU_TABS = [];
-
-const ALL_TABS = [
+const POULTRY_TABS = [
   { id: 'eggs', label: 'Egg Count' },
   { id: 'chickens', label: 'My Flock' },
   { id: 'health', label: 'Health Checks' },
   { id: 'breeds', label: 'Breeds' },
-  { id: 'sales', label: 'Sales' },
-  { id: 'sharing', label: 'Share & View' },
-  { id: 'account', label: 'Account' }
+  { id: 'sales', label: 'Sales' }
 ];
-const DEFAULT_TOP_TABS = ['eggs', 'chickens', 'health'];
-let topTabs = DEFAULT_TOP_TABS.slice();
+const LIVESTOCK_TABS = [
+  { id: 'chickens', label: 'My Flock' },
+  { id: 'health', label: 'Health Checks' },
+  { id: 'breeds', label: 'Breeds' },
+  { id: 'livestock-sales', label: 'Sales' }
+];
+const CATEGORY_TAB_IDS = ['eggs', 'chickens', 'health', 'breeds', 'sales', 'livestock-sales'];
+const SECTIONLESS_TABS = ['overall', 'account'];
+let lastPoultryTab = 'eggs';
+let lastLivestockTab = 'chickens';
 
-function visibleAllTabs(){
-  const salesOn = !!(state.salesSettings && state.salesSettings.enabled);
-  return ALL_TABS.filter(t => t.id !== 'sales' || salesOn);
+function currentSectionTabs(){
+  if(currentSection === 'poultry'){
+    const salesOn = !!(state.salesSettings && state.salesSettings.enabled);
+    return POULTRY_TABS.filter(t => t.id !== 'sales' || salesOn);
+  }
+  if(currentSection === 'livestock'){
+    const lsOn = enabledLsSaleTypes().length > 0;
+    return LIVESTOCK_TABS.filter(t => t.id !== 'livestock-sales' || lsOn);
+  }
+  return [];
 }
 
-function tabLayoutStorageKey(){
-  return 'chickenKeeperTopTabs_' + (currentUser ? currentUser.id : 'anon');
-}
-
-function loadTabLayout(){
-  topTabs = DEFAULT_TOP_TABS.slice();
-  try{
-    const raw = localStorage.getItem(tabLayoutStorageKey());
-    if(raw){
-      const parsed = JSON.parse(raw);
-      if(Array.isArray(parsed) && parsed.length && parsed.every(id => ALL_TABS.some(t => t.id === id))){
-        topTabs = parsed.slice(0, 3);
-      }
-    }
-  } catch(e){}
-}
-
-function saveTabLayout(){
-  try{ localStorage.setItem(tabLayoutStorageKey(), JSON.stringify(topTabs)); } catch(e){}
-}
-
-function renderTabbar(){
-  const activeEl = document.querySelector('.tab-panel.active');
-  const activeTab = activeEl ? activeEl.id.replace('tab-', '') : 'eggs';
-
-  const tabs = visibleAllTabs();
-  const shownTop = topTabs.filter(id => tabs.some(t => t.id === id));
-  const menuTabIds = tabs.filter(t => !shownTop.includes(t.id)).map(t => t.id);
-  MENU_TABS.length = 0;
-  MENU_TABS.push(...menuTabIds);
-
+function renderSubtabbar(){
+  const tabs = currentSectionTabs();
   const tabButtonHtml = (t) => `<button class="tab-btn" data-tab="${t.id}" onclick="switchTab('${t.id}')">${t.label}</button>`;
-
-  document.getElementById('tabbar-buttons').innerHTML = shownTop.map(id => tabButtonHtml(tabs.find(t => t.id === id))).join('');
-  document.getElementById('menu-panel').innerHTML = menuTabIds.map(id => tabButtonHtml(tabs.find(t => t.id === id))).join('');
-
-  const validTab = shownTop.includes(activeTab) || menuTabIds.includes(activeTab) ? activeTab : (shownTop[0] || 'eggs');
-  switchTab(validTab);
+  document.getElementById('tabbar-buttons').innerHTML = tabs.map(tabButtonHtml).join('');
 }
 
-function ensureThreeTopTabs(){
-  const ids = visibleAllTabs().map(t => t.id);
-  const filled = topTabs.filter(id => ids.includes(id));
-  for(const id of ids){
-    if(filled.length >= 3) break;
-    if(!filled.includes(id)) filled.push(id);
-  }
-  topTabs = filled.slice(0, 3);
+function switchSection(section){
+  currentSection = section;
+  if(section === 'poultry') currentCategory = 'poultry';
+  if(section === 'livestock') currentCategory = 'livestock';
+  if(section === 'overall'){ renderOverallPage(); switchTab('overall'); return; }
+  if(section === 'account'){ switchTab('account'); return; }
+  const tabs = currentSectionTabs();
+  const remembered = section === 'poultry' ? lastPoultryTab : lastLivestockTab;
+  const target = remembered && tabs.some(t => t.id === remembered) ? remembered : (tabs[0] ? tabs[0].id : 'chickens');
+  switchTab(target);
 }
 
-function renderTabLayoutOptions(){
-  const sel0 = document.getElementById('tabpos-0');
-  if(!sel0) return;
-  ensureThreeTopTabs();
-  const tabs = visibleAllTabs();
-  const optionsHtml = tabs.map(t => `<option value="${t.id}">${t.label}</option>`).join('');
-  for(let i = 0; i < 3; i++){
-    const sel = document.getElementById('tabpos-' + i);
-    if(!sel) continue;
-    sel.innerHTML = optionsHtml;
-    sel.value = topTabs[i];
-  }
-}
-
-function onTabPositionChange(index){
-  const sel = document.getElementById('tabpos-' + index);
-  const newVal = sel.value;
-  const existingIndex = topTabs.indexOf(newVal);
-  if(existingIndex !== -1 && existingIndex !== index){
-    topTabs[existingIndex] = topTabs[index];
-  }
-  topTabs[index] = newVal;
-  saveTabLayout();
-  renderTabLayoutOptions();
-  renderTabbar();
-  setStatus('tab-layout-status', 'Saved.', false);
+function refreshSectionNav(){
+  document.querySelectorAll('.section-btn').forEach(b => b.classList.toggle('active', b.dataset.section === currentSection));
+  const subtabWrap = document.getElementById('subtabbar-wrap');
+  const sectionless = SECTIONLESS_TABS.includes(currentSection);
+  if(subtabWrap) subtabWrap.style.display = sectionless ? 'none' : 'flex';
+  if(sectionless) return;
+  renderSubtabbar();
+  const tabs = currentSectionTabs();
+  const activeEl = document.querySelector('.tab-panel.active');
+  const activeTab = activeEl ? activeEl.id.replace('tab-', '') : null;
+  if(!tabs.some(t => t.id === activeTab)) switchTab(tabs[0] ? tabs[0].id : 'chickens');
 }
 
 function switchTab(tab){
+  const sectionless = SECTIONLESS_TABS.includes(tab);
+  if(!sectionless) currentSection = currentCategory;
+  document.querySelectorAll('.section-btn').forEach(b => b.classList.toggle('active', b.dataset.section === currentSection));
+  const subtabWrap = document.getElementById('subtabbar-wrap');
+  if(subtabWrap) subtabWrap.style.display = sectionless ? 'none' : 'flex';
+  if(!sectionless) renderSubtabbar();
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
-  const menuBtn = document.getElementById('menu-toggle-btn');
-  if(menuBtn) menuBtn.classList.toggle('active', MENU_TABS.includes(tab));
-  closeMenu();
+  if(CATEGORY_TAB_IDS.includes(tab)){
+    if(currentSection === 'poultry') lastPoultryTab = tab;
+    else if(currentSection === 'livestock') lastLivestockTab = tab;
+  }
+  if(tab === 'chickens'){ refreshFlockViews(); populateCoopSelectOptions(); }
+  if(tab === 'health'){ populateHcCoopSelectOptions(); renderHcSetupInfo(); renderHealthHistory(); }
   if(tab === 'breeds') renderBreedsList();
   if(tab === 'sales') renderSalesTab();
-  if(tab === 'sharing') renderSharingTab();
+  if(tab === 'livestock-sales') renderLivestockSalesTab();
   if(tab === 'account') renderAccountTab();
 }
-
-function toggleMenu(){
-  const panel = document.getElementById('menu-panel');
-  if(!panel) return;
-  panel.style.display = panel.style.display === 'flex' ? 'none' : 'flex';
-}
-
-function closeMenu(){
-  const panel = document.getElementById('menu-panel');
-  if(panel) panel.style.display = 'none';
-}
-
-document.addEventListener('click', (e) => {
-  const panel = document.getElementById('menu-panel');
-  const btn = document.getElementById('menu-toggle-btn');
-  if(!panel || panel.style.display !== 'flex') return;
-  if(panel.contains(e.target) || (btn && btn.contains(e.target))) return;
-  panel.style.display = 'none';
-});
 
 // ---------- AUTH ----------
 function toggleAuthMode(){
@@ -1260,8 +1331,7 @@ async function logout(){
   flocks = [];
   currentFlockOwnerId = null;
   currentRole = 'owner';
-  state = { eggs: [], chickens: [], healthChecks: [] };
-  topTabs = DEFAULT_TOP_TABS.slice();
+  state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null };
   document.getElementById('app-screen').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'block';
 }
@@ -1271,8 +1341,6 @@ async function onLoggedIn(user){
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app-screen').style.display = 'block';
   document.getElementById('user-email').textContent = user.email;
-  loadTabLayout();
-  renderTabbar();
 
   await ensureProfile();
   await acceptPendingInvites();
@@ -1280,6 +1348,7 @@ async function onLoggedIn(user){
   renderFlockSelector();
   await loadFlockData();
   renderAll();
+  switchSection('overall');
 }
 
 async function checkExistingSession(){
@@ -1402,10 +1471,12 @@ function applyRolePermissions(){
 }
 
 function renderHcSetupInfo(){
-  const n = state.chickens.filter(c => !c.isDeceased).length;
-  document.getElementById('hc-setup-info').textContent = n
-    ? `Search or tap to pick which of your ${n} chicken${n > 1 ? 's' : ''} to check, one at a time — finish whenever you're done, even if you haven't done them all.`
-    : 'You have no chickens added yet, so this will be a single general check for the flock.';
+  const el = document.getElementById('hc-setup-info');
+  if(!el) return;
+  const n = state.chickens.filter(c => !c.isDeceased && c.category === currentCategory).length;
+  el.textContent = n
+    ? `Search or tap to pick which of your ${n} animal${n > 1 ? 's' : ''} to check, one at a time — finish whenever you're done, even if you haven't done them all.`
+    : 'You have no animals added yet, so this will be a single general check for the flock.';
 }
 
 function renderAll(){
@@ -1417,15 +1488,17 @@ function renderAll(){
   selectedBirdIds.clear();
   coopSelectionMode = false;
   refreshFlockViews();
-  renderTabbar();
-  if(document.getElementById('tab-chicken-detail').classList.contains('active')) switchTab('chickens');
-  if(document.getElementById('tab-coop-detail').classList.contains('active')) switchTab('chickens');
-  if(document.getElementById('tab-customer-detail').classList.contains('active')) switchTab('sales');
+  renderOverallPage();
+  refreshSectionNav();
+  if(document.getElementById('tab-chicken-detail').classList.contains('active')) switchSection(currentCategory);
+  if(document.getElementById('tab-coop-detail').classList.contains('active')) switchSection(currentCategory);
+  if(document.getElementById('tab-customer-detail').classList.contains('active')) switchSection(currentCustomerDetailReturnTab === 'livestock-sales' ? 'livestock' : 'poultry');
   currentDetailChickenId = null;
   currentCoopDetailId = null;
   currentCustomerDetailId = null;
   editingCustomerId = null;
   editingSaleId = null;
+  editingLsSaleId = null;
   editingHc = null;
   hcSession = null;
   document.getElementById('hc-setup-section').style.display = isReadOnly() ? 'none' : 'block';
@@ -1443,11 +1516,12 @@ function rowToChicken(r){
     animalType: r.animal_type, gender: r.gender, dob: r.dob, expectedEggsPerYear: r.expected_eggs_per_year,
     eggColour: r.egg_colour, notes: r.notes,
     isDeceased: r.is_deceased, deceasedDate: r.deceased_date,
-    coopId: r.coop_id || null
+    coopId: r.coop_id || null,
+    category: r.category || categoryForAnimalType(r.animal_type)
   };
 }
-function rowToHealthCheck(r){ return { id: r.id, date: r.date, chickenId: r.chicken_id, items: r.items || [] }; }
-function rowToCoop(r){ return { id: r.id, name: r.name }; }
+function rowToHealthCheck(r){ return { id: r.id, date: r.date, chickenId: r.chicken_id, items: r.items || [], category: r.category || 'poultry' }; }
+function rowToCoop(r){ return { id: r.id, name: r.name, category: r.category || 'poultry' }; }
 function rowToBreed(r){
   return {
     id: r.id, name: r.name, animalType: r.animal_type,
@@ -1481,9 +1555,23 @@ function rowToSalesSettings(r){
     priceEgg: Number(r.price_egg) || 0, priceHalfDozen: Number(r.price_half_dozen) || 0, priceDozen: Number(r.price_dozen) || 0
   };
 }
+function rowToLivestockSale(r){
+  return {
+    id: r.id, customerId: r.customer_id, date: r.date, saleType: r.sale_type,
+    quantity: Number(r.quantity) || 0, charged: Number(r.charged) || 0, paid: Number(r.paid) || 0
+  };
+}
+function rowToLivestockSalesSettings(r){
+  if(!r) return { sellWool: false, sellMilk: false, sellMeat: false, sellLiveAnimals: false, priceWool: 0, priceMilk: 0, priceMeat: 0, priceLiveAnimal: 0 };
+  return {
+    sellWool: !!r.sell_wool, sellMilk: !!r.sell_milk, sellMeat: !!r.sell_meat, sellLiveAnimals: !!r.sell_live_animals,
+    priceWool: Number(r.price_wool) || 0, priceMilk: Number(r.price_milk) || 0,
+    priceMeat: Number(r.price_meat) || 0, priceLiveAnimal: Number(r.price_live_animal) || 0
+  };
+}
 
 async function loadFlockData(){
-  const [eggsRes, chickensRes, hcRes, coopsRes, breedsRes, customersRes, salesRes, creditsRes, salesSettingsRes] = await Promise.all([
+  const [eggsRes, chickensRes, hcRes, coopsRes, breedsRes, customersRes, salesRes, creditsRes, salesSettingsRes, livestockSalesRes, livestockSalesSettingsRes] = await Promise.all([
     sb.from('eggs').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }).order('created_at', { ascending: false }),
     sb.from('chickens').select('*').eq('owner_id', currentFlockOwnerId).order('created_at'),
     sb.from('health_checks').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
@@ -1492,7 +1580,9 @@ async function loadFlockData(){
     sb.from('customers').select('*').eq('owner_id', currentFlockOwnerId).order('name'),
     sb.from('sales').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
     sb.from('customer_credits').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
-    sb.from('sales_settings').select('*').eq('owner_id', currentFlockOwnerId).maybeSingle()
+    sb.from('sales_settings').select('*').eq('owner_id', currentFlockOwnerId).maybeSingle(),
+    sb.from('livestock_sales').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
+    sb.from('livestock_sales_settings').select('*').eq('owner_id', currentFlockOwnerId).maybeSingle()
   ]);
   state.eggs = (eggsRes.data || []).map(rowToEgg);
   state.chickens = (chickensRes.data || []).map(rowToChicken);
@@ -1503,6 +1593,8 @@ async function loadFlockData(){
   state.sales = (salesRes.data || []).map(rowToSale);
   state.customerCredits = (creditsRes.data || []).map(rowToCustomerCredit);
   state.salesSettings = rowToSalesSettings(salesSettingsRes.data);
+  state.livestockSales = (livestockSalesRes.data || []).map(rowToLivestockSale);
+  state.livestockSalesSettings = rowToLivestockSalesSettings(livestockSalesSettingsRes.data);
 }
 
 // ---------- EGG COUNT ----------
@@ -1778,21 +1870,31 @@ function onBreedChange(){
 }
 
 // ---------- BREEDS TAB ----------
+function populateBreedAnimalTypeOptions(category, preferredValue){
+  const sel = document.getElementById('breed-animal');
+  const types = animalTypeOptionsForCategory(category);
+  sel.innerHTML = types.map(t => `<option value="${t}">${t}</option>`).join('') + '<option value="__custom">Other (type below)</option>';
+  sel.value = types.includes(preferredValue) ? preferredValue : (preferredValue === '__custom' ? '__custom' : types[0]);
+}
+
 function onBreedAnimalChange(){
   const sel = document.getElementById('breed-animal').value;
   document.getElementById('breed-animal-custom-row').style.display = sel === '__custom' ? 'flex' : 'none';
+  const animalType = sel === '__custom' ? (document.getElementById('breed-animal-custom').value.trim() || 'Chicken') : sel;
+  document.getElementById('breed-eggs-row').style.display = categoryForAnimalType(animalType) === 'livestock' ? 'none' : 'flex';
 }
 
 function resetBreedForm(){
   editingBreedId = null;
   document.getElementById('breed-name').value = '';
-  document.getElementById('breed-animal').value = 'Chicken';
+  populateBreedAnimalTypeOptions(currentCategory, animalTypeOptionsForCategory(currentCategory)[0]);
   document.getElementById('breed-animal-custom-row').style.display = 'none';
   document.getElementById('breed-animal-custom').value = '';
   document.getElementById('breed-expected').value = '';
   document.getElementById('breed-egg-colour').value = '';
   document.getElementById('breed-form-title').textContent = 'Add A Breed';
   document.getElementById('breed-cancel-btn').style.display = 'none';
+  onBreedAnimalChange();
 }
 
 async function saveBreed(){
@@ -1824,6 +1926,7 @@ function editBreed(id){
   if(!b) return;
   editingBreedId = id;
   document.getElementById('breed-name').value = b.name;
+  populateBreedAnimalTypeOptions(categoryForAnimalType(b.animalType), b.animalType);
   const animalSel = document.getElementById('breed-animal');
   const hasPreset = Array.from(animalSel.options).some(o => o.value === b.animalType);
   if(hasPreset){
@@ -1838,6 +1941,7 @@ function editBreed(id){
   document.getElementById('breed-egg-colour').value = b.eggColour || '';
   document.getElementById('breed-form-title').textContent = 'Edit Breed';
   document.getElementById('breed-cancel-btn').style.display = 'block';
+  onBreedAnimalChange();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1867,10 +1971,11 @@ function breedCardHtml(b, readOnly){
           <button class="icon-btn danger" onclick="event.stopPropagation(); deleteBreed('${b.id}')" aria-label="Delete">&#10005;</button>
         </div>` : ''}
       </div>
+      ${categoryForAnimalType(b.animalType) === 'livestock' ? '' : `
       <div class="chicken-grid">
         <div><span class="chicken-label">Expected eggs / yr</span><span>${b.expectedEggsPerYear || '—'}</span></div>
         <div><span class="chicken-label">Egg colour</span><span>${escapeHtml(b.eggColour) || '—'}</span></div>
-      </div>
+      </div>`}
     </div>`;
 }
 
@@ -1878,7 +1983,9 @@ function renderBreedsList(){
   const el = document.getElementById('breeds-list');
   if(!el) return;
   const readOnly = isReadOnly();
-  const all = state.breeds.slice().sort((a, b) => a.animalType === b.animalType ? a.name.localeCompare(b.name) : a.animalType.localeCompare(b.animalType));
+  const all = state.breeds
+    .filter(b => categoryForAnimalType(b.animalType) === currentCategory)
+    .sort((a, b) => a.animalType === b.animalType ? a.name.localeCompare(b.name) : a.animalType.localeCompare(b.animalType));
   el.innerHTML = all.length ? all.map(b => breedCardHtml(b, readOnly)).join('') : '<p class="empty">No breeds yet.</p>';
 }
 
@@ -1889,10 +1996,27 @@ const GENDER_OPTIONS = {
   'Turkey': ['Hen', 'Tom'],
   'Quail': ['Hen', 'Rooster'],
   'Guinea Fowl': ['Hen', 'Cock'],
-  'Swan': ['Pen', 'Cob']
+  'Swan': ['Pen', 'Cob'],
+  'Sheep': ['Ewe', 'Ram'],
+  'Goat': ['Doe', 'Buck']
 };
 const DEFAULT_GENDER_OPTIONS = ['Female', 'Male'];
-const MALE_GENDERS = new Set(['Rooster', 'Drake', 'Gander', 'Tom', 'Cock', 'Cob', 'Male']);
+const MALE_GENDERS = new Set(['Rooster', 'Drake', 'Gander', 'Tom', 'Cock', 'Cob', 'Ram', 'Buck', 'Male']);
+
+// ---------- CATEGORIES (Poultry vs Sheep & Goats) ----------
+const LIVESTOCK_ANIMAL_TYPES = ['Sheep', 'Goat'];
+const POULTRY_ANIMAL_TYPES = ['Chicken', 'Duck', 'Quail', 'Goose', 'Turkey', 'Guinea Fowl', 'Swan'];
+
+function categoryForAnimalType(animalType){
+  return LIVESTOCK_ANIMAL_TYPES.includes(animalType) ? 'livestock' : 'poultry';
+}
+
+function animalTypeOptionsForCategory(category){
+  return category === 'livestock' ? LIVESTOCK_ANIMAL_TYPES : POULTRY_ANIMAL_TYPES;
+}
+
+function coopWordFor(category){ return category === 'livestock' ? 'Group' : 'Coop'; }
+function coopWordForPlural(category){ return category === 'livestock' ? 'Groups' : 'Coops'; }
 
 function genderOptionsFor(animalType){
   return GENDER_OPTIONS[animalType] || DEFAULT_GENDER_OPTIONS;
@@ -1909,9 +2033,15 @@ function populateGenderOptions(animalType, preferredValue){
   sel.value = opts.includes(preferredValue) ? preferredValue : opts[0];
 }
 
+function currentAnimalFormType(){
+  const sel = document.getElementById('ch-animal').value;
+  return sel === '__custom' ? (document.getElementById('ch-animal-custom').value.trim() || 'Chicken') : sel;
+}
+
 function onGenderChange(){
   const male = isMaleGender(document.getElementById('ch-gender').value);
-  document.getElementById('ch-eggs-row').style.display = male ? 'none' : 'flex';
+  const isLivestock = categoryForAnimalType(currentAnimalFormType()) === 'livestock';
+  document.getElementById('ch-eggs-row').style.display = (male || isLivestock) ? 'none' : 'flex';
 }
 
 function normalizeGenderInput(genderInput, animalType){
@@ -1920,7 +2050,7 @@ function normalizeGenderInput(genderInput, animalType){
   if(!trimmed) return opts[0];
   const matched = opts.find(o => o.toLowerCase() === trimmed.toLowerCase());
   if(matched) return matched;
-  const isMale = /rooster|cockerel|\bcock\b|drake|gander|tom|cob|male/i.test(trimmed);
+  const isMale = /rooster|cockerel|\bcock\b|drake|gander|tom|cob|\bram\b|buck|male/i.test(trimmed);
   return isMale ? opts[1] : opts[0];
 }
 
@@ -1959,19 +2089,27 @@ function calcAge(dobStr){
   return years + (years === 1 ? ' year' : ' years') + (months ? ', ' + months + (months === 1 ? ' month' : ' months') : '');
 }
 
+function populateAnimalTypeOptions(category, preferredValue){
+  const sel = document.getElementById('ch-animal');
+  const types = animalTypeOptionsForCategory(category);
+  sel.innerHTML = types.map(t => `<option value="${t}">${t}</option>`).join('') + '<option value="__custom">Other (type below)</option>';
+  sel.value = types.includes(preferredValue) ? preferredValue : (preferredValue === '__custom' ? '__custom' : types[0]);
+}
+
 function resetChickenForm(){
   editingChickenId = null;
   document.getElementById('ch-name').value = '';
   document.getElementById('ch-tag').value = '';
   document.getElementById('ch-tag-colour').value = '';
   document.getElementById('ch-coop').value = '';
-  document.getElementById('ch-animal').value = 'Chicken';
+  const defaultType = animalTypeOptionsForCategory(currentCategory)[0];
+  populateAnimalTypeOptions(currentCategory, defaultType);
   document.getElementById('ch-animal-custom-row').style.display = 'none';
   document.getElementById('ch-animal-custom').value = '';
-  populateBreedOptions('Chicken', '');
+  populateBreedOptions(defaultType, '');
   document.getElementById('ch-breed-custom-row').style.display = 'none';
   document.getElementById('ch-breed-custom').value = '';
-  populateGenderOptions('Chicken', 'Hen');
+  populateGenderOptions(defaultType, genderOptionsFor(defaultType)[0]);
   onGenderChange();
   document.getElementById('ch-dob').value = '';
   document.getElementById('ch-expected').value = '';
@@ -2012,6 +2150,7 @@ async function saveChicken(){
     tag_colour: document.getElementById('ch-tag-colour').value.trim(),
     coop_id: document.getElementById('ch-coop').value || null,
     animal_type: animalType,
+    category: categoryForAnimalType(animalType),
     breed,
     gender: document.getElementById('ch-gender').value,
     dob: document.getElementById('ch-dob').value || null,
@@ -2353,8 +2492,9 @@ function editChicken(id){
   populateCoopSelectOptions();
   document.getElementById('ch-coop').value = c.coopId || '';
 
-  const animalSel = document.getElementById('ch-animal');
   const animalValue = c.animalType || 'Chicken';
+  populateAnimalTypeOptions(categoryForAnimalType(animalValue), animalValue);
+  const animalSel = document.getElementById('ch-animal');
   const hasAnimalPreset = Array.from(animalSel.options).some(o => o.value === animalValue);
   if(hasAnimalPreset){
     animalSel.value = animalValue;
@@ -2462,7 +2602,7 @@ function chickenCardHtml(c, readOnly, returnTab, selectable){
         <div><span class="chicken-label">Tag</span><span>${tagText}</span></div>
         <div><span class="chicken-label">Age</span><span>${calcAge(c.dob)}</span></div>
         <div><span class="chicken-label">Date of birth</span><span>${c.dob ? formatDateNice(c.dob) : '—'}</span></div>
-        ${isMale ? '' : `
+        ${(isMale || c.category === 'livestock') ? '' : `
         <div><span class="chicken-label">Expected eggs / yr</span><span>${c.expectedEggsPerYear || '—'}</span></div>
         <div><span class="chicken-label">Egg colour</span><span>${escapeHtml(c.eggColour) || '—'}</span></div>`}
         ${c.isDeceased ? `<div><span class="chicken-label">Deceased</span><span>${c.deceasedDate ? formatDateNice(c.deceasedDate) : '—'}</span></div>` : ''}
@@ -2471,19 +2611,47 @@ function chickenCardHtml(c, readOnly, returnTab, selectable){
     </div>`;
 }
 
+function applyCategoryChrome(){
+  const isLivestock = currentCategory === 'livestock';
+  const word = coopWordFor(currentCategory);
+  const wordPlural = coopWordForPlural(currentCategory);
+  const backLabel = isLivestock ? 'Back to Sheep & Goats' : 'Back to My Flock';
+
+  const subEl = document.getElementById('myflock-sub');
+  if(subEl) subEl.textContent = isLivestock
+    ? 'Keep a record of every animal — breed, tag, age and health.'
+    : 'Keep a record of every bird — breed, tag, age and how many eggs you can expect from them.';
+
+  const summarySection = document.getElementById('myflock-summary-section');
+  if(summarySection) summarySection.style.display = isLivestock ? 'none' : 'block';
+
+  const addCoopSummary = document.getElementById('add-coop-summary');
+  if(addCoopSummary) addCoopSummary.textContent = `+ Add A ${word}`;
+  const addCoopBtn = document.getElementById('add-coop-submit-btn');
+  if(addCoopBtn) addCoopBtn.textContent = `+ Add ${word}`;
+  const newCoopNameInput = document.getElementById('new-coop-name');
+  if(newCoopNameInput) newCoopNameInput.placeholder = isLivestock ? 'e.g. North Field' : 'e.g. Main Coop';
+  const coopsTitle = document.getElementById('coops-section-title');
+  if(coopsTitle) coopsTitle.textContent = wordPlural;
+
+  const animalSearchBack = document.getElementById('animal-search-back-label');
+  if(animalSearchBack) animalSearchBack.textContent = backLabel;
+}
+
 function renderChickens(){
+  applyCategoryChrome();
   const listEl = document.getElementById('chicken-list');
   const lossesEl = document.getElementById('losses-list');
-  const activeChickens = state.chickens.filter(c => !c.isDeceased);
-  const deceasedChickens = state.chickens.filter(c => c.isDeceased);
+  const activeChickens = state.chickens.filter(c => !c.isDeceased && c.category === currentCategory);
+  const deceasedChickens = state.chickens.filter(c => c.isDeceased && c.category === currentCategory);
 
   const hens = activeChickens.filter(c => !isMaleGender(c.gender));
   const totalExpected = hens.reduce((s, c) => s + (Number(c.expectedEggsPerYear) || 0), 0);
   document.getElementById('expected-total').textContent = totalExpected;
   document.getElementById('expected-total-week').textContent = (totalExpected / 52).toFixed(1);
 
-  populateTagColourFilterOptions();
-  populateAnimalFilterOptions();
+  populateTagColourFilterOptions('', activeChickens);
+  populateAnimalFilterOptions('', activeChickens);
   populateBulkMoveCoopOptions();
 
   const readOnly = isReadOnly();
@@ -2515,8 +2683,9 @@ function populateCoopSelectOptions(){
   const sel = document.getElementById('ch-coop');
   if(!sel) return;
   const current = sel.value;
-  sel.innerHTML = '<option value="">Unassigned</option>' + state.coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-  sel.value = state.coops.some(c => c.id === current) ? current : '';
+  const coops = state.coops.filter(c => c.category === currentCategory);
+  sel.innerHTML = '<option value="">Unassigned</option>' + coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  sel.value = coops.some(c => c.id === current) ? current : '';
 }
 
 let selectedBirdIds = new Set();
@@ -2548,7 +2717,7 @@ function exitCoopSelectionMode(){
 function birdsInCurrentCoop(){
   if(!currentCoopDetailId) return [];
   const isUnassigned = currentCoopDetailId === '__unassigned';
-  return state.chickens.filter(c => !c.isDeceased && (isUnassigned ? !c.coopId : c.coopId === currentCoopDetailId));
+  return state.chickens.filter(c => !c.isDeceased && c.category === currentCategory && (isUnassigned ? !c.coopId : c.coopId === currentCoopDetailId));
 }
 
 function toggleSelectAllInCoop(){
@@ -2574,7 +2743,7 @@ function renderBulkMoveBars(){
 }
 
 function populateBulkMoveCoopOptions(){
-  const html = '<option value="">Unassigned</option>' + state.coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  const html = '<option value="">Unassigned</option>' + state.coops.filter(c => c.category === currentCategory).map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
   ['bulk-move-coop-select', 'coop-bulk-move-coop-select'].forEach(id => {
     const sel = document.getElementById(id);
     if(sel) sel.innerHTML = html;
@@ -2607,7 +2776,7 @@ function coopCardHtml(coop, count, readOnly){
       <div class="chicken-card-head">
         <div>
           <div class="chicken-name">${escapeHtml(coop.name)}</div>
-          <div class="chicken-meta">${count} bird${count === 1 ? '' : 's'}</div>
+          <div class="chicken-meta">${count} animal${count === 1 ? '' : 's'}</div>
         </div>
         ${readOnly ? '' : `
         <div class="icon-row">
@@ -2621,20 +2790,58 @@ function renderCoopsList(){
   const el = document.getElementById('coops-list');
   if(!el) return;
   const readOnly = isReadOnly();
-  const living = state.chickens.filter(c => !c.isDeceased);
+  const living = state.chickens.filter(c => !c.isDeceased && c.category === currentCategory);
+  const coopsInCategory = state.coops.filter(c => c.category === currentCategory);
   const countFor = (coopId) => living.filter(c => (c.coopId || null) === coopId).length;
-  const coopsHtml = state.coops.map(c => coopCardHtml(c, countFor(c.id), readOnly)).join('');
+  const coopsHtml = coopsInCategory.map(c => coopCardHtml(c, countFor(c.id), readOnly)).join('');
   const unassignedCount = countFor(null);
   const unassignedHtml = `
     <div class="chicken-card" onclick="openCoopDetail('__unassigned')">
       <div class="chicken-card-head">
         <div>
           <div class="chicken-name">Unassigned</div>
-          <div class="chicken-meta">${unassignedCount} bird${unassignedCount === 1 ? '' : 's'}</div>
+          <div class="chicken-meta">${unassignedCount} animal${unassignedCount === 1 ? '' : 's'}</div>
         </div>
       </div>
     </div>`;
   el.innerHTML = coopsHtml + unassignedHtml;
+}
+
+function overallCoopCardHtml(coop, count, category){
+  return `
+    <div class="chicken-card" onclick="openCoopDetail('${coop.id}', '${category}')">
+      <div class="chicken-card-head">
+        <div>
+          <div class="chicken-name">${escapeHtml(coop.name)}</div>
+          <div class="chicken-meta">${count} animal${count === 1 ? '' : 's'}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderOverallSectionHtml(category){
+  const living = state.chickens.filter(c => !c.isDeceased && c.category === category);
+  const coopsInCategory = state.coops.filter(c => c.category === category);
+  const countFor = (coopId) => living.filter(c => (c.coopId || null) === coopId).length;
+  const coopsHtml = coopsInCategory.map(c => overallCoopCardHtml(c, countFor(c.id), category)).join('');
+  const unassignedCount = countFor(null);
+  const unassignedHtml = `
+    <div class="chicken-card" onclick="openCoopDetail('__unassigned', '${category}')">
+      <div class="chicken-card-head">
+        <div>
+          <div class="chicken-name">Unassigned</div>
+          <div class="chicken-meta">${unassignedCount} animal${unassignedCount === 1 ? '' : 's'}</div>
+        </div>
+      </div>
+    </div>`;
+  return coopsHtml + unassignedHtml;
+}
+
+function renderOverallPage(){
+  const poultryEl = document.getElementById('overall-poultry-list');
+  const livestockEl = document.getElementById('overall-livestock-list');
+  if(poultryEl) poultryEl.innerHTML = renderOverallSectionHtml('poultry');
+  if(livestockEl) livestockEl.innerHTML = renderOverallSectionHtml('livestock');
 }
 
 function renderCoopDetailList(){
@@ -2648,7 +2855,7 @@ function renderCoopDetailList(){
   const filtered = sortChickens(allBirds.filter(c => chickenMatchesFilters(c, filters)), 'coop-');
   el.innerHTML = filtered.length
     ? filtered.map(c => chickenCardHtml(c, readOnly, 'coop-detail', coopSelectionMode)).join('')
-    : (allBirds.length ? '<p class="empty">No birds match these filters.</p>' : '<p class="empty">No birds in this coop.</p>');
+    : (allBirds.length ? '<p class="empty">No birds match these filters.</p>' : `<p class="empty">No animals in this ${coopWordFor(currentCategory).toLowerCase()}.</p>`);
   populateBulkMoveCoopOptions();
   const massMoveBtn = document.getElementById('coop-mass-move-btn');
   if(massMoveBtn) massMoveBtn.style.display = (!readOnly && allBirds.length) ? 'block' : 'none';
@@ -2660,13 +2867,22 @@ function renderCoopDetailList(){
   renderBulkMoveBars();
 }
 
-function openCoopDetail(id){
+function openCoopDetail(id, category){
+  const isUnassigned = id === '__unassigned';
+  const coop = isUnassigned ? null : state.coops.find(c => c.id === id);
+  if(coop) currentCategory = coop.category;
+  else if(category) currentCategory = category;
+
   currentCoopDetailId = id;
   selectedBirdIds.clear();
   coopSelectionMode = false;
-  const isUnassigned = id === '__unassigned';
-  const coop = isUnassigned ? null : state.coops.find(c => c.id === id);
-  document.getElementById('coop-detail-name').textContent = isUnassigned ? 'Unassigned' : (coop ? coop.name : 'Coop');
+  const word = coopWordFor(currentCategory);
+  document.getElementById('coop-detail-name').textContent = isUnassigned ? 'Unassigned' : (coop ? coop.name : word);
+  document.getElementById('coop-detail-eyebrow').textContent = word;
+  document.getElementById('coop-detail-name-label').textContent = word + ' name';
+  document.getElementById('coop-detail-rename-btn').textContent = 'Rename ' + word.toLowerCase();
+  document.getElementById('coop-detail-list-title').textContent = 'Animals In This ' + word;
+  document.getElementById('coop-detail-back-label').textContent = currentCategory === 'livestock' ? 'Back to Sheep & Goats' : 'Back to My Flock';
   document.getElementById('coop-rename-section').style.display = (isUnassigned || isReadOnly()) ? 'none' : 'block';
   if(!isUnassigned && coop) document.getElementById('coop-detail-name-input').value = coop.name;
   clearChickenFilters('coop-');
@@ -2681,8 +2897,8 @@ function closeCoopDetail(){
 
 async function addCoop(){
   const name = document.getElementById('new-coop-name').value.trim();
-  if(!name){ setStatus('coop-status', 'Enter a coop name.', true); return; }
-  const { error } = await sb.from('coops').insert({ name, owner_id: currentFlockOwnerId });
+  if(!name){ setStatus('coop-status', `Enter a ${coopWordFor(currentCategory).toLowerCase()} name.`, true); return; }
+  const { error } = await sb.from('coops').insert({ name, owner_id: currentFlockOwnerId, category: currentCategory });
   if(error){ setStatus('coop-status', error.message, true); return; }
   document.getElementById('new-coop-name').value = '';
   await loadFlockData();
@@ -2693,7 +2909,9 @@ async function addCoop(){
 }
 
 async function deleteCoop(id){
-  if(!confirm('Delete this coop? Birds in it will become Unassigned.')) return;
+  const coop = state.coops.find(c => c.id === id);
+  const word = coopWordFor(coop ? coop.category : currentCategory).toLowerCase();
+  if(!confirm(`Delete this ${word}? Animals in it will become Unassigned.`)) return;
   const { error } = await sb.from('coops').delete().eq('id', id);
   if(error){ setStatus('coop-status', error.message, true); return; }
   await loadFlockData();
@@ -2705,7 +2923,7 @@ async function deleteCoop(id){
 async function renameCoop(){
   if(!currentCoopDetailId || currentCoopDetailId === '__unassigned') return;
   const name = document.getElementById('coop-detail-name-input').value.trim();
-  if(!name){ setStatus('coop-detail-status', 'Enter a coop name.', true); return; }
+  if(!name){ setStatus('coop-detail-status', `Enter a ${coopWordFor(currentCategory).toLowerCase()} name.`, true); return; }
   const { error } = await sb.from('coops').update({ name }).eq('id', currentCoopDetailId);
   if(error){ setStatus('coop-detail-status', error.message, true); return; }
   await loadFlockData();
@@ -2717,7 +2935,7 @@ async function renameCoop(){
 }
 
 // ---------- HEALTH CHECKS ----------
-const HEALTH_ITEMS = [
+const HEALTH_ITEMS_POULTRY = [
   { key: 'wings', name: 'Wings', normal: 'Held tight to the body, symmetrical.', issue: 'Look out for abnormalities in wing position (one drooping) — this can be a sign of injury or trauma.' },
   { key: 'bodyscore', name: 'Body Condition Score', normal: 'Aim for a score of around 3 out of 5.', issue: 'A score of 1–2 means underweight, often from a lack of nutrition. A score of 4–5 means overweight.', scoreOptions: [1, 2, 3, 4, 5], scoreGoodValue: 3 },
   { key: 'gait', name: 'Gait', normal: 'No limping, fluid motion, high activity levels.', issue: 'Look out for limping or favouring one leg over the other — this can be a sign of pain or injury.' },
@@ -2736,6 +2954,27 @@ const HEALTH_ITEMS = [
   { key: 'vent', name: 'Vent', normal: 'Clean, no debris, healthy pink colour, no mites.', issue: 'Look out for discharge that seems thick or bad smelling — this can be a sign of a fungal infection.' }
 ];
 
+const HEALTH_ITEMS_LIVESTOCK = [
+  { key: 'bodyscore', name: 'Body Condition Score', normal: 'Aim for a score of around 3 out of 5.', issue: 'A score of 1–2 means underweight — spine and ribs easily felt. A score of 4–5 means overweight.', scoreOptions: [1, 2, 3, 4, 5], scoreGoodValue: 3 },
+  { key: 'coat', name: 'Coat / Fleece', normal: 'Score out of 5 — higher is better.', issue: 'A score of 1–2 means poor condition — bald patches, dull, matted or missing wool/hair, signs of mites. A score of 4–5 means clean, full coverage, good condition.', scoreOptions: [1, 2, 3, 4, 5] },
+  { key: 'gait', name: 'Gait / Mobility', normal: 'Moves freely, weight evenly on all four feet, no stiffness.', issue: 'Look out for limping or reluctance to move — a common sign of footrot or lameness.' },
+  { key: 'behaviour', name: 'Behaviour', normal: 'Alert, grazing, interested in surroundings, keeping with the group.', issue: 'Look out for an animal isolating itself, standing hunched, or grinding its teeth — signs of pain or illness.' },
+  { key: 'eyes', name: 'Eyes', normal: 'Clear, bright, no discharge or cloudiness.', issue: 'Look out for cloudiness, discharge or excessive tears — could be pink eye or an injury.' },
+  { key: 'ears', name: 'Ears', normal: 'Alert and mobile, no discharge, held up (breed-dependent).', issue: 'Look out for drooping ears not typical of the breed, discharge, or head shaking — can be a sign of infection or fly strike.' },
+  { key: 'nasal', name: 'Nose / Discharge', normal: 'Clear, no discharge, breathing quiet and even.', issue: 'Look out for thick or coloured discharge, or coughing/laboured breathing — can be a sign of respiratory infection or lungworm.' },
+  { key: 'mouth', name: 'Mouth / Teeth', normal: 'Teeth aligned and worn evenly, no drooling, eating normally.', issue: 'Look out for overshot/undershot jaw, broken teeth, or drooling — can make it hard for them to graze properly.' },
+  { key: 'feet', name: 'Feet / Hooves', normal: 'Hooves a good shape, not overgrown, no heat or smell.', issue: 'Look out for overgrown or misshapen hooves, heat, or a foul smell between the claws — signs of footrot or scald.' },
+  { key: 'udder', name: 'Udder / Underside', normal: 'Soft, even, no heat, swelling or lumps (on females).', issue: 'Look out for hard, hot or swollen udder tissue — can be a sign of mastitis.' },
+  { key: 'tail', name: 'Tail Area / Dags', normal: 'Clean, dry, no matted or soiled wool/hair around the tail.', issue: 'Look out for scouring (dirty, wet soiling) around the tail — often a sign of worms or a diet issue.' },
+  { key: 'coat_parasites', name: 'Parasites', normal: 'No excessive scratching, rubbing or visible lice/ticks.', issue: 'Look out for rubbing, wool loss, or visible lice, ticks or fly strike — especially in warm, damp weather.' }
+];
+
+const HEALTH_ITEMS_BY_CATEGORY = { poultry: HEALTH_ITEMS_POULTRY, livestock: HEALTH_ITEMS_LIVESTOCK };
+
+function currentHealthItems(){
+  return HEALTH_ITEMS_BY_CATEGORY[currentCategory] || HEALTH_ITEMS_POULTRY;
+}
+
 function chickenNameById(id){
   if(!id) return 'Whole flock';
   const c = state.chickens.find(x => x.id === id);
@@ -2750,10 +2989,12 @@ function populateHcCoopSelectOptions(){
   const sel = document.getElementById('hc-coop-select');
   if(!sel) return;
   const current = sel.value;
-  sel.innerHTML = '<option value="">All coops</option>' +
-    state.coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('') +
+  const coops = state.coops.filter(c => c.category === currentCategory);
+  const allLabel = 'All ' + coopWordForPlural(currentCategory).toLowerCase();
+  sel.innerHTML = `<option value="">${allLabel}</option>` +
+    coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('') +
     '<option value="__unassigned">Unassigned</option>';
-  sel.value = (current === '' || current === '__unassigned' || state.coops.some(c => c.id === current)) ? current : '';
+  sel.value = (current === '' || current === '__unassigned' || coops.some(c => c.id === current)) ? current : '';
 }
 
 function startHealthCheckSession(){
@@ -2761,7 +3002,7 @@ function startHealthCheckSession(){
   if(!date){ setStatus('hc-setup-status', 'Pick a date.', true); return; }
 
   const coopScope = document.getElementById('hc-coop-select').value;
-  const living = state.chickens.filter(c => !c.isDeceased);
+  const living = state.chickens.filter(c => !c.isDeceased && c.category === currentCategory);
   const scoped = coopScope === ''
     ? living
     : living.filter(c => coopScope === '__unassigned' ? !c.coopId : c.coopId === coopScope);
@@ -2880,7 +3121,7 @@ function hcNoteAlwaysVisible(item){
 
 function renderHealthItems(itemState){
   const el = document.getElementById('hc-items');
-  el.innerHTML = HEALTH_ITEMS.map(item => {
+  el.innerHTML = currentHealthItems().map(item => {
     const current = itemState[item.key] || {};
     const isIssue = hcIsIssueStatus(item, current.status);
     const isGood = hcIsGoodStatus(item, current.status);
@@ -2924,7 +3165,7 @@ function toggleEditInfo(editKey){
 }
 
 function hcSetItemStatus(key, val){
-  const item = HEALTH_ITEMS.find(i => i.key === key);
+  const item = currentHealthItems().find(i => i.key === key);
   const bird = hcSession.current;
   bird.items[key] = bird.items[key] || {};
   bird.items[key].status = val;
@@ -2978,7 +3219,7 @@ async function finishHealthCheckSession(){
   const birds = hcSession.completed.map(b => ({
     chickenId: b.chickenId,
     chickenName: b.chickenName,
-    items: HEALTH_ITEMS.map(i => ({
+    items: currentHealthItems().map(i => ({
       key: i.key,
       name: i.name,
       status: (b.items[i.key] && b.items[i.key].status) || 'unchecked',
@@ -2989,7 +3230,8 @@ async function finishHealthCheckSession(){
   const { error } = await sb.from('health_checks').insert({
     owner_id: currentFlockOwnerId,
     date: hcSession.date,
-    items: birds
+    items: birds,
+    category: currentCategory
   });
   if(error){ setStatus('hc-picker-status', error.message, true); return; }
 
@@ -3007,13 +3249,13 @@ async function finishHealthCheckSession(){
 
 function historyItemIsIssue(i){
   if(i.status == null || i.status === '' || i.status === 'unchecked') return false;
-  const item = HEALTH_ITEMS.find(h => h.key === i.key);
+  const item = currentHealthItems().find(h => h.key === i.key);
   if(item && item.scoreOptions) return hcIsIssueStatus(item, i.status);
   return i.status === 'issue';
 }
 
 function historyItemDisplay(i){
-  const item = HEALTH_ITEMS.find(h => h.key === i.key);
+  const item = currentHealthItems().find(h => h.key === i.key);
   if(item && item.scoreOptions){
     if(i.status == null || i.status === '' || i.status === 'unchecked') return { cls: 'unchecked-text', label: 'Not checked' };
     return { cls: hcIsIssueStatus(item, i.status) ? 'issue-text' : 'good-text', label: 'Score: ' + i.status };
@@ -3061,7 +3303,7 @@ function cancelEditHcBird(){
 
 function setEditHcItemStatus(prefix, key, val){
   if(!editingHc || editingHc.prefix !== prefix) return;
-  const item = HEALTH_ITEMS.find(i => i.key === key);
+  const item = currentHealthItems().find(i => i.key === key);
   editingHc.items[key] = editingHc.items[key] || {};
   editingHc.items[key].status = val;
   const card = document.querySelector('.hc-item[data-editkey="' + prefix + '__' + key + '"]');
@@ -3087,7 +3329,7 @@ async function saveEditedHcBird(){
   const rec = state.healthChecks.find(r => String(r.id) === String(recordId));
   if(!rec) return;
 
-  const newItems = HEALTH_ITEMS.map(i => ({
+  const newItems = currentHealthItems().map(i => ({
     key: i.key,
     name: i.name,
     status: (items[i.key] && items[i.key].status) || 'unchecked',
@@ -3109,7 +3351,7 @@ async function saveEditedHcBird(){
 }
 
 function hcEditableItemsHtml(prefix, itemState){
-  return HEALTH_ITEMS.map(item => {
+  return currentHealthItems().map(item => {
     const current = itemState[item.key] || {};
     const isIssue = hcIsIssueStatus(item, current.status);
     const isGood = hcIsGoodStatus(item, current.status);
@@ -3193,10 +3435,11 @@ function refreshHcHistoryViews(){
 
 function renderHealthHistory(){
   const el = document.getElementById('hc-history');
-  if(!state.healthChecks.length){ el.innerHTML = '<p class="empty">No health checks recorded yet.</p>'; return; }
+  const records = state.healthChecks.filter(r => r.category === currentCategory);
+  if(!records.length){ el.innerHTML = '<p class="empty">No health checks recorded yet.</p>'; return; }
 
   const readOnly = isReadOnly();
-  el.innerHTML = state.healthChecks.map(r => {
+  el.innerHTML = records.map(r => {
     const isSession = Array.isArray(r.items) && r.items.length > 0 && Array.isArray(r.items[0].items);
 
     if(isSession){
@@ -3302,8 +3545,7 @@ async function saveSalesSettings(){
   const { error } = await sb.from('sales_settings').upsert(payload, { onConflict: 'owner_id' });
   if(error){ setStatus('sales-settings-status', error.message, true); return; }
   await loadFlockData();
-  renderTabbar();
-  renderTabLayoutOptions();
+  refreshSectionNav();
   setStatus('sales-settings-status', 'Saved.', false);
 }
 
@@ -3743,10 +3985,13 @@ function populateCustomerPriceLabels(){
   document.getElementById('cust-price-dozen-label').textContent = `Price per dozen (standard ${formatMoney(s.priceDozen || 0)})`;
 }
 
-function openCustomerDetail(id){
+function openCustomerDetail(id, returnTab){
   currentCustomerDetailId = id;
+  currentCustomerDetailReturnTab = returnTab || 'sales';
   editingCustomerId = id;
   editingSaleId = null;
+  editingLsSaleId = null;
+  document.getElementById('customer-detail-back-label').textContent = currentCustomerDetailReturnTab === 'livestock-sales' ? '← Back to Sheep & Goats Sales' : '← Back to Sales';
   populateCustomerPriceLabels();
   populateCreditUnitSelect();
   if(id){
@@ -3762,6 +4007,8 @@ function openCustomerDetail(id){
     document.getElementById('customer-balance-section').style.display = 'block';
     document.getElementById('customer-credits-section').style.display = 'block';
     document.getElementById('customer-sales-section').style.display = 'block';
+    document.getElementById('customer-ls-balance-section').style.display = 'block';
+    document.getElementById('customer-ls-sales-section').style.display = 'block';
     document.getElementById('customer-danger-section').style.display = isReadOnly() ? 'none' : 'block';
     document.getElementById('credit-date').value = todayStr();
     document.getElementById('credit-quantity').value = '';
@@ -3769,6 +4016,8 @@ function openCustomerDetail(id){
     renderCustomerBalance(id);
     renderCustomerCredits(id);
     renderCustomerSalesList(id);
+    renderCustomerLsBalance(id);
+    renderCustomerLsSalesList(id);
   } else {
     document.getElementById('customer-detail-name').textContent = 'Add Customer';
     document.getElementById('customer-form-title').textContent = 'Add Customer';
@@ -3781,6 +4030,8 @@ function openCustomerDetail(id){
     document.getElementById('customer-balance-section').style.display = 'none';
     document.getElementById('customer-credits-section').style.display = 'none';
     document.getElementById('customer-sales-section').style.display = 'none';
+    document.getElementById('customer-ls-balance-section').style.display = 'none';
+    document.getElementById('customer-ls-sales-section').style.display = 'none';
     document.getElementById('customer-danger-section').style.display = 'none';
   }
   switchTab('customer-detail');
@@ -3791,8 +4042,11 @@ function closeCustomerDetail(){
   currentCustomerDetailId = null;
   editingCustomerId = null;
   editingSaleId = null;
-  switchTab('sales');
-  renderSalesTab();
+  editingLsSaleId = null;
+  const returnTab = currentCustomerDetailReturnTab || 'sales';
+  switchTab(returnTab);
+  if(returnTab === 'livestock-sales') renderLivestockSalesTab();
+  else renderSalesTab();
 }
 
 function customerPriceFieldValue(id){
@@ -3984,6 +4238,394 @@ async function deleteSale(id){
   renderCustomersList();
 }
 
+// ---------- LIVESTOCK SALES SETTINGS (ACCOUNT TAB) ----------
+function onLsSettingsToggle(){
+  document.getElementById('ls-price-wool-row').style.display = document.getElementById('ls-sell-wool').checked ? 'flex' : 'none';
+  document.getElementById('ls-price-milk-row').style.display = document.getElementById('ls-sell-milk').checked ? 'flex' : 'none';
+  document.getElementById('ls-price-meat-row').style.display = document.getElementById('ls-sell-meat').checked ? 'flex' : 'none';
+  document.getElementById('ls-price-live-animal-row').style.display = document.getElementById('ls-sell-live-animals').checked ? 'flex' : 'none';
+}
+
+function renderLivestockSalesSettingsForm(){
+  const s = state.livestockSalesSettings || { sellWool: false, sellMilk: false, sellMeat: false, sellLiveAnimals: false, priceWool: 0, priceMilk: 0, priceMeat: 0, priceLiveAnimal: 0 };
+  document.getElementById('ls-sell-wool').checked = !!s.sellWool;
+  document.getElementById('ls-sell-milk').checked = !!s.sellMilk;
+  document.getElementById('ls-sell-meat').checked = !!s.sellMeat;
+  document.getElementById('ls-sell-live-animals').checked = !!s.sellLiveAnimals;
+  document.getElementById('ls-price-wool').value = s.priceWool || '';
+  document.getElementById('ls-price-milk').value = s.priceMilk || '';
+  document.getElementById('ls-price-meat').value = s.priceMeat || '';
+  document.getElementById('ls-price-live-animal').value = s.priceLiveAnimal || '';
+  onLsSettingsToggle();
+}
+
+async function saveLivestockSalesSettings(){
+  const payload = {
+    owner_id: currentFlockOwnerId,
+    sell_wool: document.getElementById('ls-sell-wool').checked,
+    sell_milk: document.getElementById('ls-sell-milk').checked,
+    sell_meat: document.getElementById('ls-sell-meat').checked,
+    sell_live_animals: document.getElementById('ls-sell-live-animals').checked,
+    price_wool: Number(document.getElementById('ls-price-wool').value) || 0,
+    price_milk: Number(document.getElementById('ls-price-milk').value) || 0,
+    price_meat: Number(document.getElementById('ls-price-meat').value) || 0,
+    price_live_animal: Number(document.getElementById('ls-price-live-animal').value) || 0
+  };
+  const { error } = await sb.from('livestock_sales_settings').upsert(payload, { onConflict: 'owner_id' });
+  if(error){ setStatus('livestock-sales-settings-status', error.message, true); return; }
+  await loadFlockData();
+  refreshSectionNav();
+  setStatus('livestock-sales-settings-status', 'Saved.', false);
+}
+
+// ---------- LIVESTOCK SALES ----------
+const LS_SALE_TYPES_ALL = ['wool', 'milk', 'meat', 'live_animal'];
+const LS_SALE_TYPE_DROPDOWN_LABELS = { wool: 'Wool (kg)', milk: 'Milk (litres)', meat: 'Meat (kg)', live_animal: 'Live animal' };
+const LS_SALE_TYPE_LABELS = { wool: 'Wool', milk: 'Milk', meat: 'Meat', live_animal: 'Live animal' };
+const LS_SALE_TYPE_UNIT_SINGULAR = { wool: 'kg of wool', milk: 'litre of milk', meat: 'kg of meat', live_animal: 'live animal' };
+const LS_SALE_TYPE_UNIT_PLURAL = { wool: 'kg of wool', milk: 'litres of milk', meat: 'kg of meat', live_animal: 'live animals' };
+
+function enabledLsSaleTypes(){
+  const s = state.livestockSalesSettings || {};
+  return LS_SALE_TYPES_ALL.filter(t => {
+    if(t === 'wool') return !!s.sellWool;
+    if(t === 'milk') return !!s.sellMilk;
+    if(t === 'meat') return !!s.sellMeat;
+    return !!s.sellLiveAnimals;
+  });
+}
+
+function lsSaleTypeUnitLabel(type, qty){
+  return Math.abs(qty - 1) < 0.005 ? (LS_SALE_TYPE_UNIT_SINGULAR[type] || type) : (LS_SALE_TYPE_UNIT_PLURAL[type] || type);
+}
+
+function lsSaleTypePrice(type){
+  const s = state.livestockSalesSettings || {};
+  if(type === 'wool') return s.priceWool || 0;
+  if(type === 'milk') return s.priceMilk || 0;
+  if(type === 'meat') return s.priceMeat || 0;
+  return s.priceLiveAnimal || 0;
+}
+
+function lsSaleTypeOptionsHtml(selected){
+  let types = enabledLsSaleTypes();
+  if(selected && !types.includes(selected)) types = types.concat([selected]);
+  return types.map(t => `<option value="${t}" ${t === selected ? 'selected' : ''}>${LS_SALE_TYPE_LABELS[t] || t}</option>`).join('');
+}
+
+function populateLsSaleTypeSelect(){
+  const sel = document.getElementById('ls-sale-type');
+  const types = enabledLsSaleTypes();
+  const current = sel.value;
+  sel.innerHTML = types.map(t => `<option value="${t}" ${t === current ? 'selected' : ''}>${LS_SALE_TYPE_DROPDOWN_LABELS[t]}</option>`).join('');
+  if(!types.includes(current)) sel.value = types[0] || '';
+}
+
+function customerLsBalance(customerId){
+  return state.livestockSales.filter(s => s.customerId === customerId).reduce((sum, s) => sum + (s.charged - s.paid), 0);
+}
+
+function populateLsSaleCustomerOptions(){
+  const sel = document.getElementById('ls-sale-customer');
+  if(!sel) return;
+  const current = sel.value;
+  const search = document.getElementById('ls-sale-customer-search').value;
+  const filtered = filterCustomersByName(state.customers, search);
+  sel.innerHTML = '<option value="">Select a customer…</option>' + filtered.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  sel.value = filtered.some(c => c.id === current) ? current : '';
+}
+
+function onLsSaleCustomerSearchChange(){
+  populateLsSaleCustomerOptions();
+  onLsSaleCustomerChange();
+}
+
+function onLsSaleCustomerChange(){
+  const id = document.getElementById('ls-sale-customer').value;
+  const flagEl = document.getElementById('ls-sale-customer-flag');
+  const customer = id ? state.customers.find(c => c.id === id) : null;
+  const alerts = [];
+  if(customer){
+    const bal = customerLsBalance(id);
+    if(Math.abs(bal) >= 0.005){
+      alerts.push(bal > 0
+        ? `This customer already owes ${formatMoney(bal)}.`
+        : `You already owe this customer ${formatMoney(-bal)}.`);
+    }
+  }
+  flagEl.style.display = alerts.length ? 'block' : 'none';
+  flagEl.textContent = alerts.join(' ');
+  flagEl.className = 'alert-banner';
+  onLsSaleTypeOrQtyChange();
+}
+
+function onLsSaleTypeOrQtyChange(){
+  const type = document.getElementById('ls-sale-type').value;
+  const qty = Number(document.getElementById('ls-sale-quantity').value) || 0;
+  const standard = qty * lsSaleTypePrice(type);
+  document.getElementById('ls-sale-standard-charge').textContent = formatMoney(standard);
+  document.getElementById('ls-sale-charged').value = qty ? standard.toFixed(2) : '';
+  onLsSaleChargedChange();
+}
+
+function onLsSaleChargedChange(){
+  const charged = Number(document.getElementById('ls-sale-charged').value) || 0;
+  document.getElementById('ls-sale-paid').value = charged ? charged.toFixed(2) : '';
+  onLsSalePaidChange();
+}
+
+function onLsSalePaidChange(){
+  const qty = Number(document.getElementById('ls-sale-quantity').value) || 0;
+  const charged = Number(document.getElementById('ls-sale-charged').value) || 0;
+  const paid = Number(document.getElementById('ls-sale-paid').value) || 0;
+  const diff = paid - charged;
+  const statusEl = document.getElementById('ls-sale-paid-status');
+  if(!qty){ statusEl.textContent = ''; return; }
+  if(Math.abs(diff) < 0.005) statusEl.textContent = 'Paying in full.';
+  else if(diff > 0) statusEl.textContent = `Paying ${formatMoney(diff)} more than charged.`;
+  else statusEl.textContent = `Paying ${formatMoney(-diff)} less than charged.`;
+}
+
+async function saveLivestockSale(){
+  const customerId = document.getElementById('ls-sale-customer').value;
+  if(!customerId){ setStatus('ls-sale-status', 'Pick a customer.', true); return; }
+  const date = document.getElementById('ls-sale-date').value;
+  if(!date){ setStatus('ls-sale-status', 'Pick a date.', true); return; }
+  const saleType = document.getElementById('ls-sale-type').value;
+  if(!saleType){ setStatus('ls-sale-status', 'Enable at least one type to sell in Account settings.', true); return; }
+  const quantity = Number(document.getElementById('ls-sale-quantity').value) || 0;
+  if(!quantity){ setStatus('ls-sale-status', 'Enter a quantity.', true); return; }
+  const charged = Number(document.getElementById('ls-sale-charged').value) || 0;
+  const paid = Number(document.getElementById('ls-sale-paid').value) || 0;
+
+  const { error } = await sb.from('livestock_sales').insert({
+    owner_id: currentFlockOwnerId, customer_id: customerId, date, sale_type: saleType, quantity, charged, paid
+  });
+  if(error){ setStatus('ls-sale-status', error.message, true); return; }
+
+  document.getElementById('ls-sale-quantity').value = '';
+  document.getElementById('ls-sale-charged').value = '';
+  document.getElementById('ls-sale-paid').value = '';
+  setStatus('ls-sale-status', 'Sale logged.', false);
+  await loadFlockData();
+  renderLivestockSalesTab();
+}
+
+function lsCustomerCardHtml(c){
+  const bal = customerLsBalance(c.id);
+  const settled = Math.abs(bal) < 0.005;
+  const balLabel = settled ? 'Settled' : (bal > 0 ? `Owes ${formatMoney(bal)}` : `You owe ${formatMoney(-bal)}`);
+  return `
+    <div class="chicken-card" onclick="openCustomerDetail('${c.id}', 'livestock-sales')">
+      <div class="chicken-card-head">
+        <div>
+          <div class="chicken-name">${escapeHtml(c.name)}</div>
+        </div>
+        <span class="${settled ? 'ok-badge' : 'issue-badge'}">${balLabel}</span>
+      </div>
+    </div>`;
+}
+
+function renderLsCustomersList(){
+  const el = document.getElementById('ls-customers-list');
+  if(!el) return;
+  document.getElementById('ls-customers-count').textContent = state.customers.length;
+  const search = document.getElementById('ls-customers-search').value;
+  const filtered = filterCustomersByName(state.customers, search);
+  el.innerHTML = filtered.length
+    ? filtered.map(c => lsCustomerCardHtml(c)).join('')
+    : (state.customers.length ? '<p class="empty">No customers match your search.</p>' : '<p class="empty">No customers yet.</p>');
+}
+
+// ---------- LIVESTOCK SALES HISTORY ----------
+function computeLsSalesPeriodStats(start, end){
+  const rows = state.livestockSales.filter(s => {
+    const t = new Date(s.date + 'T00:00:00');
+    return t >= start && t <= end;
+  });
+  const charged = rows.reduce((sum, s) => sum + s.charged, 0);
+  const paid = rows.reduce((sum, s) => sum + s.paid, 0);
+  const byType = {};
+  LS_SALE_TYPES_ALL.forEach(t => byType[t] = 0);
+  rows.forEach(s => { byType[s.saleType] = (byType[s.saleType] || 0) + s.quantity; });
+  return { count: rows.length, charged, paid, outstanding: charged - paid, byType };
+}
+
+function lsSalesStatCardHtml(label, s){
+  const types = enabledLsSaleTypes();
+  const qtyRows = types.map(t => `<div class="stat-row"><span>${escapeHtml(LS_SALE_TYPE_LABELS[t])} sold</span><strong>${formatUnitQty(s.byType[t] || 0)} ${escapeHtml(lsSaleTypeUnitLabel(t, s.byType[t] || 0))}</strong></div>`).join('');
+  return `
+    <div class="stat-card">
+      <div class="stat-label">${escapeHtml(label)}</div>
+      ${moneyStatMainHtml(s.charged)}
+      <div class="stat-sub">charged</div>
+      <div class="stat-row"><span>Sales</span><strong>${s.count}</strong></div>
+      <div class="stat-row"><span>Paid</span><strong>${formatMoney(s.paid)}</strong></div>
+      <div class="stat-row"><span>Outstanding</span><strong>${formatMoney(s.outstanding)}</strong></div>
+      ${qtyRows}
+    </div>`;
+}
+
+function renderLsSalesStats(){
+  const el = document.getElementById('ls-sales-stats');
+  if(!el) return;
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const yearStart = new Date(now.getFullYear(), 0, 1);
+  const yearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+  const lifetimeStart = new Date(0);
+  const lifetimeEnd = new Date(8640000000000000);
+  el.innerHTML =
+    lsSalesStatCardHtml('This Month', computeLsSalesPeriodStats(monthStart, monthEnd)) +
+    lsSalesStatCardHtml('This Year', computeLsSalesPeriodStats(yearStart, yearEnd)) +
+    lsSalesStatCardHtml('Lifetime', computeLsSalesPeriodStats(lifetimeStart, lifetimeEnd));
+}
+
+function allLsSalesSorted(){
+  return state.livestockSales.slice().sort((a, b) => a.date < b.date ? 1 : -1);
+}
+
+function lsSalesHistoryRowHtml(s){
+  const diff = s.paid - s.charged;
+  const settled = Math.abs(diff) < 0.005;
+  const diffLabel = settled ? 'Paid in full' : (diff > 0 ? `Overpaid by ${formatMoney(diff)}` : `Underpaid by ${formatMoney(-diff)}`);
+  const clickable = !!s.customerId;
+  return `
+    <div class="log-item" style="align-items:flex-start;flex-direction:column;gap:6px;${clickable ? 'cursor:pointer;' : ''}" ${clickable ? `onclick="openCustomerDetail('${s.customerId}', 'livestock-sales')"` : ''}>
+      <div style="display:flex;justify-content:space-between;width:100%;">
+        <strong>${escapeHtml(customerNameById(s.customerId))}</strong>
+        <span class="${settled ? 'good-text' : 'issue-text'}">${diffLabel}</span>
+      </div>
+      <div class="text-dim" style="font-size:12px;">${formatDateNice(s.date)} &middot; ${formatUnitQty(s.quantity)} ${escapeHtml(lsSaleTypeUnitLabel(s.saleType, s.quantity))} &middot; Charged ${formatMoney(s.charged)} &middot; Paid ${formatMoney(s.paid)}</div>
+    </div>`;
+}
+
+function renderLsSalesHistoryList(){
+  const el = document.getElementById('ls-sales-history-list');
+  if(!el) return;
+  document.getElementById('ls-sales-history-count').textContent = state.livestockSales.length;
+  const search = (document.getElementById('ls-sales-history-search').value || '').trim().toLowerCase();
+  let list = allLsSalesSorted();
+  if(search) list = list.filter(s => customerNameById(s.customerId).toLowerCase().includes(search));
+  el.innerHTML = list.length
+    ? list.map(s => lsSalesHistoryRowHtml(s)).join('')
+    : (state.livestockSales.length ? '<p class="empty">No sales match your search.</p>' : '<p class="empty">No sales recorded yet.</p>');
+}
+
+function renderLivestockSalesTab(){
+  if(!document.getElementById('ls-sale-date').value) document.getElementById('ls-sale-date').value = todayStr();
+  const anyEnabled = enabledLsSaleTypes().length > 0;
+  document.getElementById('ls-none-enabled-note').style.display = anyEnabled ? 'none' : 'block';
+  document.getElementById('ls-sale-section-wrap').style.display = anyEnabled ? 'block' : 'none';
+  if(!anyEnabled) return;
+  populateLsSaleTypeSelect();
+  populateLsSaleCustomerOptions();
+  onLsSaleCustomerChange();
+  renderLsCustomersList();
+  renderLsSalesStats();
+  renderLsSalesHistoryList();
+}
+
+function renderCustomerLsBalance(id){
+  const bal = customerLsBalance(id);
+  const labelEl = document.getElementById('customer-ls-balance-label');
+  const amountEl = document.getElementById('customer-ls-balance-amount');
+  if(Math.abs(bal) < 0.005){ labelEl.textContent = 'All settled'; amountEl.textContent = formatMoney(0); return; }
+  if(bal > 0){ labelEl.textContent = 'Owes you'; amountEl.textContent = formatMoney(bal); }
+  else { labelEl.textContent = 'You owe them'; amountEl.textContent = formatMoney(-bal); }
+}
+
+function customerLsSalesForList(id){
+  return state.livestockSales.filter(s => s.customerId === id).sort((a, b) => a.date < b.date ? 1 : -1);
+}
+
+function lsSaleRowHtml(s, readOnly){
+  if(editingLsSaleId === s.id){
+    return `
+    <div class="hc-record" style="padding:12px;">
+      <div class="row">
+        <div><label>Date</label><input type="date" id="edit-ls-sale-date-${s.id}" value="${s.date}"></div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Type</label>
+          <select id="edit-ls-sale-type-${s.id}">${lsSaleTypeOptionsHtml(s.saleType)}</select>
+        </div>
+        <div><label>Quantity</label><input type="number" min="0" step="0.01" id="edit-ls-sale-qty-${s.id}" value="${s.quantity}"></div>
+      </div>
+      <div class="row">
+        <div><label>Amount charged</label><input type="number" min="0" step="0.01" id="edit-ls-sale-charged-${s.id}" value="${s.charged.toFixed(2)}"></div>
+        <div><label>Amount paid</label><input type="number" min="0" step="0.01" id="edit-ls-sale-paid-${s.id}" value="${s.paid.toFixed(2)}"></div>
+      </div>
+      <div class="row">
+        <div><button type="button" class="btn secondary full" onclick="cancelEditLsSale()">Cancel</button></div>
+        <div><button type="button" class="btn full" onclick="saveEditedLsSale('${s.id}')">Save changes</button></div>
+      </div>
+      <div class="status" id="edit-ls-sale-status-${s.id}"></div>
+    </div>`;
+  }
+  const diff = s.paid - s.charged;
+  const settled = Math.abs(diff) < 0.005;
+  const diffLabel = settled ? 'Paid in full' : (diff > 0 ? `Overpaid by ${formatMoney(diff)}` : `Underpaid by ${formatMoney(-diff)}`);
+  return `
+    <div class="log-item" style="align-items:flex-start;flex-direction:column;gap:6px;">
+      <div style="display:flex;justify-content:space-between;width:100%;">
+        <strong>${formatDateNice(s.date)}</strong>
+        <span class="${settled ? 'good-text' : 'issue-text'}">${diffLabel}</span>
+      </div>
+      <div class="text-dim" style="font-size:12px;">${formatUnitQty(s.quantity)} ${escapeHtml(lsSaleTypeUnitLabel(s.saleType, s.quantity))} &middot; Charged ${formatMoney(s.charged)} &middot; Paid ${formatMoney(s.paid)}</div>
+      ${readOnly ? '' : `
+      <div class="row" style="margin-top:4px;width:100%;">
+        <div><button type="button" class="btn secondary full" onclick="startEditLsSale('${s.id}')">Edit</button></div>
+        <div><button type="button" class="btn danger full" onclick="deleteLsSale('${s.id}')">Delete</button></div>
+      </div>`}
+    </div>`;
+}
+
+function renderCustomerLsSalesList(id){
+  const el = document.getElementById('customer-ls-sales-list');
+  if(!el) return;
+  const readOnly = isReadOnly();
+  const sales = customerLsSalesForList(id);
+  el.innerHTML = sales.length ? sales.map(s => lsSaleRowHtml(s, readOnly)).join('') : '<p class="empty">No sales recorded yet.</p>';
+}
+
+function startEditLsSale(id){
+  editingLsSaleId = id;
+  renderCustomerLsSalesList(currentCustomerDetailId);
+}
+
+function cancelEditLsSale(){
+  editingLsSaleId = null;
+  renderCustomerLsSalesList(currentCustomerDetailId);
+}
+
+async function saveEditedLsSale(id){
+  const date = document.getElementById('edit-ls-sale-date-' + id).value;
+  const saleType = document.getElementById('edit-ls-sale-type-' + id).value;
+  const quantity = Number(document.getElementById('edit-ls-sale-qty-' + id).value) || 0;
+  const charged = Number(document.getElementById('edit-ls-sale-charged-' + id).value) || 0;
+  const paid = Number(document.getElementById('edit-ls-sale-paid-' + id).value) || 0;
+  const { error } = await sb.from('livestock_sales').update({ date, sale_type: saleType, quantity, charged, paid }).eq('id', id);
+  if(error){ setStatus('edit-ls-sale-status-' + id, error.message, true); return; }
+  editingLsSaleId = null;
+  await loadFlockData();
+  renderCustomerLsBalance(currentCustomerDetailId);
+  renderCustomerLsSalesList(currentCustomerDetailId);
+  renderLsCustomersList();
+}
+
+async function deleteLsSale(id){
+  if(!confirm('Delete this sale record?')) return;
+  const { error } = await sb.from('livestock_sales').delete().eq('id', id);
+  if(error) return;
+  await loadFlockData();
+  renderCustomerLsBalance(currentCustomerDetailId);
+  renderCustomerLsSalesList(currentCustomerDetailId);
+  renderLsCustomersList();
+}
+
 // ---------- SHARING ----------
 function renderSharingTab(){
   const ownFlock = currentFlockOwnerId === currentUser.id;
@@ -4080,8 +4722,9 @@ async function removeCollaborator(id){
 // ---------- ACCOUNT ----------
 function renderAccountTab(){
   document.getElementById('account-email-display').textContent = currentUser ? currentUser.email : '';
-  renderTabLayoutOptions();
   renderSalesSettingsForm();
+  renderLivestockSalesSettingsForm();
+  renderSharingTab();
 }
 
 async function changePassword(){

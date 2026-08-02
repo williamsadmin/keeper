@@ -102,6 +102,12 @@ alter table chickens add column if not exists is_deceased boolean not null defau
 alter table chickens add column if not exists deceased_date date;
 alter table chickens add column if not exists animal_type text not null default 'Chicken';
 
+-- ---------- Categories (Poultry vs Sheep & Goats) ----------
+-- Drives the top-level Poultry / Sheep & Goats split. Existing rows default
+-- to 'poultry'; Sheep/Goat animal types are backfilled to 'livestock' below.
+alter table chickens add column if not exists category text not null default 'poultry' check (category in ('poultry','livestock'));
+update chickens set category = 'livestock' where animal_type in ('Sheep','Goat') and category = 'poultry';
+
 create table if not exists health_checks (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
@@ -111,13 +117,19 @@ create table if not exists health_checks (
   created_at timestamptz not null default now()
 );
 
+-- Which checklist (Poultry or Sheep & Goats) this record was checked against.
+alter table health_checks add column if not exists category text not null default 'poultry' check (category in ('poultry','livestock'));
+
 -- ---------- Coops ----------
+-- Shown as "Coop" for poultry and "Group" for Sheep & Goats, driven by category.
 create table if not exists coops (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
   created_at timestamptz not null default now()
 );
+
+alter table coops add column if not exists category text not null default 'poultry' check (category in ('poultry','livestock'));
 
 alter table chickens add column if not exists coop_id uuid references coops(id) on delete set null;
 
@@ -195,6 +207,34 @@ create table if not exists sales_settings (
 -- Off by default: charging per single egg is opt-in, hidden everywhere until enabled.
 alter table sales_settings add column if not exists allow_egg_sales boolean not null default false;
 
+-- ---------- Sheep & Goats sales ----------
+-- Tick-list of which output types are sold, each with its own price. Meat
+-- and live animals are kept as separate sellable types.
+create table if not exists livestock_sales_settings (
+  owner_id uuid primary key references auth.users(id) on delete cascade,
+  sell_wool boolean not null default false,
+  sell_milk boolean not null default false,
+  sell_meat boolean not null default false,
+  sell_live_animals boolean not null default false,
+  price_wool numeric not null default 0,
+  price_milk numeric not null default 0,
+  price_meat numeric not null default 0,
+  price_live_animal numeric not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists livestock_sales (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  customer_id uuid references customers(id) on delete set null,
+  date date not null,
+  sale_type text not null default 'wool' check (sale_type in ('wool','milk','meat','live_animal')),
+  quantity numeric not null default 0,
+  charged numeric not null default 0,
+  paid numeric not null default 0,
+  created_at timestamptz not null default now()
+);
+
 -- ---------- Account deletion ----------
 -- Lets a signed-in user permanently delete their own account. All of
 -- profiles, collaborators (both as owner and as an accepted
@@ -226,6 +266,8 @@ alter table customers enable row level security;
 alter table sales enable row level security;
 alter table customer_credits enable row level security;
 alter table sales_settings enable row level security;
+alter table livestock_sales_settings enable row level security;
+alter table livestock_sales enable row level security;
 
 -- profiles: readable by any signed-in user (needed to resolve owner emails
 -- in the sharing UI); only the owner can update their own row.
@@ -329,3 +371,19 @@ drop policy if exists "sales_settings write" on sales_settings;
 create policy "sales_settings write" on sales_settings for insert with check (has_flock_access(owner_id, 'editor'));
 drop policy if exists "sales_settings update" on sales_settings;
 create policy "sales_settings update" on sales_settings for update using (has_flock_access(owner_id, 'editor'));
+
+drop policy if exists "livestock_sales read" on livestock_sales;
+create policy "livestock_sales read" on livestock_sales for select using (has_flock_access(owner_id));
+drop policy if exists "livestock_sales write" on livestock_sales;
+create policy "livestock_sales write" on livestock_sales for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "livestock_sales update" on livestock_sales;
+create policy "livestock_sales update" on livestock_sales for update using (has_flock_access(owner_id, 'editor'));
+drop policy if exists "livestock_sales delete" on livestock_sales;
+create policy "livestock_sales delete" on livestock_sales for delete using (has_flock_access(owner_id, 'editor'));
+
+drop policy if exists "livestock_sales_settings read" on livestock_sales_settings;
+create policy "livestock_sales_settings read" on livestock_sales_settings for select using (has_flock_access(owner_id));
+drop policy if exists "livestock_sales_settings write" on livestock_sales_settings;
+create policy "livestock_sales_settings write" on livestock_sales_settings for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "livestock_sales_settings update" on livestock_sales_settings;
+create policy "livestock_sales_settings update" on livestock_sales_settings for update using (has_flock_access(owner_id, 'editor'));
