@@ -239,10 +239,10 @@
   </div>
 
   <div class="section-nav" id="section-nav">
-    <button class="section-btn active" data-section="overall" onclick="switchSection('overall')"><span class="section-icon">&#127968;</span><span class="section-label">Overall</span></button>
-    <button class="section-btn" data-section="account" onclick="switchSection('account')"><span class="section-icon">&#128100;</span><span class="section-label">Account</span></button>
+    <button class="section-btn active" data-section="overall" onclick="switchSection('overall')"><span class="section-icon">&#127968;</span><span class="section-label">Home</span></button>
     <button class="section-btn" data-section="poultry" onclick="switchSection('poultry')"><span class="section-icon">&#128020;</span><span class="section-label">Poultry</span></button>
-    <button class="section-btn" data-section="livestock" onclick="switchSection('livestock')"><span class="section-icon">&#128017;</span><span class="section-label">Sheep &amp; Goats</span></button>
+    <button class="section-btn" data-section="livestock" onclick="switchSection('livestock')"><span class="section-icon">&#128017;</span><span class="section-label">Livestock</span></button>
+    <button class="section-btn" data-section="account" onclick="switchSection('account')"><span class="section-icon">&#128100;</span><span class="section-label">Account</span></button>
   </div>
 
   <div class="tabbar" id="subtabbar-wrap" style="display:none;">
@@ -253,11 +253,16 @@
 
     <!-- OVERALL TAB -->
     <div id="tab-overall" class="tab-panel active">
-      <p class="eyebrow">Overall</p>
+      <p class="eyebrow">Home</p>
       <h1>Your Farm</h1>
       <p class="sub">Every coop and group across your flock &mdash; tap one to open it.</p>
 
       <div class="reminder-banner" id="overall-egg-reminder" style="display:none;cursor:pointer;" onclick="goToEggCount()">Egg count needs doing today! &#x1F95A;</div>
+
+      <section id="home-quick-links-section" style="display:none;">
+        <p class="sec-title">Quick Links</p>
+        <div id="home-quick-links-list"></div>
+      </section>
 
       <section>
         <p class="sec-title">Poultry Coops</p>
@@ -265,7 +270,7 @@
       </section>
 
       <section>
-        <p class="sec-title">Sheep &amp; Goats Groups</p>
+        <p class="sec-title">Livestock Groups</p>
         <div id="overall-livestock-list"></div>
       </section>
     </div>
@@ -867,7 +872,7 @@
       </section>
 
       <section id="customer-ls-balance-section" style="display:none;">
-        <p class="sec-title">Sheep &amp; Goats Balance</p>
+        <p class="sec-title">Livestock Balance</p>
         <div class="stat-card">
           <div class="stat-label" id="customer-ls-balance-label">All settled</div>
           <div class="stat-main" id="customer-ls-balance-amount">£0.00</div>
@@ -875,7 +880,7 @@
       </section>
 
       <section id="customer-ls-sales-section" style="display:none;">
-        <p class="sec-title">Sheep &amp; Goats Sales History</p>
+        <p class="sec-title">Livestock Sales History</p>
         <div id="customer-ls-sales-list"></div>
       </section>
 
@@ -887,11 +892,11 @@
     <!-- LIVESTOCK SALES TAB -->
     <div id="tab-livestock-sales" class="tab-panel">
       <p class="eyebrow">Sales</p>
-      <h1>Sheep &amp; Goats Sales</h1>
+      <h1>Livestock Sales</h1>
       <p class="sub">Log sales to customers and keep track of who owes what.</p>
 
       <div id="ls-none-enabled-note" style="display:none;">
-        <p class="empty">Nothing to sell yet — tick at least one option under Sheep &amp; Goats Sales Tracking in your Account tab.</p>
+        <p class="empty">Nothing to sell yet — tick at least one option under Livestock Sales Tracking in your Account tab.</p>
       </div>
 
       <div id="ls-sale-section-wrap">
@@ -985,14 +990,14 @@
 
       <details>
         <summary class="sec-title">Main Tabs</summary>
-        <p class="share-note" style="margin-bottom:10px;">Choose which of the 4 main tabs show up, and which smaller tabs appear inside Poultry and Sheep &amp; Goats.</p>
+        <p class="share-note" style="margin-bottom:10px;">Choose which of the 4 main tabs show up, and which smaller tabs appear inside Poultry and Livestock.</p>
         <div class="checkbox-row">
           <input type="checkbox" id="mt-show-poultry">
           <label for="mt-show-poultry">Show Poultry tab</label>
         </div>
         <div class="checkbox-row">
           <input type="checkbox" id="mt-show-livestock">
-          <label for="mt-show-livestock">Show Sheep &amp; Goats tab</label>
+          <label for="mt-show-livestock">Show Livestock tab</label>
         </div>
         <p class="sec-title" style="margin-top:14px;font-size:11px;">Poultry Tabs</p>
         <div class="checkbox-row">
@@ -1011,7 +1016,7 @@
           <input type="checkbox" id="mt-poultry-breeds">
           <label for="mt-poultry-breeds">Breeds</label>
         </div>
-        <p class="sec-title" style="margin-top:14px;font-size:11px;">Sheep &amp; Goats Tabs</p>
+        <p class="sec-title" style="margin-top:14px;font-size:11px;">Livestock Tabs</p>
         <div class="checkbox-row">
           <input type="checkbox" id="mt-livestock-chickens">
           <label for="mt-livestock-chickens">My Flock</label>
@@ -1026,6 +1031,14 @@
         </div>
         <button class="btn full" style="margin-top:4px;" onclick="saveMainTabsSettings()">Save tab settings</button>
         <div class="status" id="main-tabs-status"></div>
+      </details>
+
+      <details>
+        <summary class="sec-title">Home Quick Links</summary>
+        <p class="share-note" style="margin-bottom:10px;">Choose shortcuts to show on the Home page that jump straight to that section.</p>
+        <div id="home-quick-links-options"></div>
+        <button class="btn full" style="margin-top:4px;" onclick="saveHomeQuickLinks()">Save quick links</button>
+        <div class="status" id="home-quick-links-status"></div>
       </details>
 
       <details id="share-viewing-note" style="display:none;">
@@ -1093,7 +1106,7 @@
       </details>
 
       <details id="livestock-sales-settings-section">
-        <summary class="sec-title">Sheep &amp; Goats Sales Tracking</summary>
+        <summary class="sec-title">Livestock Sales Tracking</summary>
         <p class="share-note" style="margin-bottom:10px;">Choose what you sell, and set a standard price for each.</p>
         <div class="checkbox-row">
           <input type="checkbox" id="ls-sell-wool" onchange="onLsSettingsToggle()">
@@ -1188,7 +1201,7 @@ let editingChickenId = null;
 let currentDetailChickenId = null;
 let currentCoopDetailId = null; // real coop id, '__unassigned', or null
 let chickenDetailReturnTab = 'chickens';
-let currentCategory = 'poultry'; // 'poultry' | 'livestock' — which section (Poultry / Sheep & Goats) is active
+let currentCategory = 'poultry'; // 'poultry' | 'livestock' — which section (Poultry / Livestock) is active
 let currentSection = 'overall'; // 'overall' | 'account' | 'poultry' | 'livestock'
 let editingHc = null; // { prefix, recordId, chickenId, items: {key: {status, note}} } | null
 let pendingImportPayloads = [];
@@ -1289,6 +1302,90 @@ function applyMainTabsVisibility(){
   if(currentSection === 'poultry' && !showPoultrySection) switchSection('overall');
   if(currentSection === 'livestock' && !showLivestockSection) switchSection('overall');
   renderOverallEggReminder();
+}
+
+// ---------- HOME QUICK LINKS ----------
+const HOME_QUICK_LINK_OPTIONS = [
+  { id: 'poultry-eggs', label: 'Egg Count', category: 'poultry', tab: 'eggs' },
+  { id: 'poultry-health', label: 'Poultry Health Checks', category: 'poultry', tab: 'health' },
+  { id: 'poultry-breeds', label: 'Poultry Breeds', category: 'poultry', tab: 'breeds' },
+  { id: 'poultry-sales', label: 'Poultry Sales', category: 'poultry', tab: 'sales' },
+  { id: 'livestock-health', label: 'Livestock Health Checks', category: 'livestock', tab: 'health' },
+  { id: 'livestock-breeds', label: 'Livestock Breeds', category: 'livestock', tab: 'breeds' },
+  { id: 'livestock-sales', label: 'Livestock Sales', category: 'livestock', tab: 'livestock-sales' }
+];
+let homeQuickLinkIds = [];
+
+function homeQuickLinksStorageKey(){
+  return 'chickenKeeperHomeQuickLinks_' + (currentUser ? currentUser.id : 'anon');
+}
+
+function loadHomeQuickLinkSettings(){
+  homeQuickLinkIds = [];
+  try{
+    const raw = localStorage.getItem(homeQuickLinksStorageKey());
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(Array.isArray(parsed)) homeQuickLinkIds = parsed.filter(id => HOME_QUICK_LINK_OPTIONS.some(o => o.id === id));
+    }
+  } catch(e){}
+}
+
+function saveHomeQuickLinkSettingsToStorage(){
+  try{ localStorage.setItem(homeQuickLinksStorageKey(), JSON.stringify(homeQuickLinkIds)); } catch(e){}
+}
+
+function visibleHomeQuickLinks(){
+  const salesOn = !!(state.salesSettings && state.salesSettings.enabled);
+  const lsOn = enabledLsSaleTypes().length > 0;
+  return HOME_QUICK_LINK_OPTIONS.filter(o => {
+    if(!homeQuickLinkIds.includes(o.id)) return false;
+    if(o.category === 'poultry' && !showPoultrySection) return false;
+    if(o.category === 'livestock' && !showLivestockSection) return false;
+    if(o.tab === 'sales' && !salesOn) return false;
+    if(o.tab === 'livestock-sales' && !lsOn) return false;
+    return true;
+  });
+}
+
+function goToQuickLink(category, tab){
+  currentCategory = category;
+  switchTab(tab);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function homeQuickLinkCardHtml(o){
+  return `
+    <div class="chicken-card" onclick="goToQuickLink('${o.category}', '${o.tab}')">
+      <div class="chicken-card-head">
+        <div><div class="chicken-name">${escapeHtml(o.label)}</div></div>
+      </div>
+    </div>`;
+}
+
+function renderHomeQuickLinksSection(){
+  const links = visibleHomeQuickLinks();
+  const section = document.getElementById('home-quick-links-section');
+  const list = document.getElementById('home-quick-links-list');
+  if(section) section.style.display = links.length ? 'block' : 'none';
+  if(list) list.innerHTML = links.map(homeQuickLinkCardHtml).join('');
+}
+
+function renderHomeQuickLinksForm(){
+  const el = document.getElementById('home-quick-links-options');
+  if(!el) return;
+  el.innerHTML = HOME_QUICK_LINK_OPTIONS.map(o => `
+    <div class="checkbox-row">
+      <input type="checkbox" id="hql-${o.id}" ${homeQuickLinkIds.includes(o.id) ? 'checked' : ''}>
+      <label for="hql-${o.id}">${escapeHtml(o.label)}</label>
+    </div>`).join('');
+}
+
+function saveHomeQuickLinks(){
+  homeQuickLinkIds = HOME_QUICK_LINK_OPTIONS.filter(o => document.getElementById('hql-' + o.id).checked).map(o => o.id);
+  saveHomeQuickLinkSettingsToStorage();
+  renderHomeQuickLinksSection();
+  setStatus('home-quick-links-status', 'Saved.', false);
 }
 
 function currentSectionTabs(){
@@ -1435,6 +1532,7 @@ async function logout(){
   showLivestockSection = true;
   hiddenPoultryTabIds = [];
   hiddenLivestockTabIds = [];
+  homeQuickLinkIds = [];
   document.getElementById('app-screen').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'block';
 }
@@ -1445,6 +1543,7 @@ async function onLoggedIn(user){
   document.getElementById('app-screen').style.display = 'block';
   document.getElementById('user-email').textContent = user.email;
   loadMainTabsSettings();
+  loadHomeQuickLinkSettings();
   applyMainTabsVisibility();
 
   await ensureProfile();
@@ -2122,13 +2221,15 @@ const GENDER_OPTIONS = {
   'Guinea Fowl': ['Hen', 'Cock'],
   'Swan': ['Pen', 'Cob'],
   'Sheep': ['Ewe', 'Ram'],
-  'Goat': ['Doe', 'Buck']
+  'Goat': ['Doe', 'Buck'],
+  'Cow': ['Cow', 'Bull'],
+  'Pig': ['Sow', 'Boar']
 };
 const DEFAULT_GENDER_OPTIONS = ['Female', 'Male'];
-const MALE_GENDERS = new Set(['Rooster', 'Drake', 'Gander', 'Tom', 'Cock', 'Cob', 'Ram', 'Buck', 'Male']);
+const MALE_GENDERS = new Set(['Rooster', 'Drake', 'Gander', 'Tom', 'Cock', 'Cob', 'Ram', 'Buck', 'Bull', 'Boar', 'Male']);
 
-// ---------- CATEGORIES (Poultry vs Sheep & Goats) ----------
-const LIVESTOCK_ANIMAL_TYPES = ['Sheep', 'Goat'];
+// ---------- CATEGORIES (Poultry vs Livestock) ----------
+const LIVESTOCK_ANIMAL_TYPES = ['Sheep', 'Goat', 'Cow', 'Pig'];
 const POULTRY_ANIMAL_TYPES = ['Chicken', 'Duck', 'Quail', 'Goose', 'Turkey', 'Guinea Fowl', 'Swan'];
 
 function categoryForAnimalType(animalType){
@@ -2174,7 +2275,7 @@ function normalizeGenderInput(genderInput, animalType){
   if(!trimmed) return opts[0];
   const matched = opts.find(o => o.toLowerCase() === trimmed.toLowerCase());
   if(matched) return matched;
-  const isMale = /rooster|cockerel|\bcock\b|drake|gander|tom|cob|\bram\b|buck|male/i.test(trimmed);
+  const isMale = /rooster|cockerel|\bcock\b|drake|gander|tom|cob|\bram\b|buck|bull|boar|male/i.test(trimmed);
   return isMale ? opts[1] : opts[0];
 }
 
@@ -2745,7 +2846,7 @@ function applyCategoryChrome(){
   const isLivestock = currentCategory === 'livestock';
   const word = coopWordFor(currentCategory);
   const wordPlural = coopWordForPlural(currentCategory);
-  const backLabel = isLivestock ? 'Back to Sheep & Goats' : 'Back to My Flock';
+  const backLabel = isLivestock ? 'Back to Livestock' : 'Back to My Flock';
 
   const subEl = document.getElementById('myflock-sub');
   if(subEl) subEl.textContent = isLivestock
@@ -2969,6 +3070,7 @@ function renderOverallSectionHtml(category){
 
 function renderOverallPage(){
   renderOverallEggReminder();
+  renderHomeQuickLinksSection();
   const poultryEl = document.getElementById('overall-poultry-list');
   const livestockEl = document.getElementById('overall-livestock-list');
   if(poultryEl) poultryEl.innerHTML = renderOverallSectionHtml('poultry');
@@ -3013,7 +3115,7 @@ function openCoopDetail(id, category){
   document.getElementById('coop-detail-name-label').textContent = word + ' name';
   document.getElementById('coop-detail-rename-btn').textContent = 'Rename ' + word.toLowerCase();
   document.getElementById('coop-detail-list-title').textContent = 'Animals In This ' + word;
-  document.getElementById('coop-detail-back-label').textContent = currentCategory === 'livestock' ? 'Back to Sheep & Goats' : 'Back to My Flock';
+  document.getElementById('coop-detail-back-label').textContent = currentCategory === 'livestock' ? 'Back to Livestock' : 'Back to My Flock';
   document.getElementById('coop-rename-section').style.display = (isUnassigned || isReadOnly()) ? 'none' : 'block';
   if(!isUnassigned && coop) document.getElementById('coop-detail-name-input').value = coop.name;
   clearChickenFilters('coop-');
@@ -4122,7 +4224,7 @@ function openCustomerDetail(id, returnTab){
   editingCustomerId = id;
   editingSaleId = null;
   editingLsSaleId = null;
-  document.getElementById('customer-detail-back-label').textContent = currentCustomerDetailReturnTab === 'livestock-sales' ? '← Back to Sheep & Goats Sales' : '← Back to Sales';
+  document.getElementById('customer-detail-back-label').textContent = currentCustomerDetailReturnTab === 'livestock-sales' ? '← Back to Livestock Sales' : '← Back to Sales';
   populateCustomerPriceLabels();
   populateCreditUnitSelect();
   if(id){
@@ -4857,6 +4959,7 @@ function renderAccountTab(){
   renderLivestockSalesSettingsForm();
   renderSharingTab();
   renderMainTabsSettingsForm();
+  renderHomeQuickLinksForm();
 }
 
 function renderMainTabsSettingsForm(){
