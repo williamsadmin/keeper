@@ -257,6 +257,8 @@
       <h1>Your Farm</h1>
       <p class="sub">Every coop and group across your flock &mdash; tap one to open it.</p>
 
+      <div class="reminder-banner" id="overall-egg-reminder" style="display:none;cursor:pointer;" onclick="goToEggCount()">Egg count needs doing today! &#x1F95A;</div>
+
       <section>
         <p class="sec-title">Poultry Coops</p>
         <div id="overall-poultry-list"></div>
@@ -665,7 +667,7 @@
     <div id="tab-breeds" class="tab-panel">
       <p class="eyebrow">Reference</p>
       <h1>Breeds</h1>
-      <p class="sub">Add and edit breed presets per animal type — typical eggs per year and egg colour.</p>
+      <p class="sub" id="breeds-sub">Add and edit breed presets per animal type — typical eggs per year and egg colour.</p>
 
       <section id="breed-form-section">
         <p class="sec-title" id="breed-form-title">Add A Breed</p>
@@ -964,13 +966,13 @@
       <h1>Account</h1>
       <p class="sub">Manage your login, sharing, and sales settings.</p>
 
-      <section>
-        <p class="sec-title">Signed In As</p>
+      <details>
+        <summary class="sec-title">Signed In As</summary>
         <p class="share-note" id="account-email-display"></p>
-      </section>
+      </details>
 
-      <section>
-        <p class="sec-title">Change Password</p>
+      <details>
+        <summary class="sec-title">Change Password</summary>
         <div class="row">
           <div><label>New password</label><input type="password" id="account-new-password" autocomplete="new-password"></div>
         </div>
@@ -979,24 +981,69 @@
         </div>
         <button class="btn full" onclick="changePassword()">Update password</button>
         <div class="status" id="account-status"></div>
-      </section>
+      </details>
 
-      <section id="share-viewing-note" style="display:none;">
-        <p class="sec-title">Access</p>
+      <details>
+        <summary class="sec-title">Main Tabs</summary>
+        <p class="share-note" style="margin-bottom:10px;">Choose which of the 4 main tabs show up, and which smaller tabs appear inside Poultry and Sheep &amp; Goats.</p>
+        <div class="checkbox-row">
+          <input type="checkbox" id="mt-show-poultry">
+          <label for="mt-show-poultry">Show Poultry tab</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="mt-show-livestock">
+          <label for="mt-show-livestock">Show Sheep &amp; Goats tab</label>
+        </div>
+        <p class="sec-title" style="margin-top:14px;font-size:11px;">Poultry Tabs</p>
+        <div class="checkbox-row">
+          <input type="checkbox" id="mt-poultry-eggs">
+          <label for="mt-poultry-eggs">Egg Count</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="mt-poultry-chickens">
+          <label for="mt-poultry-chickens">My Flock</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="mt-poultry-health">
+          <label for="mt-poultry-health">Health Checks</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="mt-poultry-breeds">
+          <label for="mt-poultry-breeds">Breeds</label>
+        </div>
+        <p class="sec-title" style="margin-top:14px;font-size:11px;">Sheep &amp; Goats Tabs</p>
+        <div class="checkbox-row">
+          <input type="checkbox" id="mt-livestock-chickens">
+          <label for="mt-livestock-chickens">My Flock</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="mt-livestock-health">
+          <label for="mt-livestock-health">Health Checks</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="mt-livestock-breeds">
+          <label for="mt-livestock-breeds">Breeds</label>
+        </div>
+        <button class="btn full" style="margin-top:4px;" onclick="saveMainTabsSettings()">Save tab settings</button>
+        <div class="status" id="main-tabs-status"></div>
+      </details>
+
+      <details id="share-viewing-note" style="display:none;">
+        <summary class="sec-title">Access</summary>
         <p class="share-note" id="share-viewing-note-text"></p>
-      </section>
+      </details>
 
-      <section id="share-default-flock-section" style="display:none;">
-        <p class="sec-title">Default Flock</p>
+      <details id="share-default-flock-section" style="display:none;">
+        <summary class="sec-title">Default Flock</summary>
         <p class="share-note" style="margin-bottom:10px;">Choose which flock this account sees first when logging in &mdash; handy if someone else should always land on a shared flock instead of their own.</p>
         <div class="row">
           <div><label>Open this flock by default</label><select id="default-flock-select" onchange="onDefaultFlockChange()"></select></div>
         </div>
         <div class="status" id="default-flock-status"></div>
-      </section>
+      </details>
 
-      <section id="share-manage-section" style="display:none;">
-        <p class="sec-title">Invite Someone</p>
+      <details id="share-manage-section" style="display:none;">
+        <summary class="sec-title">Invite Someone</summary>
         <div class="row">
           <div><label>Email</label><input type="email" id="share-email" placeholder="them@example.com"></div>
           <div>
@@ -1009,15 +1056,15 @@
         </div>
         <button class="btn full" onclick="inviteCollaborator()">Send invite</button>
         <div class="status" id="share-status"></div>
-      </section>
+      </details>
 
-      <section id="share-list-section" style="display:none;">
-        <p class="sec-title">People With Access</p>
+      <details id="share-list-section" style="display:none;">
+        <summary class="sec-title">People With Access</summary>
         <div id="collaborator-list"></div>
-      </section>
+      </details>
 
-      <section id="sales-settings-section">
-        <p class="sec-title">Sales Tracking</p>
+      <details id="sales-settings-section">
+        <summary class="sec-title">Sales Tracking</summary>
         <div class="checkbox-row">
           <input type="checkbox" id="sales-enabled" onchange="onSalesEnabledToggle()">
           <label for="sales-enabled">Track egg sales to customers</label>
@@ -1043,10 +1090,10 @@
           <button class="btn full" onclick="saveSalesSettings()">Save sales settings</button>
         </div>
         <div class="status" id="sales-settings-status"></div>
-      </section>
+      </details>
 
-      <section id="livestock-sales-settings-section">
-        <p class="sec-title">Sheep &amp; Goats Sales Tracking</p>
+      <details id="livestock-sales-settings-section">
+        <summary class="sec-title">Sheep &amp; Goats Sales Tracking</summary>
         <p class="share-note" style="margin-bottom:10px;">Choose what you sell, and set a standard price for each.</p>
         <div class="checkbox-row">
           <input type="checkbox" id="ls-sell-wool" onchange="onLsSettingsToggle()">
@@ -1078,10 +1125,10 @@
         </div>
         <button class="btn full" onclick="saveLivestockSalesSettings()">Save sales settings</button>
         <div class="status" id="livestock-sales-settings-status"></div>
-      </section>
+      </details>
 
-      <section id="chicken-import-section">
-        <p class="sec-title">Import Chickens</p>
+      <details id="chicken-import-section">
+        <summary class="sec-title">Import Chickens</summary>
         <p class="share-note" style="margin-bottom:10px;">Paste one chicken (or duck, quail, etc.) per line. Just a name works, or add details separated by commas: <code>Name, Tag, Tag Colour, Animal, Breed, Gender, DOB (YYYY-MM-DD), Expected Eggs/Year, Egg Colour, Notes</code>. Animal defaults to Chicken if left blank. Anything after the Egg Colour is treated as notes, commas and all.</p>
         <textarea id="import-list-text" placeholder="Henrietta, 14, Red, Chicken, Rhode Island Red, Hen, 2024-03-15, 280, Blue, Rescued in 2024&#10;Clucky"></textarea>
         <button class="btn full" style="margin-top:8px;" id="import-preview-btn" onclick="previewImportList()">Preview import</button>
@@ -1095,14 +1142,14 @@
             <div><button class="btn full" id="import-confirm-btn" onclick="confirmImportList()">Confirm import</button></div>
           </div>
         </div>
-      </section>
+      </details>
 
-      <section>
-        <p class="sec-title" style="color:var(--danger);">Danger Zone</p>
+      <details>
+        <summary class="sec-title" style="color:var(--danger);">Danger Zone</summary>
         <p class="share-note">Permanently delete your account and everything in it &mdash; eggs, chickens, health checks, and any sharing you've set up. This cannot be undone.</p>
         <button class="btn danger full" onclick="deleteAccountAndData()">Delete account and data</button>
         <div class="status" id="delete-account-status"></div>
-      </section>
+      </details>
     </div>
 
   </div>
@@ -1193,17 +1240,69 @@ const LIVESTOCK_TABS = [
 ];
 const CATEGORY_TAB_IDS = ['eggs', 'chickens', 'health', 'breeds', 'sales', 'livestock-sales'];
 const SECTIONLESS_TABS = ['overall', 'account'];
+const POULTRY_CUSTOMIZABLE_TAB_IDS = ['eggs', 'chickens', 'health', 'breeds'];
+const LIVESTOCK_CUSTOMIZABLE_TAB_IDS = ['chickens', 'health', 'breeds'];
 let lastPoultryTab = 'eggs';
 let lastLivestockTab = 'chickens';
+let showPoultrySection = true;
+let showLivestockSection = true;
+let hiddenPoultryTabIds = [];
+let hiddenLivestockTabIds = [];
+
+function mainTabsStorageKey(){
+  return 'chickenKeeperMainTabs_' + (currentUser ? currentUser.id : 'anon');
+}
+
+function loadMainTabsSettings(){
+  showPoultrySection = true;
+  showLivestockSection = true;
+  hiddenPoultryTabIds = [];
+  hiddenLivestockTabIds = [];
+  try{
+    const raw = localStorage.getItem(mainTabsStorageKey());
+    if(raw){
+      const parsed = JSON.parse(raw);
+      if(parsed && typeof parsed === 'object'){
+        if(typeof parsed.showPoultry === 'boolean') showPoultrySection = parsed.showPoultry;
+        if(typeof parsed.showLivestock === 'boolean') showLivestockSection = parsed.showLivestock;
+        if(Array.isArray(parsed.hiddenPoultryTabs)) hiddenPoultryTabIds = parsed.hiddenPoultryTabs.filter(id => POULTRY_CUSTOMIZABLE_TAB_IDS.includes(id));
+        if(Array.isArray(parsed.hiddenLivestockTabs)) hiddenLivestockTabIds = parsed.hiddenLivestockTabs.filter(id => LIVESTOCK_CUSTOMIZABLE_TAB_IDS.includes(id));
+      }
+    }
+  } catch(e){}
+}
+
+function saveMainTabsSettingsToStorage(){
+  try{
+    localStorage.setItem(mainTabsStorageKey(), JSON.stringify({
+      showPoultry: showPoultrySection, showLivestock: showLivestockSection,
+      hiddenPoultryTabs: hiddenPoultryTabIds, hiddenLivestockTabs: hiddenLivestockTabIds
+    }));
+  } catch(e){}
+}
+
+function applyMainTabsVisibility(){
+  const poultryBtn = document.querySelector('.section-btn[data-section="poultry"]');
+  const livestockBtn = document.querySelector('.section-btn[data-section="livestock"]');
+  if(poultryBtn) poultryBtn.style.display = showPoultrySection ? 'flex' : 'none';
+  if(livestockBtn) livestockBtn.style.display = showLivestockSection ? 'flex' : 'none';
+  if(currentSection === 'poultry' && !showPoultrySection) switchSection('overall');
+  if(currentSection === 'livestock' && !showLivestockSection) switchSection('overall');
+  renderOverallEggReminder();
+}
 
 function currentSectionTabs(){
   if(currentSection === 'poultry'){
     const salesOn = !!(state.salesSettings && state.salesSettings.enabled);
-    return POULTRY_TABS.filter(t => t.id !== 'sales' || salesOn);
+    const tabs = POULTRY_TABS.filter(t => t.id !== 'sales' || salesOn);
+    const filtered = tabs.filter(t => t.id === 'sales' || !hiddenPoultryTabIds.includes(t.id));
+    return filtered.length ? filtered : tabs;
   }
   if(currentSection === 'livestock'){
     const lsOn = enabledLsSaleTypes().length > 0;
-    return LIVESTOCK_TABS.filter(t => t.id !== 'livestock-sales' || lsOn);
+    const tabs = LIVESTOCK_TABS.filter(t => t.id !== 'livestock-sales' || lsOn);
+    const filtered = tabs.filter(t => t.id === 'livestock-sales' || !hiddenLivestockTabIds.includes(t.id));
+    return filtered.length ? filtered : tabs;
   }
   return [];
 }
@@ -1254,7 +1353,7 @@ function switchTab(tab){
   }
   if(tab === 'chickens'){ refreshFlockViews(); populateCoopSelectOptions(); }
   if(tab === 'health'){ populateHcCoopSelectOptions(); renderHcSetupInfo(); renderHealthHistory(); }
-  if(tab === 'breeds') renderBreedsList();
+  if(tab === 'breeds'){ if(!editingBreedId) resetBreedForm(); renderBreedsList(); }
   if(tab === 'sales') renderSalesTab();
   if(tab === 'livestock-sales') renderLivestockSalesTab();
   if(tab === 'account') renderAccountTab();
@@ -1332,6 +1431,10 @@ async function logout(){
   currentFlockOwnerId = null;
   currentRole = 'owner';
   state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null };
+  showPoultrySection = true;
+  showLivestockSection = true;
+  hiddenPoultryTabIds = [];
+  hiddenLivestockTabIds = [];
   document.getElementById('app-screen').style.display = 'none';
   document.getElementById('auth-screen').style.display = 'block';
 }
@@ -1341,6 +1444,8 @@ async function onLoggedIn(user){
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app-screen').style.display = 'block';
   document.getElementById('user-email').textContent = user.email;
+  loadMainTabsSettings();
+  applyMainTabsVisibility();
 
   await ensureProfile();
   await acceptPendingInvites();
@@ -1782,10 +1887,23 @@ function renderEggs(){
 }
 
 function renderEggReminder(){
-  const el = document.getElementById('egg-today-reminder');
-  if(!el) return;
   const hasToday = state.eggs.some(e => e.date === todayStr());
-  el.style.display = hasToday ? 'none' : 'block';
+  const el = document.getElementById('egg-today-reminder');
+  if(el) el.style.display = hasToday ? 'none' : 'block';
+  renderOverallEggReminder(hasToday);
+}
+
+function renderOverallEggReminder(hasToday){
+  const el = document.getElementById('overall-egg-reminder');
+  if(!el) return;
+  if(hasToday === undefined) hasToday = state.eggs.some(e => e.date === todayStr());
+  el.style.display = (showPoultrySection && !hasToday) ? 'block' : 'none';
+}
+
+function goToEggCount(){
+  currentCategory = 'poultry';
+  switchTab('eggs');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 // ---------- EGG HISTORY BROWSER ----------
@@ -1881,11 +1999,17 @@ function onBreedAnimalChange(){
   const sel = document.getElementById('breed-animal').value;
   document.getElementById('breed-animal-custom-row').style.display = sel === '__custom' ? 'flex' : 'none';
   const animalType = sel === '__custom' ? (document.getElementById('breed-animal-custom').value.trim() || 'Chicken') : sel;
-  document.getElementById('breed-eggs-row').style.display = categoryForAnimalType(animalType) === 'livestock' ? 'none' : 'flex';
+  const isLivestock = categoryForAnimalType(animalType) === 'livestock';
+  document.getElementById('breed-eggs-row').style.display = isLivestock ? 'none' : 'flex';
+  document.getElementById('breed-name').placeholder = isLivestock ? 'e.g. Shetland' : 'e.g. Cream Legbar';
 }
 
 function resetBreedForm(){
   editingBreedId = null;
+  const breedsSub = document.getElementById('breeds-sub');
+  if(breedsSub) breedsSub.textContent = currentCategory === 'livestock'
+    ? 'Add and edit breed presets per animal type.'
+    : 'Add and edit breed presets per animal type — typical eggs per year and egg colour.';
   document.getElementById('breed-name').value = '';
   populateBreedAnimalTypeOptions(currentCategory, animalTypeOptionsForCategory(currentCategory)[0]);
   document.getElementById('breed-animal-custom-row').style.display = 'none';
@@ -2214,10 +2338,12 @@ function previewImportList(){
 }
 
 function importPreviewSummary(p){
-  return `${[p.tag_colour, p.tag].filter(Boolean).join(' ') || '&mdash;'} &middot; ${escapeHtml(p.animal_type || 'Chicken')} &middot; ${escapeHtml(p.breed || 'Unknown breed')} &middot; ${p.gender}${p.dob ? ' &middot; ' + formatDateNice(p.dob) : ''}${p.expected_eggs_per_year ? ' &middot; ' + p.expected_eggs_per_year + '/yr' : ''}${p.egg_colour ? ' &middot; ' + escapeHtml(p.egg_colour) + ' eggs' : ''}${p.notes ? ' &middot; ' + escapeHtml(p.notes) : ''}`;
+  const isLivestock = categoryForAnimalType(p.animal_type || 'Chicken') === 'livestock';
+  return `${[p.tag_colour, p.tag].filter(Boolean).join(' ') || '&mdash;'} &middot; ${escapeHtml(p.animal_type || 'Chicken')} &middot; ${escapeHtml(p.breed || 'Unknown breed')} &middot; ${p.gender}${p.dob ? ' &middot; ' + formatDateNice(p.dob) : ''}${(!isLivestock && p.expected_eggs_per_year) ? ' &middot; ' + p.expected_eggs_per_year + '/yr' : ''}${(!isLivestock && p.egg_colour) ? ' &middot; ' + escapeHtml(p.egg_colour) + ' eggs' : ''}${p.notes ? ' &middot; ' + escapeHtml(p.notes) : ''}`;
 }
 
 function importPreviewRowHtml(p, i){
+  const isLivestock = categoryForAnimalType(p.animal_type || 'Chicken') === 'livestock';
   return `
   <details class="import-preview-item" data-index="${i}">
     <summary class="import-preview-summary">
@@ -2245,7 +2371,7 @@ function importPreviewRowHtml(p, i){
         </div>
         <div><label>Date of birth</label><input type="date" value="${p.dob || ''}" oninput="updatePendingImport(${i}, 'dob', this.value)"></div>
       </div>
-      <div class="row">
+      <div class="row" id="import-eggs-row-${i}" style="display:${isLivestock ? 'none' : 'flex'};">
         <div><label>Expected eggs / year</label><input type="number" min="0" value="${p.expected_eggs_per_year || ''}" oninput="updatePendingImport(${i}, 'expected_eggs_per_year', this.value === '' ? 0 : Number(this.value))"></div>
         <div><label>Egg colour</label><input type="text" value="${escapeHtml(p.egg_colour)}" oninput="updatePendingImport(${i}, 'egg_colour', this.value)"></div>
       </div>
@@ -2270,6 +2396,10 @@ function updatePendingImport(i, field, value){
     const nameEl = document.getElementById('import-name-' + i);
     if(nameEl) nameEl.textContent = value || 'Unnamed';
   }
+  if(field === 'animal_type'){
+    const row = document.getElementById('import-eggs-row-' + i);
+    if(row) row.style.display = categoryForAnimalType(value || 'Chicken') === 'livestock' ? 'none' : 'flex';
+  }
 }
 
 function removePendingImportRow(i){
@@ -2284,7 +2414,7 @@ function cancelImportPreview(){
 
 async function confirmImportList(){
   if(!pendingImportPayloads.length) return;
-  const payloads = pendingImportPayloads.map(p => ({ ...p, name: p.name || 'Unnamed' }));
+  const payloads = pendingImportPayloads.map(p => ({ ...p, name: p.name || 'Unnamed', category: categoryForAnimalType(p.animal_type || 'Chicken') }));
   const { error } = await sb.from('chickens').insert(payloads);
   if(error){ setStatus('import-status', error.message, true); return; }
 
@@ -2838,6 +2968,7 @@ function renderOverallSectionHtml(category){
 }
 
 function renderOverallPage(){
+  renderOverallEggReminder();
   const poultryEl = document.getElementById('overall-poultry-list');
   const livestockEl = document.getElementById('overall-livestock-list');
   if(poultryEl) poultryEl.innerHTML = renderOverallSectionHtml('poultry');
@@ -4725,6 +4856,30 @@ function renderAccountTab(){
   renderSalesSettingsForm();
   renderLivestockSalesSettingsForm();
   renderSharingTab();
+  renderMainTabsSettingsForm();
+}
+
+function renderMainTabsSettingsForm(){
+  document.getElementById('mt-show-poultry').checked = showPoultrySection;
+  document.getElementById('mt-show-livestock').checked = showLivestockSection;
+  POULTRY_CUSTOMIZABLE_TAB_IDS.forEach(id => {
+    document.getElementById('mt-poultry-' + id).checked = !hiddenPoultryTabIds.includes(id);
+  });
+  LIVESTOCK_CUSTOMIZABLE_TAB_IDS.forEach(id => {
+    document.getElementById('mt-livestock-' + id).checked = !hiddenLivestockTabIds.includes(id);
+  });
+}
+
+function saveMainTabsSettings(){
+  showPoultrySection = document.getElementById('mt-show-poultry').checked;
+  showLivestockSection = document.getElementById('mt-show-livestock').checked;
+  hiddenPoultryTabIds = POULTRY_CUSTOMIZABLE_TAB_IDS.filter(id => !document.getElementById('mt-poultry-' + id).checked);
+  hiddenLivestockTabIds = LIVESTOCK_CUSTOMIZABLE_TAB_IDS.filter(id => !document.getElementById('mt-livestock-' + id).checked);
+  saveMainTabsSettingsToStorage();
+  applyMainTabsVisibility();
+  refreshSectionNav();
+  renderOverallPage();
+  setStatus('main-tabs-status', 'Saved.', false);
 }
 
 async function changePassword(){
