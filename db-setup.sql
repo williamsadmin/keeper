@@ -177,6 +177,11 @@ create table if not exists breeds (
 -- as a dropdown on the animal form once a breed with colours is selected.
 alter table breeds add column if not exists colours text not null default '';
 
+-- Typical age (in weeks) at which this breed starts laying (poultry only).
+-- Used to adjust a bird's contribution to the flock's expected-eggs totals
+-- until they reach point of lay, and to show an expected start date.
+alter table breeds add column if not exists point_of_lay_weeks int not null default 0;
+
 -- ---------- Sales ----------
 -- price_egg/price_half_dozen/price_dozen are per-customer price overrides;
 -- null means "charge this customer the standard price set in sales_settings".

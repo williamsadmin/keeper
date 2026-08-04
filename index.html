@@ -351,7 +351,7 @@
         <div class="stat-card">
           <div class="stat-label">Expected eggs from hens</div>
           <div class="stat-main"><span id="expected-total">0</span> <span style="font-size:14px;color:var(--text-dim);font-family:'Inter',sans-serif;font-weight:400;">/ year</span></div>
-          <div class="stat-sub">~<span id="expected-total-week">0</span> eggs / week across the flock</div>
+          <div class="stat-sub">~<span id="expected-total-week">0</span> eggs / week &middot; ~<span id="expected-total-day">0</span> eggs / day across the flock</div>
         </div>
       </section>
 
@@ -377,6 +377,14 @@
       <section>
         <p class="sec-title" id="coops-section-title">Coops</p>
         <div id="coops-list"></div>
+      </section>
+
+      <section id="age-list-section" style="display:none;">
+        <details>
+          <summary class="sec-title">All Livestock By Age</summary>
+          <p class="share-note" style="margin:10px 0;">Oldest first (ties broken alphabetically), down to youngest.</p>
+          <div id="age-list"></div>
+        </details>
       </section>
     </div>
 
@@ -633,7 +641,7 @@
           <div><label>Egg colour</label><input type="text" id="ch-egg-colour" placeholder="e.g. Blue"></div>
         </div>
         <details id="ch-pedigree-section" style="display:none;">
-          <summary class="sec-title">Pedigree</summary>
+          <summary class="sec-title">Pedigree and/or Lineage</summary>
           <div class="checkbox-row">
             <input type="checkbox" id="ch-registered-pedigree">
             <label for="ch-registered-pedigree">Registered pedigree of this breed</label>
@@ -786,6 +794,9 @@
         <div class="row" id="breed-eggs-row">
           <div><label>Expected eggs / year</label><input type="number" min="0" id="breed-expected" placeholder="e.g. 250"></div>
           <div><label>Egg colour</label><input type="text" id="breed-egg-colour" placeholder="e.g. Blue"></div>
+        </div>
+        <div class="row" id="breed-point-of-lay-row">
+          <div><label>Starts laying at (age in weeks)</label><input type="number" min="0" id="breed-point-of-lay" placeholder="e.g. 20"></div>
         </div>
         <div class="row" id="breed-colours-row" style="display:none;">
           <div><label>Colours (comma separated)</label><input type="text" id="breed-colours" placeholder="e.g. Black, Brown, White"></div>
@@ -1866,6 +1877,7 @@ function rowToBreed(r){
   return {
     id: r.id, name: r.name, animalType: r.animal_type,
     expectedEggsPerYear: Number(r.expected_eggs_per_year) || 0, eggColour: r.egg_colour || '',
+    pointOfLayWeeks: Number(r.point_of_lay_weeks) || 0,
     colours: (r.colours || '').split(',').map(s => s.trim()).filter(Boolean)
   };
 }
@@ -2243,6 +2255,7 @@ function onBreedAnimalChange(){
   const animalType = sel === '__custom' ? (document.getElementById('breed-animal-custom').value.trim() || 'Chicken') : sel;
   const isLivestock = categoryForAnimalType(animalType) === 'livestock';
   document.getElementById('breed-eggs-row').style.display = isLivestock ? 'none' : 'flex';
+  document.getElementById('breed-point-of-lay-row').style.display = isLivestock ? 'none' : 'flex';
   document.getElementById('breed-colours-row').style.display = isLivestock ? 'flex' : 'none';
   document.getElementById('breed-name').placeholder = isLivestock ? 'e.g. Shetland' : 'e.g. Cream Legbar';
 }
@@ -2259,6 +2272,7 @@ function resetBreedForm(){
   document.getElementById('breed-animal-custom').value = '';
   document.getElementById('breed-expected').value = '';
   document.getElementById('breed-egg-colour').value = '';
+  document.getElementById('breed-point-of-lay').value = '';
   document.getElementById('breed-colours').value = '';
   document.getElementById('breed-form-title').textContent = 'Add A Breed';
   document.getElementById('breed-cancel-btn').style.display = 'none';
@@ -2275,6 +2289,7 @@ async function saveBreed(){
     animal_type: animalType,
     expected_eggs_per_year: Number(document.getElementById('breed-expected').value) || 0,
     egg_colour: document.getElementById('breed-egg-colour').value.trim(),
+    point_of_lay_weeks: Number(document.getElementById('breed-point-of-lay').value) || 0,
     colours: document.getElementById('breed-colours').value.split(',').map(s => s.trim()).filter(Boolean).join(', ')
   };
   let error;
@@ -2308,6 +2323,7 @@ function editBreed(id){
   }
   document.getElementById('breed-expected').value = b.expectedEggsPerYear || '';
   document.getElementById('breed-egg-colour').value = b.eggColour || '';
+  document.getElementById('breed-point-of-lay').value = b.pointOfLayWeeks || '';
   document.getElementById('breed-colours').value = (b.colours || []).join(', ');
   document.getElementById('breed-form-title').textContent = 'Edit Breed';
   document.getElementById('breed-cancel-btn').style.display = 'block';
@@ -2347,6 +2363,7 @@ function breedCardHtml(b, readOnly){
       <div class="chicken-grid">
         <div><span class="chicken-label">Expected eggs / yr</span><span>${b.expectedEggsPerYear || '—'}</span></div>
         <div><span class="chicken-label">Egg colour</span><span>${escapeHtml(b.eggColour) || '—'}</span></div>
+        <div><span class="chicken-label">Starts laying at</span><span>${b.pointOfLayWeeks ? b.pointOfLayWeeks + ' weeks' : '—'}</span></div>
       </div>`}
     </div>`;
 }
@@ -2661,7 +2678,7 @@ function onAnimalChange(){
   if(currentCategory === 'livestock') refreshColourOptions();
 }
 
-function calcAge(dobStr){
+function calcAge(dobStr, precision){
   if(!dobStr) return '—';
   const dob = new Date(dobStr + 'T00:00:00');
   const now = new Date();
@@ -2671,6 +2688,10 @@ function calcAge(dobStr){
   let months = now.getMonth() - dob.getMonth();
   if(now.getDate() < dob.getDate()) months -= 1;
   if(months < 0){ years -= 1; months += 12; }
+
+  if(precision === 'year'){
+    return years > 0 ? (years + (years === 1 ? ' year' : ' years')) : 'Less than 1 year';
+  }
 
   if(years === 0 && months === 0){
     const diffDays = Math.floor((now - dob) / 86400000);
@@ -2997,6 +3018,27 @@ function ageInWeeks(dobStr){
   const diffDays = Math.floor((now - dob) / 86400000);
   if(diffDays < 0) return null;
   return diffDays / 7;
+}
+
+// ---------- POINT OF LAY ----------
+function pointOfLayWeeksFor(c){
+  const breed = state.breeds.find(b => b.name === c.breed && b.animalType === (c.animalType || 'Chicken'));
+  return breed ? (Number(breed.pointOfLayWeeks) || 0) : 0;
+}
+
+function isAtPointOfLay(c){
+  const weeks = pointOfLayWeeksFor(c);
+  if(!weeks || !c.dob) return true;
+  const ageW = ageInWeeks(c.dob);
+  return ageW == null ? true : ageW >= weeks;
+}
+
+function pointOfLayDate(c){
+  const weeks = pointOfLayWeeksFor(c);
+  if(!weeks || !c.dob) return null;
+  const d = new Date(c.dob + 'T00:00:00');
+  d.setDate(d.getDate() + weeks * 7);
+  return d.toISOString().slice(0, 10);
 }
 
 function populateTagColourFilterOptions(prefix, birds){
@@ -3414,11 +3456,12 @@ function chickenCardHtml(c, readOnly, returnTab, selectable){
       </div>
       <div class="chicken-grid">
         <div><span class="chicken-label">Tag</span><span>${tagText}</span></div>
-        <div><span class="chicken-label">Age</span><span>${calcAge(c.dob)}</span></div>
+        <div><span class="chicken-label">Age</span><span>${calcAge(c.dob, c.dobPrecision)}</span></div>
         <div><span class="chicken-label">Date of birth</span><span>${formatDobNice(c.dob, c.dobPrecision)}</span></div>
         ${(isMale || c.category === 'livestock') ? '' : `
-        <div><span class="chicken-label">Expected eggs / yr</span><span>${c.expectedEggsPerYear || '—'}</span></div>
-        <div><span class="chicken-label">Egg colour</span><span>${escapeHtml(c.eggColour) || '—'}</span></div>`}
+        <div><span class="chicken-label">Expected eggs / yr</span><span>${isAtPointOfLay(c) ? (c.expectedEggsPerYear || '—') : 'Not laying yet'}</span></div>
+        <div><span class="chicken-label">Egg colour</span><span>${escapeHtml(c.eggColour) || '—'}</span></div>
+        ${!isAtPointOfLay(c) && pointOfLayDate(c) ? `<div><span class="chicken-label">Expected to start laying</span><span>${formatDateNice(pointOfLayDate(c))}</span></div>` : ''}`}
         ${c.isDeceased ? `<div><span class="chicken-label">Deceased</span><span>${c.deceasedDate ? formatDateNice(c.deceasedDate) : '—'}</span></div>` : ''}
       </div>
       ${c.notes ? `<div class="chicken-notes">${escapeHtml(c.notes)}</div>` : ''}
@@ -3438,6 +3481,9 @@ function applyCategoryChrome(){
 
   const summarySection = document.getElementById('myflock-summary-section');
   if(summarySection) summarySection.style.display = isLivestock ? 'none' : 'block';
+
+  const ageListSection = document.getElementById('age-list-section');
+  if(ageListSection) ageListSection.style.display = isLivestock ? 'block' : 'none';
 
   const addCoopSummary = document.getElementById('add-coop-summary');
   if(addCoopSummary) addCoopSummary.textContent = `+ Add A ${word}`;
@@ -3466,9 +3512,10 @@ function renderChickens(){
   const deceasedChickens = state.chickens.filter(c => c.isDeceased && c.category === currentCategory);
 
   const hens = activeChickens.filter(c => !isMaleGender(c.gender));
-  const totalExpected = hens.reduce((s, c) => s + (Number(c.expectedEggsPerYear) || 0), 0);
+  const totalExpected = hens.reduce((s, c) => s + (isAtPointOfLay(c) ? (Number(c.expectedEggsPerYear) || 0) : 0), 0);
   document.getElementById('expected-total').textContent = totalExpected;
   document.getElementById('expected-total-week').textContent = (totalExpected / 52).toFixed(1);
+  document.getElementById('expected-total-day').textContent = (totalExpected / 365).toFixed(1);
 
   populateTagColourFilterOptions('', activeChickens);
   populateAnimalFilterOptions('', activeChickens);
@@ -3491,6 +3538,30 @@ function renderChickens(){
     ? animalTypeGroupsHtml(deceasedChickens, readOnly, false)
     : '<p class="empty">No losses recorded.</p>';
   renderBulkMoveBars();
+
+  if(currentCategory === 'livestock') renderAgeList(activeChickens, readOnly);
+}
+
+function compareAgeThenName(a, b){
+  if(a.dob && b.dob){
+    if(a.dob !== b.dob) return a.dob < b.dob ? -1 : 1;
+  } else if(a.dob && !b.dob){
+    return -1;
+  } else if(!a.dob && b.dob){
+    return 1;
+  }
+  return (a.name || '').localeCompare(b.name || '');
+}
+
+function renderAgeList(activeChickens, readOnly){
+  const el = document.getElementById('age-list');
+  if(!el) return;
+  if(!activeChickens.length){
+    el.innerHTML = '<p class="empty">No animals added yet.</p>';
+    return;
+  }
+  const sorted = activeChickens.slice().sort(compareAgeThenName);
+  el.innerHTML = sorted.map(c => chickenCardHtml(c, readOnly, 'chickens', false)).join('');
 }
 
 function refreshFlockViews(){
@@ -3891,7 +3962,7 @@ function renderHcBirdMatches(){
 }
 
 function hcBirdMetaLine(c){
-  const parts = [c.gender, c.dob ? calcAge(c.dob) : ''].filter(Boolean).map(escapeHtml);
+  const parts = [c.gender, c.dob ? calcAge(c.dob, c.dobPrecision) : ''].filter(Boolean).map(escapeHtml);
   return parts.length ? `<span class="hc-bird-match-meta">${parts.join(' &middot; ')}</span>` : '';
 }
 
@@ -3903,7 +3974,7 @@ function tagBadgeLabel(tag, tagColour){
 function selectHcBird(id){
   const c = hcSession.pool.find(x => String(x.id) === String(id));
   if(!c) return;
-  hcSession.current = { chickenId: c.id, chickenName: animalDisplayName(c), chickenGender: c.gender || '', chickenDob: c.dob || '', items: {} };
+  hcSession.current = { chickenId: c.id, chickenName: animalDisplayName(c), chickenGender: c.gender || '', chickenDob: c.dob || '', chickenDobPrecision: c.dobPrecision || 'day', items: {} };
   document.getElementById('hc-picker-section').style.display = 'none';
   document.getElementById('hc-session-section').style.display = 'block';
   setStatus('hc-status', '', false);
@@ -3914,7 +3985,7 @@ function renderHcCurrentBird(){
   const bird = hcSession.current;
   document.getElementById('hc-session-progress').textContent = `${hcSession.completed.length} of ${hcSession.pool.length} done`;
   document.getElementById('hc-session-bird-name').textContent = bird.chickenName;
-  const metaParts = [bird.chickenGender, bird.chickenDob ? calcAge(bird.chickenDob) : ''].filter(Boolean);
+  const metaParts = [bird.chickenGender, bird.chickenDob ? calcAge(bird.chickenDob, bird.chickenDobPrecision) : ''].filter(Boolean);
   document.getElementById('hc-session-bird-meta').textContent = metaParts.join(' · ');
   renderHealthItems(bird.items);
 }
