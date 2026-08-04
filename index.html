@@ -270,7 +270,7 @@
       </section>
 
       <section>
-        <p class="sec-title">Livestock Groups</p>
+        <p class="sec-title">Livestock Flocks</p>
         <div id="overall-livestock-list"></div>
       </section>
     </div>
@@ -2287,8 +2287,23 @@ function animalTypeOptionsForCategory(category){
   return category === 'livestock' ? LIVESTOCK_ANIMAL_TYPES : POULTRY_ANIMAL_TYPES;
 }
 
-function coopWordFor(category){ return category === 'livestock' ? 'Group' : 'Coop'; }
-function coopWordForPlural(category){ return category === 'livestock' ? 'Groups' : 'Coops'; }
+function coopWordFor(category){ return category === 'livestock' ? 'Flock' : 'Coop'; }
+function coopWordForPlural(category){ return category === 'livestock' ? 'Flocks' : 'Coops'; }
+
+function coopNameById(id){
+  if(!id) return '';
+  const coop = state.coops.find(x => x.id === id);
+  return coop ? coop.name : '';
+}
+
+function animalDisplayName(c){
+  if(!c) return '';
+  if(c.category === 'livestock' && c.coopId){
+    const flockName = coopNameById(c.coopId);
+    if(flockName) return `${flockName} ${c.name}`;
+  }
+  return c.name;
+}
 
 function genderOptionsFor(animalType){
   return GENDER_OPTIONS[animalType] || DEFAULT_GENDER_OPTIONS;
@@ -2946,7 +2961,7 @@ function openChickenDetail(id, presetCoopId, returnTab){
   populateCoopSelectOptions();
   if(id){
     const c = state.chickens.find(x => x.id === id);
-    document.getElementById('chicken-detail-name').textContent = c ? c.name : 'Animal';
+    document.getElementById('chicken-detail-name').textContent = c ? animalDisplayName(c) : 'Animal';
     editChicken(id);
     document.getElementById('chicken-detail-history-section').style.display = 'block';
     renderChickenDetailHistory(id);
@@ -2995,7 +3010,7 @@ function chickenCardHtml(c, readOnly, returnTab, selectable){
         <div class="chicken-card-head-main">
           ${checkboxHtml}
           <div>
-            <div class="chicken-name">${escapeHtml(c.name)}<span class="gender-tag ${genderClass}">${escapeHtml(c.gender || 'Hen')}</span>${c.isDeceased ? '<span class="deceased-tag">Lost</span>' : ''}</div>
+            <div class="chicken-name">${escapeHtml(animalDisplayName(c))}<span class="gender-tag ${genderClass}">${escapeHtml(c.gender || 'Hen')}</span>${c.isDeceased ? '<span class="deceased-tag">Lost</span>' : ''}</div>
             <div class="chicken-meta">${escapeHtml(c.animalType || 'Chicken')} &middot; ${escapeHtml(c.breed || 'Unknown breed')}</div>
           </div>
         </div>
@@ -3392,11 +3407,11 @@ function currentHealthItems(){
 function chickenNameById(id){
   if(!id) return 'Whole flock';
   const c = state.chickens.find(x => x.id === id);
-  return c ? c.name : 'Deleted chicken';
+  return c ? animalDisplayName(c) : 'Deleted chicken';
 }
 
 function hcChickenPoolEntry(c){
-  return { id: c.id, name: c.name, tag: c.tag || '', tagColour: c.tagColour || '', gender: c.gender || '', dob: c.dob || '' };
+  return { id: c.id, name: c.name, tag: c.tag || '', tagColour: c.tagColour || '', gender: c.gender || '', dob: c.dob || '', category: c.category, coopId: c.coopId || null };
 }
 
 function populateHcCoopSelectOptions(){
@@ -3476,7 +3491,7 @@ function renderHcBirdMatches(){
   }
   el.innerHTML = matches.map(c => `
     <button type="button" class="hc-bird-match" onclick="selectHcBird('${c.id}')">
-      <span class="hc-bird-match-name">${escapeHtml(c.name)}${c.tag ? `<span class="hc-bird-match-tag">${escapeHtml(tagBadgeLabel(c.tag, c.tagColour))}</span>` : ''}</span>
+      <span class="hc-bird-match-name">${escapeHtml(animalDisplayName(c))}${c.tag ? `<span class="hc-bird-match-tag">${escapeHtml(tagBadgeLabel(c.tag, c.tagColour))}</span>` : ''}</span>
       ${hcBirdMetaLine(c)}
     </button>
   `).join('');
@@ -3495,7 +3510,7 @@ function tagBadgeLabel(tag, tagColour){
 function selectHcBird(id){
   const c = hcSession.pool.find(x => String(x.id) === String(id));
   if(!c) return;
-  hcSession.current = { chickenId: c.id, chickenName: c.name, chickenGender: c.gender || '', chickenDob: c.dob || '', items: {} };
+  hcSession.current = { chickenId: c.id, chickenName: animalDisplayName(c), chickenGender: c.gender || '', chickenDob: c.dob || '', items: {} };
   document.getElementById('hc-picker-section').style.display = 'none';
   document.getElementById('hc-session-section').style.display = 'block';
   setStatus('hc-status', '', false);
