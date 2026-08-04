@@ -125,6 +125,11 @@ alter table chickens add column if not exists sire_dam text;
 alter table chickens add column if not exists dam_sire text;
 alter table chickens add column if not exists dam_dam text;
 
+-- Livestock only. A breeding/registration flock name chosen per animal,
+-- independent of which physical coop/group they're currently kept in —
+-- shown as a prefix before the animal's own name.
+alter table chickens add column if not exists flock_name text;
+
 create table if not exists health_checks (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,

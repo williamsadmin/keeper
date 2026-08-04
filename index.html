@@ -539,6 +539,18 @@
 
       <section id="chicken-form-section">
         <p class="sec-title" id="chicken-form-title">Add an Animal</p>
+        <div class="row" id="ch-flock-name-wrap" style="display:none;">
+          <div>
+            <label>Flock name</label>
+            <select id="ch-flock-name" onchange="onFlockNameChange()">
+              <option value="">No flock name</option>
+              <option value="__custom">Other (type below)</option>
+            </select>
+          </div>
+        </div>
+        <div class="row" id="ch-flock-name-custom-row" style="display:none;">
+          <div><label>Flock name</label><input type="text" id="ch-flock-name-custom" placeholder="e.g. Hillside Flock"></div>
+        </div>
         <div class="row">
           <div><label>Name</label><input type="text" id="ch-name" placeholder="e.g. Henrietta"></div>
         </div>
@@ -548,7 +560,7 @@
         </div>
         <div class="row">
           <div>
-            <label>Coop</label>
+            <label id="ch-coop-label">Coop</label>
             <select id="ch-coop">
               <option value="">Unassigned</option>
             </select>
@@ -1791,6 +1803,7 @@ function rowToChicken(r){
     eggColour: r.egg_colour, notes: r.notes,
     isDeceased: r.is_deceased, deceasedDate: r.deceased_date,
     coopId: r.coop_id || null,
+    flockName: r.flock_name || '',
     category: r.category || categoryForAnimalType(r.animal_type),
     registeredPedigree: !!r.registered_pedigree,
     sire: r.sire || '', dam: r.dam || '',
@@ -2330,18 +2343,9 @@ function animalTypeOptionsForCategory(category){
 function coopWordFor(category){ return category === 'livestock' ? 'Flock' : 'Coop'; }
 function coopWordForPlural(category){ return category === 'livestock' ? 'Flocks' : 'Coops'; }
 
-function coopNameById(id){
-  if(!id) return '';
-  const coop = state.coops.find(x => x.id === id);
-  return coop ? coop.name : '';
-}
-
 function animalDisplayName(c){
   if(!c) return '';
-  if(c.category === 'livestock' && c.coopId){
-    const flockName = coopNameById(c.coopId);
-    if(flockName) return `${flockName} ${c.name}`;
-  }
+  if(c.category === 'livestock' && c.flockName) return `${c.flockName} ${c.name}`;
   return c.name;
 }
 
@@ -2374,6 +2378,44 @@ function onGenderChange(){
   document.getElementById('ch-colour-wrap').style.display = isLivestock ? 'flex' : 'none';
   if(!isLivestock) document.getElementById('ch-colour-custom-row').style.display = 'none';
   document.getElementById('ch-pedigree-section').style.display = isLivestock ? 'block' : 'none';
+  document.getElementById('ch-coop-label').textContent = coopWordFor(currentCategory);
+  document.getElementById('ch-flock-name-wrap').style.display = isLivestock ? 'flex' : 'none';
+  if(!isLivestock) document.getElementById('ch-flock-name-custom-row').style.display = 'none';
+}
+
+function existingFlockNames(){
+  return Array.from(new Set(state.chickens.filter(c => c.category === 'livestock' && c.flockName).map(c => c.flockName))).sort();
+}
+
+function populateFlockNameOptions(preferredValue){
+  const sel = document.getElementById('ch-flock-name');
+  if(!sel) return;
+  const names = existingFlockNames();
+  let html = '<option value="">No flock name</option>';
+  names.forEach(n => { html += `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`; });
+  html += '<option value="__custom">Other (type below)</option>';
+  sel.innerHTML = html;
+  const customRow = document.getElementById('ch-flock-name-custom-row');
+  const customInput = document.getElementById('ch-flock-name-custom');
+  if(preferredValue && names.includes(preferredValue)){
+    sel.value = preferredValue;
+    customRow.style.display = 'none';
+    customInput.value = '';
+  } else if(preferredValue){
+    sel.value = '__custom';
+    customRow.style.display = 'flex';
+    customInput.value = preferredValue;
+  } else {
+    sel.value = '';
+    customRow.style.display = 'none';
+    customInput.value = '';
+  }
+}
+
+function onFlockNameChange(){
+  const sel = document.getElementById('ch-flock-name').value;
+  document.getElementById('ch-flock-name-custom-row').style.display = sel === '__custom' ? 'flex' : 'none';
+  if(sel !== '__custom') document.getElementById('ch-flock-name-custom').value = '';
 }
 
 function refreshColourOptions(preferredValue){
@@ -2498,6 +2540,7 @@ function populateAnimalTypeOptions(category, preferredValue){
 
 function resetChickenForm(){
   editingChickenId = null;
+  populateFlockNameOptions('');
   document.getElementById('ch-name').value = '';
   document.getElementById('ch-tag').value = '';
   document.getElementById('ch-tag-colour').value = '';
@@ -2561,12 +2604,19 @@ async function saveChicken(){
     colourValue = document.getElementById('ch-tag-colour').value.trim();
   }
 
+  let flockNameValue = '';
+  if(isLivestock){
+    const flockSel = document.getElementById('ch-flock-name').value;
+    flockNameValue = flockSel === '__custom' ? document.getElementById('ch-flock-name-custom').value.trim() : flockSel;
+  }
+
   const { dob, precision: dobPrecision } = readDobFields('ch');
 
   const payload = {
     name,
     tag,
     tag_colour: colourValue,
+    flock_name: flockNameValue,
     coop_id: document.getElementById('ch-coop').value || null,
     animal_type: animalType,
     category: currentCategory,
@@ -2961,6 +3011,7 @@ function editChicken(id){
   if(!c) return;
   editingChickenId = id;
   currentCategory = c.category || categoryForAnimalType(c.animalType || 'Chicken');
+  populateFlockNameOptions(currentCategory === 'livestock' ? (c.flockName || '') : '');
   document.getElementById('ch-name').value = c.name || '';
   document.getElementById('ch-tag').value = c.tag || '';
   document.getElementById('ch-tag-colour').value = currentCategory === 'livestock' ? '' : (c.tagColour || '');
