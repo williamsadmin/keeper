@@ -638,18 +638,42 @@
             <input type="checkbox" id="ch-registered-pedigree">
             <label for="ch-registered-pedigree">Registered pedigree of this breed</label>
           </div>
+          <p class="share-note" style="margin-bottom:10px;">If the sire or dam is already one of your animals, pick them from the list to link the two records together.</p>
           <div class="row">
-            <div><label>Sire (father)</label><input type="text" id="ch-sire" placeholder="e.g. Blackthorn Duke"></div>
-            <div><label>Dam (mother)</label><input type="text" id="ch-dam" placeholder="e.g. Rosie"></div>
+            <div>
+              <label>Sire (father)</label>
+              <select id="ch-sire-select" onchange="onSireChange()">
+                <option value="">Not tracked / unknown</option>
+                <option value="__custom">Type a name (not in this flock)</option>
+              </select>
+            </div>
+            <div>
+              <label>Dam (mother)</label>
+              <select id="ch-dam-select" onchange="onDamChange()">
+                <option value="">Not tracked / unknown</option>
+                <option value="__custom">Type a name (not in this flock)</option>
+              </select>
+            </div>
           </div>
+          <div class="row" id="ch-sire-custom-row" style="display:none;">
+            <div><label>Sire's name</label><input type="text" id="ch-sire-custom" placeholder="e.g. Blackthorn Duke" oninput="refreshRelatednessWarning()"></div>
+          </div>
+          <div class="row" id="ch-dam-custom-row" style="display:none;">
+            <div><label>Dam's name</label><input type="text" id="ch-dam-custom" placeholder="e.g. Rosie" oninput="refreshRelatednessWarning()"></div>
+          </div>
+          <div class="row">
+            <div id="ch-sire-view-wrap" style="display:none;"><button type="button" class="btn secondary full" onclick="viewLinkedParent('sire')">View sire's profile</button></div>
+            <div id="ch-dam-view-wrap" style="display:none;"><button type="button" class="btn secondary full" onclick="viewLinkedParent('dam')">View dam's profile</button></div>
+          </div>
+          <p class="alert-banner" id="ch-related-warning" style="display:none;margin-bottom:10px;"></p>
           <p class="sec-title" style="margin-top:14px;font-size:11px;">Grandparents</p>
           <div class="row">
-            <div><label>Sire's sire</label><input type="text" id="ch-sire-sire" placeholder="Paternal grandsire"></div>
-            <div><label>Sire's dam</label><input type="text" id="ch-sire-dam" placeholder="Paternal granddam"></div>
+            <div><label>Sire's sire</label><input type="text" id="ch-sire-sire" placeholder="Paternal grandsire" oninput="refreshRelatednessWarning()"></div>
+            <div><label>Sire's dam</label><input type="text" id="ch-sire-dam" placeholder="Paternal granddam" oninput="refreshRelatednessWarning()"></div>
           </div>
           <div class="row">
-            <div><label>Dam's sire</label><input type="text" id="ch-dam-sire" placeholder="Maternal grandsire"></div>
-            <div><label>Dam's dam</label><input type="text" id="ch-dam-dam" placeholder="Maternal granddam"></div>
+            <div><label>Dam's sire</label><input type="text" id="ch-dam-sire" placeholder="Maternal grandsire" oninput="refreshRelatednessWarning()"></div>
+            <div><label>Dam's dam</label><input type="text" id="ch-dam-dam" placeholder="Maternal granddam" oninput="refreshRelatednessWarning()"></div>
           </div>
         </details>
         <div class="row">
@@ -1045,198 +1069,222 @@
       <h1>Account</h1>
       <p class="sub">Manage your login, sharing, and sales settings.</p>
 
-      <details>
-        <summary class="sec-title">Signed In As</summary>
-        <p class="share-note" id="account-email-display"></p>
-      </details>
+      <section>
+        <details>
+          <summary class="sec-title">Signed In As</summary>
+          <p class="share-note" id="account-email-display"></p>
+        </details>
+      </section>
 
-      <details>
-        <summary class="sec-title">Change Password</summary>
-        <div class="row">
-          <div><label>New password</label><input type="password" id="account-new-password" autocomplete="new-password"></div>
-        </div>
-        <div class="row">
-          <div><label>Confirm new password</label><input type="password" id="account-confirm-password" autocomplete="new-password"></div>
-        </div>
-        <button class="btn full" onclick="changePassword()">Update password</button>
-        <div class="status" id="account-status"></div>
-      </details>
-
-      <details>
-        <summary class="sec-title">Main Tabs</summary>
-        <p class="share-note" style="margin-bottom:10px;">Choose which of the 4 main tabs show up, and which smaller tabs appear inside Poultry and Livestock.</p>
-        <div class="checkbox-row">
-          <input type="checkbox" id="mt-show-poultry">
-          <label for="mt-show-poultry">Show Poultry tab</label>
-        </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="mt-show-livestock">
-          <label for="mt-show-livestock">Show Livestock tab</label>
-        </div>
-        <p class="sec-title" style="margin-top:14px;font-size:11px;">Poultry Tabs</p>
-        <div class="checkbox-row">
-          <input type="checkbox" id="mt-poultry-eggs">
-          <label for="mt-poultry-eggs">Egg Count</label>
-        </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="mt-poultry-chickens">
-          <label for="mt-poultry-chickens">My Flock</label>
-        </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="mt-poultry-health">
-          <label for="mt-poultry-health">Health Checks</label>
-        </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="mt-poultry-breeds">
-          <label for="mt-poultry-breeds">Breeds</label>
-        </div>
-        <p class="sec-title" style="margin-top:14px;font-size:11px;">Livestock Tabs</p>
-        <div class="checkbox-row">
-          <input type="checkbox" id="mt-livestock-chickens">
-          <label for="mt-livestock-chickens">My Flock</label>
-        </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="mt-livestock-health">
-          <label for="mt-livestock-health">Health Checks</label>
-        </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="mt-livestock-breeds">
-          <label for="mt-livestock-breeds">Breeds</label>
-        </div>
-        <button class="btn full" style="margin-top:4px;" onclick="saveMainTabsSettings()">Save tab settings</button>
-        <div class="status" id="main-tabs-status"></div>
-      </details>
-
-      <details>
-        <summary class="sec-title">Home Quick Links</summary>
-        <p class="share-note" style="margin-bottom:10px;">Choose shortcuts to show on the Home page that jump straight to that section.</p>
-        <div id="home-quick-links-options"></div>
-        <button class="btn full" style="margin-top:4px;" onclick="saveHomeQuickLinks()">Save quick links</button>
-        <div class="status" id="home-quick-links-status"></div>
-      </details>
-
-      <details id="share-viewing-note" style="display:none;">
-        <summary class="sec-title">Access</summary>
-        <p class="share-note" id="share-viewing-note-text"></p>
-      </details>
-
-      <details id="share-default-flock-section" style="display:none;">
-        <summary class="sec-title">Default Flock</summary>
-        <p class="share-note" style="margin-bottom:10px;">Choose which flock this account sees first when logging in &mdash; handy if someone else should always land on a shared flock instead of their own.</p>
-        <div class="row">
-          <div><label>Open this flock by default</label><select id="default-flock-select" onchange="onDefaultFlockChange()"></select></div>
-        </div>
-        <div class="status" id="default-flock-status"></div>
-      </details>
-
-      <details id="share-manage-section" style="display:none;">
-        <summary class="sec-title">Invite Someone</summary>
-        <div class="row">
-          <div><label>Email</label><input type="email" id="share-email" placeholder="them@example.com"></div>
-          <div>
-            <label>Access</label>
-            <select id="share-role">
-              <option value="viewer">Can view</option>
-              <option value="editor">Can edit</option>
-            </select>
-          </div>
-        </div>
-        <button class="btn full" onclick="inviteCollaborator()">Send invite</button>
-        <div class="status" id="share-status"></div>
-      </details>
-
-      <details id="share-list-section" style="display:none;">
-        <summary class="sec-title">People With Access</summary>
-        <div id="collaborator-list"></div>
-      </details>
-
-      <details id="sales-settings-section">
-        <summary class="sec-title">Sales Tracking</summary>
-        <div class="checkbox-row">
-          <input type="checkbox" id="sales-enabled" onchange="onSalesEnabledToggle()">
-          <label for="sales-enabled">Track egg sales to customers</label>
-        </div>
-        <div id="sales-settings-fields" style="display:none;">
-          <div class="checkbox-row">
-            <input type="checkbox" id="sales-allow-egg" onchange="onSalesAllowEggToggle()">
-            <label for="sales-allow-egg">Allow charging per single egg</label>
+      <section>
+        <details>
+          <summary class="sec-title">Change Password</summary>
+          <div class="row">
+            <div><label>New password</label><input type="password" id="account-new-password" autocomplete="new-password"></div>
           </div>
           <div class="row">
+            <div><label>Confirm new password</label><input type="password" id="account-confirm-password" autocomplete="new-password"></div>
+          </div>
+          <button class="btn full" onclick="changePassword()">Update password</button>
+          <div class="status" id="account-status"></div>
+        </details>
+      </section>
+
+      <section>
+        <details>
+          <summary class="sec-title">Main Tabs</summary>
+          <p class="share-note" style="margin-bottom:10px;">Choose which of the 4 main tabs show up, and which smaller tabs appear inside Poultry and Livestock.</p>
+          <div class="checkbox-row">
+            <input type="checkbox" id="mt-show-poultry">
+            <label for="mt-show-poultry">Show Poultry tab</label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="mt-show-livestock">
+            <label for="mt-show-livestock">Show Livestock tab</label>
+          </div>
+          <p class="sec-title" style="margin-top:14px;font-size:11px;">Poultry Tabs</p>
+          <div class="checkbox-row">
+            <input type="checkbox" id="mt-poultry-eggs">
+            <label for="mt-poultry-eggs">Egg Count</label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="mt-poultry-chickens">
+            <label for="mt-poultry-chickens">My Flock</label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="mt-poultry-health">
+            <label for="mt-poultry-health">Health Checks</label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="mt-poultry-breeds">
+            <label for="mt-poultry-breeds">Breeds</label>
+          </div>
+          <p class="sec-title" style="margin-top:14px;font-size:11px;">Livestock Tabs</p>
+          <div class="checkbox-row">
+            <input type="checkbox" id="mt-livestock-chickens">
+            <label for="mt-livestock-chickens">My Flock</label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="mt-livestock-health">
+            <label for="mt-livestock-health">Health Checks</label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="mt-livestock-breeds">
+            <label for="mt-livestock-breeds">Breeds</label>
+          </div>
+          <button class="btn full" style="margin-top:4px;" onclick="saveMainTabsSettings()">Save tab settings</button>
+          <div class="status" id="main-tabs-status"></div>
+        </details>
+      </section>
+
+      <section>
+        <details>
+          <summary class="sec-title">Home Quick Links</summary>
+          <p class="share-note" style="margin-bottom:10px;">Choose shortcuts to show on the Home page that jump straight to that section.</p>
+          <div id="home-quick-links-options"></div>
+          <button class="btn full" style="margin-top:4px;" onclick="saveHomeQuickLinks()">Save quick links</button>
+          <div class="status" id="home-quick-links-status"></div>
+        </details>
+      </section>
+
+      <section id="share-viewing-note" style="display:none;">
+        <details>
+          <summary class="sec-title">Access</summary>
+          <p class="share-note" id="share-viewing-note-text"></p>
+        </details>
+      </section>
+
+      <section id="share-default-flock-section" style="display:none;">
+        <details>
+          <summary class="sec-title">Default Flock</summary>
+          <p class="share-note" style="margin-bottom:10px;">Choose which flock this account sees first when logging in &mdash; handy if someone else should always land on a shared flock instead of their own.</p>
+          <div class="row">
+            <div><label>Open this flock by default</label><select id="default-flock-select" onchange="onDefaultFlockChange()"></select></div>
+          </div>
+          <div class="status" id="default-flock-status"></div>
+        </details>
+      </section>
+
+      <section id="share-manage-section" style="display:none;">
+        <details>
+          <summary class="sec-title">Invite Someone</summary>
+          <div class="row">
+            <div><label>Email</label><input type="email" id="share-email" placeholder="them@example.com"></div>
             <div>
-              <label>Standard unit</label>
-              <select id="sales-standard-unit"></select>
+              <label>Access</label>
+              <select id="share-role">
+                <option value="viewer">Can view</option>
+                <option value="editor">Can edit</option>
+              </select>
             </div>
           </div>
-          <div class="row" id="sales-price-egg-row">
-            <div><label>Price per egg</label><input type="number" min="0" step="0.01" id="sales-price-egg" placeholder="0.00"></div>
+          <button class="btn full" onclick="inviteCollaborator()">Send invite</button>
+          <div class="status" id="share-status"></div>
+        </details>
+      </section>
+
+      <section id="share-list-section" style="display:none;">
+        <details>
+          <summary class="sec-title">People With Access</summary>
+          <div id="collaborator-list"></div>
+        </details>
+      </section>
+
+      <section id="sales-settings-section">
+        <details>
+          <summary class="sec-title">Sales Tracking</summary>
+          <div class="checkbox-row">
+            <input type="checkbox" id="sales-enabled" onchange="onSalesEnabledToggle()">
+            <label for="sales-enabled">Track egg sales to customers</label>
           </div>
-          <div class="row">
-            <div><label>Price per half dozen</label><input type="number" min="0" step="0.01" id="sales-price-half-dozen" placeholder="0.00"></div>
-            <div><label>Price per dozen</label><input type="number" min="0" step="0.01" id="sales-price-dozen" placeholder="0.00"></div>
+          <div id="sales-settings-fields" style="display:none;">
+            <div class="checkbox-row">
+              <input type="checkbox" id="sales-allow-egg" onchange="onSalesAllowEggToggle()">
+              <label for="sales-allow-egg">Allow charging per single egg</label>
+            </div>
+            <div class="row">
+              <div>
+                <label>Standard unit</label>
+                <select id="sales-standard-unit"></select>
+              </div>
+            </div>
+            <div class="row" id="sales-price-egg-row">
+              <div><label>Price per egg</label><input type="number" min="0" step="0.01" id="sales-price-egg" placeholder="0.00"></div>
+            </div>
+            <div class="row">
+              <div><label>Price per half dozen</label><input type="number" min="0" step="0.01" id="sales-price-half-dozen" placeholder="0.00"></div>
+              <div><label>Price per dozen</label><input type="number" min="0" step="0.01" id="sales-price-dozen" placeholder="0.00"></div>
+            </div>
+            <button class="btn full" onclick="saveSalesSettings()">Save sales settings</button>
           </div>
-          <button class="btn full" onclick="saveSalesSettings()">Save sales settings</button>
-        </div>
-        <div class="status" id="sales-settings-status"></div>
-      </details>
+          <div class="status" id="sales-settings-status"></div>
+        </details>
+      </section>
 
-      <details id="livestock-sales-settings-section">
-        <summary class="sec-title">Livestock Sales Tracking</summary>
-        <p class="share-note" style="margin-bottom:10px;">Choose what you sell, and set a standard price for each.</p>
-        <div class="checkbox-row">
-          <input type="checkbox" id="ls-sell-wool" onchange="onLsSettingsToggle()">
-          <label for="ls-sell-wool">Sell wool</label>
-        </div>
-        <div class="row" id="ls-price-wool-row" style="display:none;">
-          <div><label>Price per kg of wool</label><input type="number" min="0" step="0.01" id="ls-price-wool" placeholder="0.00"></div>
-        </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="ls-sell-milk" onchange="onLsSettingsToggle()">
-          <label for="ls-sell-milk">Sell milk</label>
-        </div>
-        <div class="row" id="ls-price-milk-row" style="display:none;">
-          <div><label>Price per litre of milk</label><input type="number" min="0" step="0.01" id="ls-price-milk" placeholder="0.00"></div>
-        </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="ls-sell-meat" onchange="onLsSettingsToggle()">
-          <label for="ls-sell-meat">Sell meat</label>
-        </div>
-        <div class="row" id="ls-price-meat-row" style="display:none;">
-          <div><label>Price per kg of meat</label><input type="number" min="0" step="0.01" id="ls-price-meat" placeholder="0.00"></div>
-        </div>
-        <div class="checkbox-row">
-          <input type="checkbox" id="ls-sell-live-animals" onchange="onLsSettingsToggle()">
-          <label for="ls-sell-live-animals">Sell live animals</label>
-        </div>
-        <div class="row" id="ls-price-live-animal-row" style="display:none;">
-          <div><label>Price per live animal</label><input type="number" min="0" step="0.01" id="ls-price-live-animal" placeholder="0.00"></div>
-        </div>
-        <button class="btn full" onclick="saveLivestockSalesSettings()">Save sales settings</button>
-        <div class="status" id="livestock-sales-settings-status"></div>
-      </details>
-
-      <details id="chicken-import-section">
-        <summary class="sec-title">Import Chickens</summary>
-        <p class="share-note" style="margin-bottom:10px;">Paste one chicken (or duck, quail, etc.) per line. Just a name works, or add details separated by commas: <code>Name, Tag, Tag Colour, Animal, Breed, Gender, DOB (YYYY-MM-DD), Expected Eggs/Year, Egg Colour, Notes</code>. Animal defaults to Chicken if left blank. Anything after the Egg Colour is treated as notes, commas and all.</p>
-        <textarea id="import-list-text" placeholder="Henrietta, 14, Red, Chicken, Rhode Island Red, Hen, 2024-03-15, 280, Blue, Rescued in 2024&#10;Clucky"></textarea>
-        <button class="btn full" style="margin-top:8px;" id="import-preview-btn" onclick="previewImportList()">Preview import</button>
-        <div class="status" id="import-status"></div>
-
-        <div id="import-preview-section" style="display:none;margin-top:14px;">
-          <p class="sec-title" id="import-preview-title">Preview</p>
-          <div id="import-preview-list"></div>
-          <div class="row" style="margin-top:6px;">
-            <div><button class="btn secondary full" onclick="cancelImportPreview()">Cancel</button></div>
-            <div><button class="btn full" id="import-confirm-btn" onclick="confirmImportList()">Confirm import</button></div>
+      <section id="livestock-sales-settings-section">
+        <details>
+          <summary class="sec-title">Livestock Sales Tracking</summary>
+          <p class="share-note" style="margin-bottom:10px;">Choose what you sell, and set a standard price for each.</p>
+          <div class="checkbox-row">
+            <input type="checkbox" id="ls-sell-wool" onchange="onLsSettingsToggle()">
+            <label for="ls-sell-wool">Sell wool</label>
           </div>
-        </div>
-      </details>
+          <div class="row" id="ls-price-wool-row" style="display:none;">
+            <div><label>Price per kg of wool</label><input type="number" min="0" step="0.01" id="ls-price-wool" placeholder="0.00"></div>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="ls-sell-milk" onchange="onLsSettingsToggle()">
+            <label for="ls-sell-milk">Sell milk</label>
+          </div>
+          <div class="row" id="ls-price-milk-row" style="display:none;">
+            <div><label>Price per litre of milk</label><input type="number" min="0" step="0.01" id="ls-price-milk" placeholder="0.00"></div>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="ls-sell-meat" onchange="onLsSettingsToggle()">
+            <label for="ls-sell-meat">Sell meat</label>
+          </div>
+          <div class="row" id="ls-price-meat-row" style="display:none;">
+            <div><label>Price per kg of meat</label><input type="number" min="0" step="0.01" id="ls-price-meat" placeholder="0.00"></div>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="ls-sell-live-animals" onchange="onLsSettingsToggle()">
+            <label for="ls-sell-live-animals">Sell live animals</label>
+          </div>
+          <div class="row" id="ls-price-live-animal-row" style="display:none;">
+            <div><label>Price per live animal</label><input type="number" min="0" step="0.01" id="ls-price-live-animal" placeholder="0.00"></div>
+          </div>
+          <button class="btn full" onclick="saveLivestockSalesSettings()">Save sales settings</button>
+          <div class="status" id="livestock-sales-settings-status"></div>
+        </details>
+      </section>
 
-      <details>
-        <summary class="sec-title" style="color:var(--danger);">Danger Zone</summary>
-        <p class="share-note">Permanently delete your account and everything in it &mdash; eggs, chickens, health checks, and any sharing you've set up. This cannot be undone.</p>
-        <button class="btn danger full" onclick="deleteAccountAndData()">Delete account and data</button>
-        <div class="status" id="delete-account-status"></div>
-      </details>
+      <section id="chicken-import-section">
+        <details>
+          <summary class="sec-title">Import Chickens</summary>
+          <p class="share-note" style="margin-bottom:10px;">Paste one chicken (or duck, quail, etc.) per line. Just a name works, or add details separated by commas: <code>Name, Tag, Tag Colour, Animal, Breed, Gender, DOB (YYYY-MM-DD), Expected Eggs/Year, Egg Colour, Notes</code>. Animal defaults to Chicken if left blank. Anything after the Egg Colour is treated as notes, commas and all.</p>
+          <textarea id="import-list-text" placeholder="Henrietta, 14, Red, Chicken, Rhode Island Red, Hen, 2024-03-15, 280, Blue, Rescued in 2024&#10;Clucky"></textarea>
+          <button class="btn full" style="margin-top:8px;" id="import-preview-btn" onclick="previewImportList()">Preview import</button>
+          <div class="status" id="import-status"></div>
+
+          <div id="import-preview-section" style="display:none;margin-top:14px;">
+            <p class="sec-title" id="import-preview-title">Preview</p>
+            <div id="import-preview-list"></div>
+            <div class="row" style="margin-top:6px;">
+              <div><button class="btn secondary full" onclick="cancelImportPreview()">Cancel</button></div>
+              <div><button class="btn full" id="import-confirm-btn" onclick="confirmImportList()">Confirm import</button></div>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <section>
+        <details>
+          <summary class="sec-title" style="color:var(--danger);">Danger Zone</summary>
+          <p class="share-note">Permanently delete your account and everything in it &mdash; eggs, chickens, health checks, and any sharing you've set up. This cannot be undone.</p>
+          <button class="btn danger full" onclick="deleteAccountAndData()">Delete account and data</button>
+          <div class="status" id="delete-account-status"></div>
+        </details>
+      </section>
     </div>
 
   </div>
@@ -1807,6 +1855,7 @@ function rowToChicken(r){
     category: r.category || categoryForAnimalType(r.animal_type),
     registeredPedigree: !!r.registered_pedigree,
     sire: r.sire || '', dam: r.dam || '',
+    sireId: r.sire_id || null, damId: r.dam_id || null,
     sireSire: r.sire_sire || '', sireDam: r.sire_dam || '',
     damSire: r.dam_sire || '', damDam: r.dam_dam || ''
   };
@@ -2418,6 +2467,107 @@ function onFlockNameChange(){
   if(sel !== '__custom') document.getElementById('ch-flock-name-custom').value = '';
 }
 
+// ---------- PEDIGREE LINKING (LIVESTOCK) ----------
+function otherLivestockAnimals(excludeId){
+  return state.chickens.filter(c => c.category === 'livestock' && c.id !== excludeId).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function populateParentSelect(selectId, excludeId, preferredId){
+  const sel = document.getElementById(selectId);
+  if(!sel) return;
+  const animals = otherLivestockAnimals(excludeId);
+  let html = '<option value="">Not tracked / unknown</option>';
+  animals.forEach(a => { html += `<option value="${a.id}">${escapeHtml(animalDisplayName(a))}</option>`; });
+  html += '<option value="__custom">Type a name (not in this flock)</option>';
+  sel.innerHTML = html;
+  sel.value = animals.some(a => a.id === preferredId) ? preferredId : '';
+}
+
+function onSireChange(){
+  const sel = document.getElementById('ch-sire-select').value;
+  document.getElementById('ch-sire-custom-row').style.display = sel === '__custom' ? 'flex' : 'none';
+  document.getElementById('ch-sire-view-wrap').style.display = (sel && sel !== '__custom') ? 'block' : 'none';
+  if(sel !== '__custom') document.getElementById('ch-sire-custom').value = '';
+  refreshRelatednessWarning();
+}
+
+function onDamChange(){
+  const sel = document.getElementById('ch-dam-select').value;
+  document.getElementById('ch-dam-custom-row').style.display = sel === '__custom' ? 'flex' : 'none';
+  document.getElementById('ch-dam-view-wrap').style.display = (sel && sel !== '__custom') ? 'block' : 'none';
+  if(sel !== '__custom') document.getElementById('ch-dam-custom').value = '';
+  refreshRelatednessWarning();
+}
+
+function viewLinkedParent(which){
+  const sel = document.getElementById(which === 'sire' ? 'ch-sire-select' : 'ch-dam-select').value;
+  if(!sel || sel === '__custom') return;
+  openChickenDetail(sel);
+}
+
+function knownAncestorIds(chickenId, depth){
+  const ids = new Set();
+  function walk(id, remaining){
+    if(!id || remaining <= 0) return;
+    const c = state.chickens.find(x => x.id === id);
+    if(!c) return;
+    if(c.sireId && !ids.has(c.sireId)){ ids.add(c.sireId); walk(c.sireId, remaining - 1); }
+    if(c.damId && !ids.has(c.damId)){ ids.add(c.damId); walk(c.damId, remaining - 1); }
+  }
+  walk(chickenId, depth);
+  return ids;
+}
+
+function refreshRelatednessWarning(){
+  const banner = document.getElementById('ch-related-warning');
+  if(!banner) return;
+  const sireSel = document.getElementById('ch-sire-select').value;
+  const damSel = document.getElementById('ch-dam-select').value;
+  const sireId = sireSel && sireSel !== '__custom' ? sireSel : null;
+  const damId = damSel && damSel !== '__custom' ? damSel : null;
+
+  if(sireId && damId){
+    if(sireId === damId){
+      banner.textContent = "Sire and Dam can't be the same animal.";
+      banner.style.display = 'block';
+      return;
+    }
+    const sire = state.chickens.find(c => c.id === sireId);
+    const dam = state.chickens.find(c => c.id === damId);
+    const sireAncestors = knownAncestorIds(sireId, 3);
+    const damAncestors = knownAncestorIds(damId, 3);
+    if(damAncestors.has(sireId)){
+      banner.textContent = `${sire ? sire.name : 'The sire'} is an ancestor of ${dam ? dam.name : 'the dam'} — this is a related pairing.`;
+      banner.style.display = 'block';
+      return;
+    }
+    if(sireAncestors.has(damId)){
+      banner.textContent = `${dam ? dam.name : 'The dam'} is an ancestor of ${sire ? sire.name : 'the sire'} — this is a related pairing.`;
+      banner.style.display = 'block';
+      return;
+    }
+    const shared = [...sireAncestors].filter(id => damAncestors.has(id));
+    if(shared.length){
+      const sharedNames = shared.map(id => { const c = state.chickens.find(x => x.id === id); return c ? c.name : null; }).filter(Boolean);
+      banner.textContent = `Sire and Dam share a common ancestor${sharedNames.length ? ' (' + sharedNames.join(', ') + ')' : ''} — this is a related pairing.`;
+      banner.style.display = 'block';
+      return;
+    }
+  }
+
+  const gpField = id => (document.getElementById(id).value || '').trim().toLowerCase();
+  const sirePair = [gpField('ch-sire-sire'), gpField('ch-sire-dam')].filter(Boolean);
+  const damPair = [gpField('ch-dam-sire'), gpField('ch-dam-dam')].filter(Boolean);
+  const overlap = sirePair.find(n => damPair.includes(n));
+  if(overlap){
+    banner.textContent = `Sire and Dam appear to share a grandparent ("${overlap}") — this may be a related pairing.`;
+    banner.style.display = 'block';
+    return;
+  }
+
+  banner.style.display = 'none';
+}
+
 function refreshColourOptions(preferredValue){
   const sel = document.getElementById('ch-colour');
   if(!sel) return;
@@ -2559,12 +2709,15 @@ function resetChickenForm(){
   document.getElementById('ch-expected').value = '';
   document.getElementById('ch-egg-colour').value = '';
   document.getElementById('ch-registered-pedigree').checked = false;
-  document.getElementById('ch-sire').value = '';
-  document.getElementById('ch-dam').value = '';
+  populateParentSelect('ch-sire-select', null, '');
+  populateParentSelect('ch-dam-select', null, '');
+  onSireChange();
+  onDamChange();
   document.getElementById('ch-sire-sire').value = '';
   document.getElementById('ch-sire-dam').value = '';
   document.getElementById('ch-dam-sire').value = '';
   document.getElementById('ch-dam-dam').value = '';
+  refreshRelatednessWarning();
   document.getElementById('ch-notes').value = '';
   document.getElementById('ch-deceased').checked = false;
   document.getElementById('ch-deceased-date').value = '';
@@ -2612,6 +2765,18 @@ async function saveChicken(){
 
   const { dob, precision: dobPrecision } = readDobFields('ch');
 
+  let sireId = null, sireText = '';
+  let damId = null, damText = '';
+  if(isLivestock){
+    const sireSel = document.getElementById('ch-sire-select').value;
+    if(sireSel === '__custom'){ sireText = document.getElementById('ch-sire-custom').value.trim(); }
+    else if(sireSel){ sireId = sireSel; const s = state.chickens.find(x => x.id === sireSel); sireText = s ? s.name : ''; }
+
+    const damSel = document.getElementById('ch-dam-select').value;
+    if(damSel === '__custom'){ damText = document.getElementById('ch-dam-custom').value.trim(); }
+    else if(damSel){ damId = damSel; const d = state.chickens.find(x => x.id === damSel); damText = d ? d.name : ''; }
+  }
+
   const payload = {
     name,
     tag,
@@ -2627,8 +2792,10 @@ async function saveChicken(){
     expected_eggs_per_year: Number(document.getElementById('ch-expected').value) || 0,
     egg_colour: document.getElementById('ch-egg-colour').value.trim(),
     registered_pedigree: isLivestock ? document.getElementById('ch-registered-pedigree').checked : false,
-    sire: isLivestock ? document.getElementById('ch-sire').value.trim() : '',
-    dam: isLivestock ? document.getElementById('ch-dam').value.trim() : '',
+    sire: isLivestock ? sireText : '',
+    dam: isLivestock ? damText : '',
+    sire_id: isLivestock ? sireId : null,
+    dam_id: isLivestock ? damId : null,
     sire_sire: isLivestock ? document.getElementById('ch-sire-sire').value.trim() : '',
     sire_dam: isLivestock ? document.getElementById('ch-sire-dam').value.trim() : '',
     dam_sire: isLivestock ? document.getElementById('ch-dam-sire').value.trim() : '',
@@ -3048,12 +3215,34 @@ function editChicken(id){
   document.getElementById('ch-expected').value = c.expectedEggsPerYear || '';
   document.getElementById('ch-egg-colour').value = c.eggColour || '';
   document.getElementById('ch-registered-pedigree').checked = !!c.registeredPedigree;
-  document.getElementById('ch-sire').value = c.sire || '';
-  document.getElementById('ch-dam').value = c.dam || '';
+
+  populateParentSelect('ch-sire-select', id, c.sireId || '');
+  if(!c.sireId && c.sire){
+    document.getElementById('ch-sire-select').value = '__custom';
+    document.getElementById('ch-sire-custom-row').style.display = 'flex';
+    document.getElementById('ch-sire-custom').value = c.sire;
+  } else {
+    document.getElementById('ch-sire-custom-row').style.display = 'none';
+    document.getElementById('ch-sire-custom').value = '';
+  }
+  document.getElementById('ch-sire-view-wrap').style.display = c.sireId ? 'block' : 'none';
+
+  populateParentSelect('ch-dam-select', id, c.damId || '');
+  if(!c.damId && c.dam){
+    document.getElementById('ch-dam-select').value = '__custom';
+    document.getElementById('ch-dam-custom-row').style.display = 'flex';
+    document.getElementById('ch-dam-custom').value = c.dam;
+  } else {
+    document.getElementById('ch-dam-custom-row').style.display = 'none';
+    document.getElementById('ch-dam-custom').value = '';
+  }
+  document.getElementById('ch-dam-view-wrap').style.display = c.damId ? 'block' : 'none';
+
   document.getElementById('ch-sire-sire').value = c.sireSire || '';
   document.getElementById('ch-sire-dam').value = c.sireDam || '';
   document.getElementById('ch-dam-sire').value = c.damSire || '';
   document.getElementById('ch-dam-dam').value = c.damDam || '';
+  refreshRelatednessWarning();
   document.getElementById('ch-notes').value = c.notes || '';
   document.getElementById('ch-deceased').checked = !!c.isDeceased;
   document.getElementById('ch-deceased-date').value = c.deceasedDate || '';

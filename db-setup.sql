@@ -114,12 +114,17 @@ update chickens set category = 'livestock' where animal_type in ('Sheep','Goat',
 -- dob_precision only controls how it's displayed.
 alter table chickens add column if not exists dob_precision text not null default 'day' check (dob_precision in ('day','month','year'));
 
--- Optional pedigree info (livestock only). Sire/dam and grandparents are
--- free-text names rather than links to other animal rows, since the parent
--- may not be tracked in the app at all.
+-- Optional pedigree info (livestock only). Sire/dam are free-text names,
+-- optionally linked to another animal row via sire_id/dam_id when the
+-- parent is also tracked in the app (the text column still gets a copy of
+-- the linked animal's name so display never needs a live join). Grandparents
+-- stay free-text only, since going another generation back is rarely tracked
+-- as its own animal record.
 alter table chickens add column if not exists registered_pedigree boolean not null default false;
 alter table chickens add column if not exists sire text;
 alter table chickens add column if not exists dam text;
+alter table chickens add column if not exists sire_id uuid references chickens(id) on delete set null;
+alter table chickens add column if not exists dam_id uuid references chickens(id) on delete set null;
 alter table chickens add column if not exists sire_sire text;
 alter table chickens add column if not exists sire_dam text;
 alter table chickens add column if not exists dam_sire text;
