@@ -3205,7 +3205,7 @@ function renderCoopsList(){
   const countFor = (coopId) => living.filter(c => (c.coopId || null) === coopId).length;
   const coopsHtml = coopsInCategory.map(c => coopCardHtml(c, countFor(c.id), readOnly)).join('');
   const unassignedCount = countFor(null);
-  const unassignedHtml = `
+  const unassignedHtml = unassignedCount ? `
     <div class="chicken-card" onclick="openCoopDetail('__unassigned')">
       <div class="chicken-card-head">
         <div>
@@ -3213,8 +3213,8 @@ function renderCoopsList(){
           <div class="chicken-meta">${unassignedCount} animal${unassignedCount === 1 ? '' : 's'}</div>
         </div>
       </div>
-    </div>`;
-  el.innerHTML = coopsHtml + unassignedHtml;
+    </div>` : '';
+  el.innerHTML = coopsHtml + unassignedHtml || '<p class="empty">No animals added yet.</p>';
 }
 
 function overallCoopCardHtml(coop, count, category){
@@ -3235,7 +3235,7 @@ function renderOverallSectionHtml(category){
   const countFor = (coopId) => living.filter(c => (c.coopId || null) === coopId).length;
   const coopsHtml = coopsInCategory.map(c => overallCoopCardHtml(c, countFor(c.id), category)).join('');
   const unassignedCount = countFor(null);
-  const unassignedHtml = `
+  const unassignedHtml = unassignedCount ? `
     <div class="chicken-card" onclick="openCoopDetail('__unassigned', '${category}')">
       <div class="chicken-card-head">
         <div>
@@ -3243,8 +3243,8 @@ function renderOverallSectionHtml(category){
           <div class="chicken-meta">${unassignedCount} animal${unassignedCount === 1 ? '' : 's'}</div>
         </div>
       </div>
-    </div>`;
-  return coopsHtml + unassignedHtml;
+    </div>` : '';
+  return coopsHtml + unassignedHtml || `<p class="empty">No ${category === 'livestock' ? 'animals' : 'birds'} yet.</p>`;
 }
 
 function renderOverallPage(){
