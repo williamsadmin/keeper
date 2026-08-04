@@ -102,11 +102,17 @@ alter table chickens add column if not exists is_deceased boolean not null defau
 alter table chickens add column if not exists deceased_date date;
 alter table chickens add column if not exists animal_type text not null default 'Chicken';
 
--- ---------- Categories (Poultry vs Sheep & Goats) ----------
--- Drives the top-level Poultry / Sheep & Goats split. Existing rows default
--- to 'poultry'; Sheep/Goat animal types are backfilled to 'livestock' below.
+-- ---------- Categories (Poultry vs Livestock) ----------
+-- Drives the top-level Poultry / Livestock split. Existing rows default
+-- to 'poultry'; livestock animal types are backfilled to 'livestock' below.
 alter table chickens add column if not exists category text not null default 'poultry' check (category in ('poultry','livestock'));
-update chickens set category = 'livestock' where animal_type in ('Sheep','Goat') and category = 'poultry';
+update chickens set category = 'livestock' where animal_type in ('Sheep','Goat','Cow','Pig') and category = 'poultry';
+
+-- How precisely the date of birth is known — a full date, just a month and
+-- year, or just a year. dob still stores a real date (the 1st of the month,
+-- or 1 Jan of the year) so age/sort calculations keep working unchanged;
+-- dob_precision only controls how it's displayed.
+alter table chickens add column if not exists dob_precision text not null default 'day' check (dob_precision in ('day','month','year'));
 
 create table if not exists health_checks (
   id uuid primary key default gen_random_uuid(),
@@ -145,6 +151,10 @@ create table if not exists breeds (
   egg_colour text,
   created_at timestamptz not null default now()
 );
+
+-- Comma-separated list of colours for this breed (livestock only) — offered
+-- as a dropdown on the animal form once a breed with colours is selected.
+alter table breeds add column if not exists colours text not null default '';
 
 -- ---------- Sales ----------
 -- price_egg/price_half_dozen/price_dozen are per-customer price overrides;

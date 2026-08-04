@@ -409,7 +409,7 @@
           <div><label>Gender</label><select id="filter-gender" onchange="onChickenFilterChange()"><option value="">All</option><option value="Female">Female</option><option value="Male">Male</option></select></div>
         </div>
         <div class="row">
-          <div><label>Tag colour</label><select id="filter-tag-colour" onchange="onChickenFilterChange()"><option value="">All</option></select></div>
+          <div><label id="filter-tag-colour-label">Tag colour</label><select id="filter-tag-colour" onchange="onChickenFilterChange()"><option value="">All</option></select></div>
           <div id="filter-tag-exact-wrap"><label>Tag number</label><input type="number" id="filter-tag-exact" oninput="onChickenFilterChange()" placeholder="e.g. 14"></div>
         </div>
         <div class="row" id="filter-tag-range-row" style="display:none;">
@@ -494,7 +494,7 @@
           <div><label>Gender</label><select id="coop-filter-gender" onchange="onChickenFilterChange('coop-')"><option value="">All</option><option value="Female">Female</option><option value="Male">Male</option></select></div>
         </div>
         <div class="row">
-          <div><label>Tag colour</label><select id="coop-filter-tag-colour" onchange="onChickenFilterChange('coop-')"><option value="">All</option></select></div>
+          <div><label id="coop-filter-tag-colour-label">Tag colour</label><select id="coop-filter-tag-colour" onchange="onChickenFilterChange('coop-')"><option value="">All</option></select></div>
           <div id="coop-filter-tag-exact-wrap"><label>Tag number</label><input type="number" id="coop-filter-tag-exact" oninput="onChickenFilterChange('coop-')" placeholder="e.g. 14"></div>
         </div>
         <div class="row" id="coop-filter-tag-range-row" style="display:none;">
@@ -543,8 +543,18 @@
           <div><label>Name</label><input type="text" id="ch-name" placeholder="e.g. Henrietta"></div>
         </div>
         <div class="row">
-          <div><label>Leg / tag number</label><input type="text" id="ch-tag" placeholder="e.g. 14"></div>
-          <div><label>Tag colour</label><input type="text" id="ch-tag-colour" placeholder="e.g. Red"></div>
+          <div><label id="ch-tag-label">Leg / tag number</label><input type="text" id="ch-tag" placeholder="e.g. 14"></div>
+          <div id="ch-tag-colour-wrap"><label>Tag colour</label><input type="text" id="ch-tag-colour" placeholder="e.g. Red"></div>
+          <div id="ch-colour-wrap" style="display:none;">
+            <label>Colour</label>
+            <select id="ch-colour" onchange="onColourChange()">
+              <option value="">Select colour…</option>
+              <option value="__custom">Other (type below)</option>
+            </select>
+          </div>
+        </div>
+        <div class="row" id="ch-colour-custom-row" style="display:none;">
+          <div><label>Colour name</label><input type="text" id="ch-colour-custom" placeholder="e.g. Piebald"></div>
         </div>
         <div class="row">
           <div>
@@ -586,7 +596,23 @@
             <label>Gender</label>
             <select id="ch-gender" onchange="onGenderChange()"></select>
           </div>
-          <div><label>Date of birth</label><input type="date" id="ch-dob"></div>
+          <div>
+            <label>Know date of birth as</label>
+            <select id="ch-dob-precision" onchange="onDobPrecisionChange('ch')">
+              <option value="day">Full date</option>
+              <option value="month">Month &amp; year</option>
+              <option value="year">Year only</option>
+            </select>
+          </div>
+        </div>
+        <div class="row" id="ch-dob-day-row">
+          <div><label>Date of birth</label><input type="date" id="ch-dob-day"></div>
+        </div>
+        <div class="row" id="ch-dob-month-row" style="display:none;">
+          <div><label>Month of birth</label><input type="month" id="ch-dob-month"></div>
+        </div>
+        <div class="row" id="ch-dob-year-row" style="display:none;">
+          <div><label>Year of birth</label><input type="number" id="ch-dob-year" min="1900" max="2100" placeholder="e.g. 2023"></div>
         </div>
         <div class="row" id="ch-eggs-row">
           <div><label>Expected eggs / year</label><input type="number" min="0" id="ch-expected" placeholder="e.g. 250"></div>
@@ -691,6 +717,9 @@
         <div class="row" id="breed-eggs-row">
           <div><label>Expected eggs / year</label><input type="number" min="0" id="breed-expected" placeholder="e.g. 250"></div>
           <div><label>Egg colour</label><input type="text" id="breed-egg-colour" placeholder="e.g. Blue"></div>
+        </div>
+        <div class="row" id="breed-colours-row" style="display:none;">
+          <div><label>Colours (comma separated)</label><input type="text" id="breed-colours" placeholder="e.g. Black, Brown, White"></div>
         </div>
         <button class="btn full" onclick="saveBreed()">Save breed</button>
         <button class="btn secondary full" id="breed-cancel-btn" style="display:none;margin-top:8px;" onclick="cancelEditBreed()">Cancel edit</button>
@@ -1227,6 +1256,13 @@ function formatDateNice(dateStr){
   return new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function formatDobNice(dobStr, precision){
+  if(!dobStr) return '—';
+  if(precision === 'year') return String(new Date(dobStr + 'T00:00:00').getFullYear());
+  if(precision === 'month') return new Date(dobStr + 'T00:00:00').toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  return formatDateNice(dobStr);
+}
+
 function setStatus(id, msg, isError){
   const el = document.getElementById(id);
   el.textContent = msg;
@@ -1717,7 +1753,8 @@ function rowToEgg(r){ return { id: r.id, date: r.date, total: r.total, cracked: 
 function rowToChicken(r){
   return {
     id: r.id, name: r.name, tag: r.tag, tagColour: r.tag_colour, breed: r.breed,
-    animalType: r.animal_type, gender: r.gender, dob: r.dob, expectedEggsPerYear: r.expected_eggs_per_year,
+    animalType: r.animal_type, gender: r.gender, dob: r.dob, dobPrecision: r.dob_precision || 'day',
+    expectedEggsPerYear: r.expected_eggs_per_year,
     eggColour: r.egg_colour, notes: r.notes,
     isDeceased: r.is_deceased, deceasedDate: r.deceased_date,
     coopId: r.coop_id || null,
@@ -1729,7 +1766,8 @@ function rowToCoop(r){ return { id: r.id, name: r.name, category: r.category || 
 function rowToBreed(r){
   return {
     id: r.id, name: r.name, animalType: r.animal_type,
-    expectedEggsPerYear: Number(r.expected_eggs_per_year) || 0, eggColour: r.egg_colour || ''
+    expectedEggsPerYear: Number(r.expected_eggs_per_year) || 0, eggColour: r.egg_colour || '',
+    colours: (r.colours || '').split(',').map(s => s.trim()).filter(Boolean)
   };
 }
 function rowToCustomer(r){
@@ -2074,16 +2112,17 @@ function populateBreedOptions(animalType, preferredValue){
 function onBreedChange(){
   const sel = document.getElementById('ch-breed').value;
   const customRow = document.getElementById('ch-breed-custom-row');
-  if(sel === '__custom'){ customRow.style.display = 'flex'; return; }
-  customRow.style.display = 'none';
-  if(!sel) return;
-  const animalSel = document.getElementById('ch-animal').value;
-  const animalType = animalSel === '__custom' ? (document.getElementById('ch-animal-custom').value.trim() || 'Chicken') : animalSel;
-  const match = allBreedsForAnimal(animalType).find(b => b.name === sel);
-  if(match){
-    if(match.expectedEggsPerYear) document.getElementById('ch-expected').value = match.expectedEggsPerYear;
-    if(match.eggColour) document.getElementById('ch-egg-colour').value = match.eggColour;
+  customRow.style.display = sel === '__custom' ? 'flex' : 'none';
+  if(sel && sel !== '__custom'){
+    const animalSel = document.getElementById('ch-animal').value;
+    const animalType = animalSel === '__custom' ? (document.getElementById('ch-animal-custom').value.trim() || 'Chicken') : animalSel;
+    const match = allBreedsForAnimal(animalType).find(b => b.name === sel);
+    if(match){
+      if(match.expectedEggsPerYear) document.getElementById('ch-expected').value = match.expectedEggsPerYear;
+      if(match.eggColour) document.getElementById('ch-egg-colour').value = match.eggColour;
+    }
   }
+  if(currentCategory === 'livestock') refreshColourOptions();
 }
 
 // ---------- BREEDS TAB ----------
@@ -2100,6 +2139,7 @@ function onBreedAnimalChange(){
   const animalType = sel === '__custom' ? (document.getElementById('breed-animal-custom').value.trim() || 'Chicken') : sel;
   const isLivestock = categoryForAnimalType(animalType) === 'livestock';
   document.getElementById('breed-eggs-row').style.display = isLivestock ? 'none' : 'flex';
+  document.getElementById('breed-colours-row').style.display = isLivestock ? 'flex' : 'none';
   document.getElementById('breed-name').placeholder = isLivestock ? 'e.g. Shetland' : 'e.g. Cream Legbar';
 }
 
@@ -2115,6 +2155,7 @@ function resetBreedForm(){
   document.getElementById('breed-animal-custom').value = '';
   document.getElementById('breed-expected').value = '';
   document.getElementById('breed-egg-colour').value = '';
+  document.getElementById('breed-colours').value = '';
   document.getElementById('breed-form-title').textContent = 'Add A Breed';
   document.getElementById('breed-cancel-btn').style.display = 'none';
   onBreedAnimalChange();
@@ -2129,7 +2170,8 @@ async function saveBreed(){
     name,
     animal_type: animalType,
     expected_eggs_per_year: Number(document.getElementById('breed-expected').value) || 0,
-    egg_colour: document.getElementById('breed-egg-colour').value.trim()
+    egg_colour: document.getElementById('breed-egg-colour').value.trim(),
+    colours: document.getElementById('breed-colours').value.split(',').map(s => s.trim()).filter(Boolean).join(', ')
   };
   let error;
   if(editingBreedId){
@@ -2162,6 +2204,7 @@ function editBreed(id){
   }
   document.getElementById('breed-expected').value = b.expectedEggsPerYear || '';
   document.getElementById('breed-egg-colour').value = b.eggColour || '';
+  document.getElementById('breed-colours').value = (b.colours || []).join(', ');
   document.getElementById('breed-form-title').textContent = 'Edit Breed';
   document.getElementById('breed-cancel-btn').style.display = 'block';
   onBreedAnimalChange();
@@ -2194,7 +2237,9 @@ function breedCardHtml(b, readOnly){
           <button class="icon-btn danger" onclick="event.stopPropagation(); deleteBreed('${b.id}')" aria-label="Delete">&#10005;</button>
         </div>` : ''}
       </div>
-      ${categoryForAnimalType(b.animalType) === 'livestock' ? '' : `
+      ${categoryForAnimalType(b.animalType) === 'livestock'
+        ? (b.colours && b.colours.length ? `<div class="chicken-meta">Colours: ${escapeHtml(b.colours.join(', '))}</div>` : '')
+        : `
       <div class="chicken-grid">
         <div><span class="chicken-label">Expected eggs / yr</span><span>${b.expectedEggsPerYear || '—'}</span></div>
         <div><span class="chicken-label">Egg colour</span><span>${escapeHtml(b.eggColour) || '—'}</span></div>
@@ -2265,8 +2310,79 @@ function currentAnimalFormType(){
 
 function onGenderChange(){
   const male = isMaleGender(document.getElementById('ch-gender').value);
-  const isLivestock = categoryForAnimalType(currentAnimalFormType()) === 'livestock';
+  const isLivestock = currentCategory === 'livestock';
   document.getElementById('ch-eggs-row').style.display = (male || isLivestock) ? 'none' : 'flex';
+  document.getElementById('ch-tag-label').textContent = isLivestock ? 'Tag number' : 'Leg / tag number';
+  document.getElementById('ch-tag-colour-wrap').style.display = isLivestock ? 'none' : '';
+  document.getElementById('ch-colour-wrap').style.display = isLivestock ? '' : 'none';
+  if(!isLivestock) document.getElementById('ch-colour-custom-row').style.display = 'none';
+}
+
+function refreshColourOptions(preferredValue){
+  const sel = document.getElementById('ch-colour');
+  if(!sel) return;
+  const animalSel = document.getElementById('ch-animal').value;
+  const animalType = animalSel === '__custom' ? (document.getElementById('ch-animal-custom').value.trim() || 'Chicken') : animalSel;
+  const breedSel = document.getElementById('ch-breed').value;
+  const breedName = breedSel === '__custom' ? '' : breedSel;
+  const breed = allBreedsForAnimal(animalType).find(b => b.name === breedName);
+  const colours = (breed && breed.colours) || [];
+  let html = '<option value="">Select colour…</option>';
+  colours.forEach(c => { html += `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`; });
+  html += '<option value="__custom">Other (type below)</option>';
+  sel.innerHTML = html;
+  const customRow = document.getElementById('ch-colour-custom-row');
+  const customInput = document.getElementById('ch-colour-custom');
+  if(preferredValue && colours.includes(preferredValue)){
+    sel.value = preferredValue;
+    customRow.style.display = 'none';
+    customInput.value = '';
+  } else if(preferredValue){
+    sel.value = '__custom';
+    customRow.style.display = 'flex';
+    customInput.value = preferredValue;
+  } else {
+    sel.value = '';
+    customRow.style.display = 'none';
+    customInput.value = '';
+  }
+}
+
+function onColourChange(){
+  const sel = document.getElementById('ch-colour').value;
+  document.getElementById('ch-colour-custom-row').style.display = sel === '__custom' ? 'flex' : 'none';
+  if(sel !== '__custom') document.getElementById('ch-colour-custom').value = '';
+}
+
+// ---------- PARTIAL DATE OF BIRTH (full date / month+year / year only) ----------
+function onDobPrecisionChange(idPrefix){
+  const p = document.getElementById(idPrefix + '-dob-precision').value;
+  document.getElementById(idPrefix + '-dob-day-row').style.display = p === 'day' ? 'flex' : 'none';
+  document.getElementById(idPrefix + '-dob-month-row').style.display = p === 'month' ? 'flex' : 'none';
+  document.getElementById(idPrefix + '-dob-year-row').style.display = p === 'year' ? 'flex' : 'none';
+}
+
+function readDobFields(idPrefix){
+  const precision = document.getElementById(idPrefix + '-dob-precision').value;
+  if(precision === 'year'){
+    const y = document.getElementById(idPrefix + '-dob-year').value;
+    return { dob: y ? `${y}-01-01` : null, precision: 'year' };
+  }
+  if(precision === 'month'){
+    const m = document.getElementById(idPrefix + '-dob-month').value;
+    return { dob: m ? `${m}-01` : null, precision: 'month' };
+  }
+  const d = document.getElementById(idPrefix + '-dob-day').value;
+  return { dob: d || null, precision: 'day' };
+}
+
+function setDobFields(idPrefix, dobStr, precision){
+  const p = precision || 'day';
+  document.getElementById(idPrefix + '-dob-precision').value = p;
+  document.getElementById(idPrefix + '-dob-day').value = p === 'day' ? (dobStr || '') : '';
+  document.getElementById(idPrefix + '-dob-month').value = (p === 'month' && dobStr) ? dobStr.slice(0, 7) : '';
+  document.getElementById(idPrefix + '-dob-year').value = (p === 'year' && dobStr) ? dobStr.slice(0, 4) : '';
+  onDobPrecisionChange(idPrefix);
 }
 
 function normalizeGenderInput(genderInput, animalType){
@@ -2292,6 +2408,7 @@ function onAnimalChange(){
   populateBreedOptions(animalType, '');
   document.getElementById('ch-breed-custom-row').style.display = 'none';
   document.getElementById('ch-breed-custom').value = '';
+  if(currentCategory === 'livestock') refreshColourOptions();
 }
 
 function calcAge(dobStr){
@@ -2336,7 +2453,8 @@ function resetChickenForm(){
   document.getElementById('ch-breed-custom').value = '';
   populateGenderOptions(defaultType, genderOptionsFor(defaultType)[0]);
   onGenderChange();
-  document.getElementById('ch-dob').value = '';
+  refreshColourOptions();
+  setDobFields('ch', '', 'day');
   document.getElementById('ch-expected').value = '';
   document.getElementById('ch-egg-colour').value = '';
   document.getElementById('ch-notes').value = '';
@@ -2369,16 +2487,28 @@ async function saveChicken(){
 
   const isDeceased = document.getElementById('ch-deceased').checked;
 
+  const isLivestock = currentCategory === 'livestock';
+  let colourValue;
+  if(isLivestock){
+    const colourSel = document.getElementById('ch-colour').value;
+    colourValue = colourSel === '__custom' ? document.getElementById('ch-colour-custom').value.trim() : colourSel;
+  } else {
+    colourValue = document.getElementById('ch-tag-colour').value.trim();
+  }
+
+  const { dob, precision: dobPrecision } = readDobFields('ch');
+
   const payload = {
     name,
     tag,
-    tag_colour: document.getElementById('ch-tag-colour').value.trim(),
+    tag_colour: colourValue,
     coop_id: document.getElementById('ch-coop').value || null,
     animal_type: animalType,
-    category: categoryForAnimalType(animalType),
+    category: currentCategory,
     breed,
     gender: document.getElementById('ch-gender').value,
-    dob: document.getElementById('ch-dob').value || null,
+    dob,
+    dob_precision: dobPrecision,
     expected_eggs_per_year: Number(document.getElementById('ch-expected').value) || 0,
     egg_colour: document.getElementById('ch-egg-colour').value.trim(),
     notes: document.getElementById('ch-notes').value.trim(),
@@ -2404,6 +2534,14 @@ function findBreedMatch(breedInput, animalType){
   return allBreedsForAnimal(animalType || 'Chicken').find(b => b.name.toLowerCase() === breedInput.trim().toLowerCase()) || null;
 }
 
+function parseDobInput(dobInput){
+  const trimmed = (dobInput || '').trim();
+  if(!trimmed) return { dob: null, precision: 'day' };
+  if(/^\d{4}$/.test(trimmed)) return { dob: `${trimmed}-01-01`, precision: 'year' };
+  if(/^\d{4}-\d{2}$/.test(trimmed)) return { dob: `${trimmed}-01`, precision: 'month' };
+  return { dob: trimmed, precision: 'day' };
+}
+
 function previewImportList(){
   const raw = document.getElementById('import-list-text').value;
   const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
@@ -2418,6 +2556,7 @@ function previewImportList(){
     const breed = (matchedBreed ? matchedBreed.name : breedInput) || '';
     const explicitExpected = expectedInput !== undefined && expectedInput !== '' ? Number(expectedInput) : null;
     const expected = (explicitExpected != null && !isNaN(explicitExpected)) ? explicitExpected : (matchedBreed ? matchedBreed.expectedEggsPerYear : 0);
+    const { dob: parsedDob, precision: dobPrecision } = parseDobInput(dob);
     return {
       owner_id: currentFlockOwnerId,
       name: name || tag || 'Unnamed',
@@ -2426,7 +2565,8 @@ function previewImportList(){
       animal_type: animalType,
       breed,
       gender: normalizeGenderInput(genderInput, animalType),
-      dob: dob || null,
+      dob: parsedDob,
+      dob_precision: dobPrecision,
       expected_eggs_per_year: expected,
       egg_colour: eggColourInput || '',
       notes
@@ -2440,7 +2580,7 @@ function previewImportList(){
 
 function importPreviewSummary(p){
   const isLivestock = categoryForAnimalType(p.animal_type || 'Chicken') === 'livestock';
-  return `${[p.tag_colour, p.tag].filter(Boolean).join(' ') || '&mdash;'} &middot; ${escapeHtml(p.animal_type || 'Chicken')} &middot; ${escapeHtml(p.breed || 'Unknown breed')} &middot; ${p.gender}${p.dob ? ' &middot; ' + formatDateNice(p.dob) : ''}${(!isLivestock && p.expected_eggs_per_year) ? ' &middot; ' + p.expected_eggs_per_year + '/yr' : ''}${(!isLivestock && p.egg_colour) ? ' &middot; ' + escapeHtml(p.egg_colour) + ' eggs' : ''}${p.notes ? ' &middot; ' + escapeHtml(p.notes) : ''}`;
+  return `${[p.tag_colour, p.tag].filter(Boolean).join(' ') || '&mdash;'} &middot; ${escapeHtml(p.animal_type || 'Chicken')} &middot; ${escapeHtml(p.breed || 'Unknown breed')} &middot; ${p.gender}${p.dob ? ' &middot; ' + formatDobNice(p.dob, p.dob_precision) : ''}${(!isLivestock && p.expected_eggs_per_year) ? ' &middot; ' + p.expected_eggs_per_year + '/yr' : ''}${(!isLivestock && p.egg_colour) ? ' &middot; ' + escapeHtml(p.egg_colour) + ' eggs' : ''}${p.notes ? ' &middot; ' + escapeHtml(p.notes) : ''}`;
 }
 
 function importPreviewRowHtml(p, i){
@@ -2454,10 +2594,10 @@ function importPreviewRowHtml(p, i){
     <div class="import-preview-edit">
       <div class="row">
         <div><label>Name</label><input type="text" value="${escapeHtml(p.name)}" oninput="updatePendingImport(${i}, 'name', this.value)"></div>
-        <div><label>Leg / tag number</label><input type="text" value="${escapeHtml(p.tag)}" oninput="updatePendingImport(${i}, 'tag', this.value)"></div>
+        <div><label id="import-tag-label-${i}">${isLivestock ? 'Tag number' : 'Leg / tag number'}</label><input type="text" value="${escapeHtml(p.tag)}" oninput="updatePendingImport(${i}, 'tag', this.value)"></div>
       </div>
       <div class="row">
-        <div><label>Tag colour</label><input type="text" value="${escapeHtml(p.tag_colour)}" oninput="updatePendingImport(${i}, 'tag_colour', this.value)"></div>
+        <div><label id="import-colour-label-${i}">${isLivestock ? 'Colour' : 'Tag colour'}</label><input type="text" value="${escapeHtml(p.tag_colour)}" oninput="updatePendingImport(${i}, 'tag_colour', this.value)"></div>
         <div><label>Animal</label><input type="text" value="${escapeHtml(p.animal_type || 'Chicken')}" oninput="updatePendingImport(${i}, 'animal_type', this.value)"></div>
       </div>
       <div class="row">
@@ -2470,7 +2610,23 @@ function importPreviewRowHtml(p, i){
             ${genderOptionsHtml(p.animal_type || 'Chicken', p.gender)}
           </select>
         </div>
-        <div><label>Date of birth</label><input type="date" value="${p.dob || ''}" oninput="updatePendingImport(${i}, 'dob', this.value)"></div>
+        <div>
+          <label>Know date of birth as</label>
+          <select id="import-${i}-dob-precision" onchange="onImportDobChange(${i})">
+            <option value="day" ${(!p.dob_precision || p.dob_precision === 'day') ? 'selected' : ''}>Full date</option>
+            <option value="month" ${p.dob_precision === 'month' ? 'selected' : ''}>Month &amp; year</option>
+            <option value="year" ${p.dob_precision === 'year' ? 'selected' : ''}>Year only</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" id="import-${i}-dob-day-row" style="display:${(!p.dob_precision || p.dob_precision === 'day') ? 'flex' : 'none'};">
+        <div><label>Date of birth</label><input type="date" id="import-${i}-dob-day" value="${(!p.dob_precision || p.dob_precision === 'day') ? (p.dob || '') : ''}" oninput="onImportDobChange(${i})"></div>
+      </div>
+      <div class="row" id="import-${i}-dob-month-row" style="display:${p.dob_precision === 'month' ? 'flex' : 'none'};">
+        <div><label>Month of birth</label><input type="month" id="import-${i}-dob-month" value="${p.dob_precision === 'month' ? (p.dob || '').slice(0, 7) : ''}" oninput="onImportDobChange(${i})"></div>
+      </div>
+      <div class="row" id="import-${i}-dob-year-row" style="display:${p.dob_precision === 'year' ? 'flex' : 'none'};">
+        <div><label>Year of birth</label><input type="number" id="import-${i}-dob-year" min="1900" max="2100" placeholder="e.g. 2023" value="${p.dob_precision === 'year' ? (p.dob || '').slice(0, 4) : ''}" oninput="onImportDobChange(${i})"></div>
       </div>
       <div class="row" id="import-eggs-row-${i}" style="display:${isLivestock ? 'none' : 'flex'};">
         <div><label>Expected eggs / year</label><input type="number" min="0" value="${p.expected_eggs_per_year || ''}" oninput="updatePendingImport(${i}, 'expected_eggs_per_year', this.value === '' ? 0 : Number(this.value))"></div>
@@ -2498,9 +2654,24 @@ function updatePendingImport(i, field, value){
     if(nameEl) nameEl.textContent = value || 'Unnamed';
   }
   if(field === 'animal_type'){
+    const isLivestock = categoryForAnimalType(value || 'Chicken') === 'livestock';
     const row = document.getElementById('import-eggs-row-' + i);
-    if(row) row.style.display = categoryForAnimalType(value || 'Chicken') === 'livestock' ? 'none' : 'flex';
+    if(row) row.style.display = isLivestock ? 'none' : 'flex';
+    const tagLabel = document.getElementById('import-tag-label-' + i);
+    if(tagLabel) tagLabel.textContent = isLivestock ? 'Tag number' : 'Leg / tag number';
+    const colourLabel = document.getElementById('import-colour-label-' + i);
+    if(colourLabel) colourLabel.textContent = isLivestock ? 'Colour' : 'Tag colour';
   }
+}
+
+function onImportDobChange(i){
+  const idPrefix = 'import-' + i;
+  onDobPrecisionChange(idPrefix);
+  const { dob, precision } = readDobFields(idPrefix);
+  pendingImportPayloads[i].dob = dob;
+  pendingImportPayloads[i].dob_precision = precision;
+  const summaryEl = document.getElementById('import-summary-' + i);
+  if(summaryEl) summaryEl.innerHTML = importPreviewSummary(pendingImportPayloads[i]);
 }
 
 function removePendingImportRow(i){
@@ -2717,14 +2888,15 @@ function editChicken(id){
   const c = state.chickens.find(x => x.id === id);
   if(!c) return;
   editingChickenId = id;
+  currentCategory = c.category || categoryForAnimalType(c.animalType || 'Chicken');
   document.getElementById('ch-name').value = c.name || '';
   document.getElementById('ch-tag').value = c.tag || '';
-  document.getElementById('ch-tag-colour').value = c.tagColour || '';
+  document.getElementById('ch-tag-colour').value = currentCategory === 'livestock' ? '' : (c.tagColour || '');
   populateCoopSelectOptions();
   document.getElementById('ch-coop').value = c.coopId || '';
 
   const animalValue = c.animalType || 'Chicken';
-  populateAnimalTypeOptions(categoryForAnimalType(animalValue), animalValue);
+  populateAnimalTypeOptions(currentCategory, animalValue);
   const animalSel = document.getElementById('ch-animal');
   const hasAnimalPreset = Array.from(animalSel.options).some(o => o.value === animalValue);
   if(hasAnimalPreset){
@@ -2748,7 +2920,8 @@ function editChicken(id){
 
   populateGenderOptions(animalValue, c.gender || '');
   onGenderChange();
-  document.getElementById('ch-dob').value = c.dob || '';
+  refreshColourOptions(currentCategory === 'livestock' ? (c.tagColour || '') : '');
+  setDobFields('ch', c.dob || '', c.dobPrecision || 'day');
   document.getElementById('ch-expected').value = c.expectedEggsPerYear || '';
   document.getElementById('ch-egg-colour').value = c.eggColour || '';
   document.getElementById('ch-notes').value = c.notes || '';
@@ -2832,7 +3005,7 @@ function chickenCardHtml(c, readOnly, returnTab, selectable){
       <div class="chicken-grid">
         <div><span class="chicken-label">Tag</span><span>${tagText}</span></div>
         <div><span class="chicken-label">Age</span><span>${calcAge(c.dob)}</span></div>
-        <div><span class="chicken-label">Date of birth</span><span>${c.dob ? formatDateNice(c.dob) : '—'}</span></div>
+        <div><span class="chicken-label">Date of birth</span><span>${formatDobNice(c.dob, c.dobPrecision)}</span></div>
         ${(isMale || c.category === 'livestock') ? '' : `
         <div><span class="chicken-label">Expected eggs / yr</span><span>${c.expectedEggsPerYear || '—'}</span></div>
         <div><span class="chicken-label">Egg colour</span><span>${escapeHtml(c.eggColour) || '—'}</span></div>`}
@@ -2867,6 +3040,12 @@ function applyCategoryChrome(){
 
   const animalSearchBack = document.getElementById('animal-search-back-label');
   if(animalSearchBack) animalSearchBack.textContent = backLabel;
+
+  const colourLabelText = isLivestock ? 'Colour' : 'Tag colour';
+  const filterColourLabel = document.getElementById('filter-tag-colour-label');
+  if(filterColourLabel) filterColourLabel.textContent = colourLabelText;
+  const coopFilterColourLabel = document.getElementById('coop-filter-tag-colour-label');
+  if(coopFilterColourLabel) coopFilterColourLabel.textContent = colourLabelText;
 }
 
 function renderChickens(){
