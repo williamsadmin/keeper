@@ -114,6 +114,17 @@ update chickens set category = 'livestock' where animal_type in ('Sheep','Goat',
 -- dob_precision only controls how it's displayed.
 alter table chickens add column if not exists dob_precision text not null default 'day' check (dob_precision in ('day','month','year'));
 
+-- Optional pedigree info (livestock only). Sire/dam and grandparents are
+-- free-text names rather than links to other animal rows, since the parent
+-- may not be tracked in the app at all.
+alter table chickens add column if not exists registered_pedigree boolean not null default false;
+alter table chickens add column if not exists sire text;
+alter table chickens add column if not exists dam text;
+alter table chickens add column if not exists sire_sire text;
+alter table chickens add column if not exists sire_dam text;
+alter table chickens add column if not exists dam_sire text;
+alter table chickens add column if not exists dam_dam text;
+
 create table if not exists health_checks (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
@@ -245,6 +256,20 @@ create table if not exists livestock_sales (
   created_at timestamptz not null default now()
 );
 
+-- ---------- Offspring (livestock) ----------
+-- One row per animal per year, with a running male/female young count
+-- adjusted with +/- in the UI rather than re-entered each time.
+create table if not exists offspring_records (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  chicken_id uuid not null references chickens(id) on delete cascade,
+  year int not null,
+  male_count int not null default 0,
+  female_count int not null default 0,
+  created_at timestamptz not null default now(),
+  unique (chicken_id, year)
+);
+
 -- ---------- Account deletion ----------
 -- Lets a signed-in user permanently delete their own account. All of
 -- profiles, collaborators (both as owner and as an accepted
@@ -278,6 +303,7 @@ alter table customer_credits enable row level security;
 alter table sales_settings enable row level security;
 alter table livestock_sales_settings enable row level security;
 alter table livestock_sales enable row level security;
+alter table offspring_records enable row level security;
 
 -- profiles: readable by any signed-in user (needed to resolve owner emails
 -- in the sharing UI); only the owner can update their own row.
@@ -397,3 +423,12 @@ drop policy if exists "livestock_sales_settings write" on livestock_sales_settin
 create policy "livestock_sales_settings write" on livestock_sales_settings for insert with check (has_flock_access(owner_id, 'editor'));
 drop policy if exists "livestock_sales_settings update" on livestock_sales_settings;
 create policy "livestock_sales_settings update" on livestock_sales_settings for update using (has_flock_access(owner_id, 'editor'));
+
+drop policy if exists "offspring_records read" on offspring_records;
+create policy "offspring_records read" on offspring_records for select using (has_flock_access(owner_id));
+drop policy if exists "offspring_records write" on offspring_records;
+create policy "offspring_records write" on offspring_records for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "offspring_records update" on offspring_records;
+create policy "offspring_records update" on offspring_records for update using (has_flock_access(owner_id, 'editor'));
+drop policy if exists "offspring_records delete" on offspring_records;
+create policy "offspring_records delete" on offspring_records for delete using (has_flock_access(owner_id, 'editor'));

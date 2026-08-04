@@ -472,8 +472,8 @@
         </div>
       </section>
 
-      <section id="coop-filter-section">
-        <p class="sec-title">Filter &amp; Sort</p>
+      <details id="coop-filter-section">
+        <summary class="sec-title">Filter &amp; Sort</summary>
         <div class="row">
           <div>
             <label>Sort by</label>
@@ -507,7 +507,7 @@
           <div><label>Age (weeks) to</label><input type="number" min="0" id="coop-filter-age-to" oninput="onChickenFilterChange('coop-')" placeholder="e.g. 100"></div>
         </div>
         <button class="btn secondary full" onclick="clearChickenFilters('coop-')">Clear filters</button>
-      </section>
+      </details>
 
       <section>
         <p class="sec-title" id="coop-detail-list-title">Birds In This Coop</p>
@@ -620,6 +620,26 @@
           <div><label>Expected eggs / year</label><input type="number" min="0" id="ch-expected" placeholder="e.g. 250"></div>
           <div><label>Egg colour</label><input type="text" id="ch-egg-colour" placeholder="e.g. Blue"></div>
         </div>
+        <details id="ch-pedigree-section" style="display:none;">
+          <summary class="sec-title">Pedigree</summary>
+          <div class="checkbox-row">
+            <input type="checkbox" id="ch-registered-pedigree">
+            <label for="ch-registered-pedigree">Registered pedigree of this breed</label>
+          </div>
+          <div class="row">
+            <div><label>Sire (father)</label><input type="text" id="ch-sire" placeholder="e.g. Blackthorn Duke"></div>
+            <div><label>Dam (mother)</label><input type="text" id="ch-dam" placeholder="e.g. Rosie"></div>
+          </div>
+          <p class="sec-title" style="margin-top:14px;font-size:11px;">Grandparents</p>
+          <div class="row">
+            <div><label>Sire's sire</label><input type="text" id="ch-sire-sire" placeholder="Paternal grandsire"></div>
+            <div><label>Sire's dam</label><input type="text" id="ch-sire-dam" placeholder="Paternal granddam"></div>
+          </div>
+          <div class="row">
+            <div><label>Dam's sire</label><input type="text" id="ch-dam-sire" placeholder="Maternal grandsire"></div>
+            <div><label>Dam's dam</label><input type="text" id="ch-dam-dam" placeholder="Maternal granddam"></div>
+          </div>
+        </details>
         <div class="row">
           <div><label>Notes</label><textarea id="ch-notes" placeholder="e.g. Bent beak, rescued 2024"></textarea></div>
         </div>
@@ -638,6 +658,17 @@
       <section id="chicken-detail-history-section" style="display:none;">
         <p class="sec-title">Health Check History</p>
         <div id="chicken-detail-history"></div>
+      </section>
+
+      <section id="offspring-section" style="display:none;">
+        <p class="sec-title" id="offspring-title">Offspring</p>
+        <p class="share-note" style="margin-bottom:10px;">Track how many male and female young this animal has had, by year.</p>
+        <div class="row">
+          <div><label>Add a year</label><input type="number" id="offspring-year-input" min="1900" max="2100" placeholder="e.g. 2024"></div>
+        </div>
+        <button type="button" class="btn secondary full" onclick="addOffspringYear()">+ Add year</button>
+        <div class="status" id="offspring-status"></div>
+        <div id="offspring-list" style="margin-top:12px;"></div>
       </section>
     </div>
 
@@ -1220,7 +1251,7 @@ let isSignup = false;
 let flocks = []; // [{ ownerId, label, role: 'owner'|'editor'|'viewer' }]
 let currentFlockOwnerId = null;
 let currentRole = 'owner';
-let state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null };
+let state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null, offspringRecords: [] };
 let editingEggId = null;
 let editingBreedId = null;
 let currentCustomerDetailId = null;
@@ -1565,7 +1596,7 @@ async function logout(){
   flocks = [];
   currentFlockOwnerId = null;
   currentRole = 'owner';
-  state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null };
+  state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null, offspringRecords: [] };
   showPoultrySection = true;
   showLivestockSection = true;
   hiddenPoultryTabIds = [];
@@ -1760,7 +1791,11 @@ function rowToChicken(r){
     eggColour: r.egg_colour, notes: r.notes,
     isDeceased: r.is_deceased, deceasedDate: r.deceased_date,
     coopId: r.coop_id || null,
-    category: r.category || categoryForAnimalType(r.animal_type)
+    category: r.category || categoryForAnimalType(r.animal_type),
+    registeredPedigree: !!r.registered_pedigree,
+    sire: r.sire || '', dam: r.dam || '',
+    sireSire: r.sire_sire || '', sireDam: r.sire_dam || '',
+    damSire: r.dam_sire || '', damDam: r.dam_dam || ''
   };
 }
 function rowToHealthCheck(r){ return { id: r.id, date: r.date, chickenId: r.chicken_id, items: r.items || [], category: r.category || 'poultry' }; }
@@ -1813,9 +1848,12 @@ function rowToLivestockSalesSettings(r){
     priceMeat: Number(r.price_meat) || 0, priceLiveAnimal: Number(r.price_live_animal) || 0
   };
 }
+function rowToOffspringRecord(r){
+  return { id: r.id, chickenId: r.chicken_id, year: Number(r.year) || 0, maleCount: Number(r.male_count) || 0, femaleCount: Number(r.female_count) || 0 };
+}
 
 async function loadFlockData(){
-  const [eggsRes, chickensRes, hcRes, coopsRes, breedsRes, customersRes, salesRes, creditsRes, salesSettingsRes, livestockSalesRes, livestockSalesSettingsRes] = await Promise.all([
+  const [eggsRes, chickensRes, hcRes, coopsRes, breedsRes, customersRes, salesRes, creditsRes, salesSettingsRes, livestockSalesRes, livestockSalesSettingsRes, offspringRes] = await Promise.all([
     sb.from('eggs').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }).order('created_at', { ascending: false }),
     sb.from('chickens').select('*').eq('owner_id', currentFlockOwnerId).order('created_at'),
     sb.from('health_checks').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
@@ -1826,7 +1864,8 @@ async function loadFlockData(){
     sb.from('customer_credits').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
     sb.from('sales_settings').select('*').eq('owner_id', currentFlockOwnerId).maybeSingle(),
     sb.from('livestock_sales').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
-    sb.from('livestock_sales_settings').select('*').eq('owner_id', currentFlockOwnerId).maybeSingle()
+    sb.from('livestock_sales_settings').select('*').eq('owner_id', currentFlockOwnerId).maybeSingle(),
+    sb.from('offspring_records').select('*').eq('owner_id', currentFlockOwnerId).order('year', { ascending: false })
   ]);
   state.eggs = (eggsRes.data || []).map(rowToEgg);
   state.chickens = (chickensRes.data || []).map(rowToChicken);
@@ -1839,6 +1878,7 @@ async function loadFlockData(){
   state.salesSettings = rowToSalesSettings(salesSettingsRes.data);
   state.livestockSales = (livestockSalesRes.data || []).map(rowToLivestockSale);
   state.livestockSalesSettings = rowToLivestockSalesSettings(livestockSalesSettingsRes.data);
+  state.offspringRecords = (offspringRes.data || []).map(rowToOffspringRecord);
 }
 
 // ---------- EGG COUNT ----------
@@ -2333,6 +2373,7 @@ function onGenderChange(){
   document.getElementById('ch-tag-colour-wrap').style.display = isLivestock ? 'none' : '';
   document.getElementById('ch-colour-wrap').style.display = isLivestock ? 'flex' : 'none';
   if(!isLivestock) document.getElementById('ch-colour-custom-row').style.display = 'none';
+  document.getElementById('ch-pedigree-section').style.display = isLivestock ? 'block' : 'none';
 }
 
 function refreshColourOptions(preferredValue){
@@ -2474,6 +2515,13 @@ function resetChickenForm(){
   setDobFields('ch', '', 'day');
   document.getElementById('ch-expected').value = '';
   document.getElementById('ch-egg-colour').value = '';
+  document.getElementById('ch-registered-pedigree').checked = false;
+  document.getElementById('ch-sire').value = '';
+  document.getElementById('ch-dam').value = '';
+  document.getElementById('ch-sire-sire').value = '';
+  document.getElementById('ch-sire-dam').value = '';
+  document.getElementById('ch-dam-sire').value = '';
+  document.getElementById('ch-dam-dam').value = '';
   document.getElementById('ch-notes').value = '';
   document.getElementById('ch-deceased').checked = false;
   document.getElementById('ch-deceased-date').value = '';
@@ -2528,6 +2576,13 @@ async function saveChicken(){
     dob_precision: dobPrecision,
     expected_eggs_per_year: Number(document.getElementById('ch-expected').value) || 0,
     egg_colour: document.getElementById('ch-egg-colour').value.trim(),
+    registered_pedigree: isLivestock ? document.getElementById('ch-registered-pedigree').checked : false,
+    sire: isLivestock ? document.getElementById('ch-sire').value.trim() : '',
+    dam: isLivestock ? document.getElementById('ch-dam').value.trim() : '',
+    sire_sire: isLivestock ? document.getElementById('ch-sire-sire').value.trim() : '',
+    sire_dam: isLivestock ? document.getElementById('ch-sire-dam').value.trim() : '',
+    dam_sire: isLivestock ? document.getElementById('ch-dam-sire').value.trim() : '',
+    dam_dam: isLivestock ? document.getElementById('ch-dam-dam').value.trim() : '',
     notes: document.getElementById('ch-notes').value.trim(),
     is_deceased: isDeceased,
     deceased_date: isDeceased ? (document.getElementById('ch-deceased-date').value || null) : null
@@ -2941,6 +2996,13 @@ function editChicken(id){
   setDobFields('ch', c.dob || '', c.dobPrecision || 'day');
   document.getElementById('ch-expected').value = c.expectedEggsPerYear || '';
   document.getElementById('ch-egg-colour').value = c.eggColour || '';
+  document.getElementById('ch-registered-pedigree').checked = !!c.registeredPedigree;
+  document.getElementById('ch-sire').value = c.sire || '';
+  document.getElementById('ch-dam').value = c.dam || '';
+  document.getElementById('ch-sire-sire').value = c.sireSire || '';
+  document.getElementById('ch-sire-dam').value = c.sireDam || '';
+  document.getElementById('ch-dam-sire').value = c.damSire || '';
+  document.getElementById('ch-dam-dam').value = c.damDam || '';
   document.getElementById('ch-notes').value = c.notes || '';
   document.getElementById('ch-deceased').checked = !!c.isDeceased;
   document.getElementById('ch-deceased-date').value = c.deceasedDate || '';
@@ -2965,11 +3027,13 @@ function openChickenDetail(id, presetCoopId, returnTab){
     editChicken(id);
     document.getElementById('chicken-detail-history-section').style.display = 'block';
     renderChickenDetailHistory(id);
+    renderOffspringSection(c);
   } else {
     resetChickenForm();
     if(presetCoopId) document.getElementById('ch-coop').value = presetCoopId;
     document.getElementById('chicken-detail-name').textContent = 'Add an Animal';
     document.getElementById('chicken-detail-history-section').style.display = 'none';
+    document.getElementById('offspring-section').style.display = 'none';
   }
   switchTab('chicken-detail');
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2985,6 +3049,95 @@ function closeChickenDetail(){
   resetChickenForm();
   refreshFlockViews();
   switchTab(chickenDetailReturnTab);
+}
+
+// ---------- OFFSPRING (LIVESTOCK) ----------
+const BABY_ANIMAL_NAMES = { Sheep: 'lambs', Goat: 'kids', Cow: 'calves', Pig: 'piglets' };
+function babyNameFor(animalType){ return BABY_ANIMAL_NAMES[animalType] || 'young'; }
+
+function offspringRecordsForChicken(id){
+  return state.offspringRecords.filter(r => r.chickenId === id).sort((a, b) => b.year - a.year);
+}
+
+function offspringRowHtml(r, babyName){
+  return `
+    <div class="chicken-card">
+      <div class="chicken-card-head">
+        <div><div class="chicken-name">${r.year}</div></div>
+        <div class="icon-row">
+          <button type="button" class="icon-btn danger" onclick="deleteOffspringRecord('${r.id}')" aria-label="Delete">&#10005;</button>
+        </div>
+      </div>
+      <div class="row" style="margin-top:4px;">
+        <div>
+          <label>Male ${escapeHtml(babyName)}</label>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button type="button" class="icon-btn" onclick="adjustOffspring('${r.id}','male',-1)" aria-label="Decrease male count">&minus;</button>
+            <span style="min-width:20px;text-align:center;font-weight:600;">${r.maleCount}</span>
+            <button type="button" class="icon-btn" onclick="adjustOffspring('${r.id}','male',1)" aria-label="Increase male count">+</button>
+          </div>
+        </div>
+        <div>
+          <label>Female ${escapeHtml(babyName)}</label>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button type="button" class="icon-btn" onclick="adjustOffspring('${r.id}','female',-1)" aria-label="Decrease female count">&minus;</button>
+            <span style="min-width:20px;text-align:center;font-weight:600;">${r.femaleCount}</span>
+            <button type="button" class="icon-btn" onclick="adjustOffspring('${r.id}','female',1)" aria-label="Increase female count">+</button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderOffspringSection(c){
+  const section = document.getElementById('offspring-section');
+  if(!section) return;
+  if(!c || c.category !== 'livestock'){ section.style.display = 'none'; return; }
+  section.style.display = 'block';
+  const babyName = babyNameFor(c.animalType);
+  document.getElementById('offspring-title').textContent = 'Offspring (' + babyName + ')';
+  const records = offspringRecordsForChicken(c.id);
+  const el = document.getElementById('offspring-list');
+  el.innerHTML = records.length ? records.map(r => offspringRowHtml(r, babyName)).join('') : '<p class="empty">No offspring logged yet.</p>';
+}
+
+async function addOffspringYear(){
+  if(!currentDetailChickenId) return;
+  const yearInput = document.getElementById('offspring-year-input');
+  const year = Number(yearInput.value) || new Date().getFullYear();
+  const existing = state.offspringRecords.find(r => r.chickenId === currentDetailChickenId && r.year === year);
+  if(existing){ setStatus('offspring-status', `${year} is already logged — use the + / − buttons below to adjust it.`, true); return; }
+  const { error } = await sb.from('offspring_records').insert({ owner_id: currentFlockOwnerId, chicken_id: currentDetailChickenId, year, male_count: 0, female_count: 0 });
+  if(error){ setStatus('offspring-status', error.message, true); return; }
+  yearInput.value = '';
+  await loadFlockData();
+  renderOffspringSection(state.chickens.find(x => x.id === currentDetailChickenId));
+}
+
+async function adjustOffspring(id, gender, delta){
+  const rec = state.offspringRecords.find(r => r.id === id);
+  if(!rec) return;
+  const field = gender === 'male' ? 'maleCount' : 'femaleCount';
+  const prevVal = rec[field];
+  const newVal = Math.max(0, prevVal + delta);
+  if(newVal === prevVal) return;
+  rec[field] = newVal;
+  const c = state.chickens.find(x => x.id === currentDetailChickenId);
+  renderOffspringSection(c);
+  const dbField = gender === 'male' ? 'male_count' : 'female_count';
+  const { error } = await sb.from('offspring_records').update({ [dbField]: newVal }).eq('id', id);
+  if(error){
+    rec[field] = prevVal;
+    renderOffspringSection(c);
+  }
+}
+
+async function deleteOffspringRecord(id){
+  if(!confirm("Delete this year's offspring record?")) return;
+  const { error } = await sb.from('offspring_records').delete().eq('id', id);
+  if(error) return;
+  await loadFlockData();
+  renderOffspringSection(state.chickens.find(x => x.id === currentDetailChickenId));
 }
 
 async function deleteChicken(id){
