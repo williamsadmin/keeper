@@ -545,16 +545,6 @@
         <div class="row">
           <div><label id="ch-tag-label">Leg / tag number</label><input type="text" id="ch-tag" placeholder="e.g. 14"></div>
           <div id="ch-tag-colour-wrap"><label>Tag colour</label><input type="text" id="ch-tag-colour" placeholder="e.g. Red"></div>
-          <div id="ch-colour-wrap" style="display:none;">
-            <label>Colour</label>
-            <select id="ch-colour" onchange="onColourChange()">
-              <option value="">Select colour…</option>
-              <option value="__custom">Other (type below)</option>
-            </select>
-          </div>
-        </div>
-        <div class="row" id="ch-colour-custom-row" style="display:none;">
-          <div><label>Colour name</label><input type="text" id="ch-colour-custom" placeholder="e.g. Piebald"></div>
         </div>
         <div class="row">
           <div>
@@ -590,6 +580,18 @@
         </div>
         <div class="row" id="ch-breed-custom-row" style="display:none;">
           <div><label>Breed name</label><input type="text" id="ch-breed-custom" placeholder="e.g. Cream Legbar"></div>
+        </div>
+        <div class="row" id="ch-colour-wrap" style="display:none;">
+          <div>
+            <label>Colour</label>
+            <select id="ch-colour" onchange="onColourChange()">
+              <option value="">Select colour…</option>
+              <option value="__custom">Other (type below)</option>
+            </select>
+          </div>
+        </div>
+        <div class="row" id="ch-colour-custom-row" style="display:none;">
+          <div><label>Colour name</label><input type="text" id="ch-colour-custom" placeholder="e.g. Piebald"></div>
         </div>
         <div class="row">
           <div>
@@ -2314,7 +2316,7 @@ function onGenderChange(){
   document.getElementById('ch-eggs-row').style.display = (male || isLivestock) ? 'none' : 'flex';
   document.getElementById('ch-tag-label').textContent = isLivestock ? 'Tag number' : 'Leg / tag number';
   document.getElementById('ch-tag-colour-wrap').style.display = isLivestock ? 'none' : '';
-  document.getElementById('ch-colour-wrap').style.display = isLivestock ? '' : 'none';
+  document.getElementById('ch-colour-wrap').style.display = isLivestock ? 'flex' : 'none';
   if(!isLivestock) document.getElementById('ch-colour-custom-row').style.display = 'none';
 }
 
