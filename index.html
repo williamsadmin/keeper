@@ -3341,7 +3341,33 @@ function offspringRecordsForChicken(id){
   return state.offspringRecords.filter(r => r.chickenId === id).sort((a, b) => b.year - a.year);
 }
 
-function offspringRowHtml(r, babyName){
+function linkedChildrenOf(chickenId){
+  return state.chickens.filter(c => c.sireId === chickenId || c.damId === chickenId);
+}
+
+function linkedChildrenForYear(chickenId, year){
+  return linkedChildrenOf(chickenId)
+    .filter(c => c.dob && new Date(c.dob + 'T00:00:00').getFullYear() === year)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function offspringRowHtml(r, babyName, parentId, year){
+  year = r ? r.year : year;
+  const linked = linkedChildrenForYear(parentId, year);
+  const linkedHtml = linked.length ? `
+      <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px;">
+        ${linked.map(x => `<button type="button" class="btn secondary full" onclick="openChickenDetail('${x.id}')">View ${escapeHtml(x.name)}'s profile</button>`).join('')}
+      </div>` : '';
+  if(!r){
+    return `
+    <div class="chicken-card">
+      <div class="chicken-card-head">
+        <div><div class="chicken-name">${year}</div></div>
+      </div>
+      <p class="chicken-meta">Linked ${escapeHtml(babyName.toLowerCase())} below — add a year record above if you also want to track counts.</p>
+      ${linkedHtml}
+    </div>`;
+  }
   return `
     <div class="chicken-card">
       <div class="chicken-card-head">
@@ -3368,6 +3394,7 @@ function offspringRowHtml(r, babyName){
           </div>
         </div>
       </div>
+      ${linkedHtml}
     </div>`;
 }
 
@@ -3379,8 +3406,19 @@ function renderOffspringSection(c){
   const babyName = babyNameFor(c.animalType);
   document.getElementById('offspring-title').textContent = 'Offspring (' + babyName + ')';
   const records = offspringRecordsForChicken(c.id);
+  const recordYears = new Set(records.map(r => r.year));
+  const extraYears = [...new Set(linkedChildrenOf(c.id)
+    .filter(x => x.dob)
+    .map(x => new Date(x.dob + 'T00:00:00').getFullYear()))]
+    .filter(y => !recordYears.has(y));
+  const entries = [
+    ...records.map(r => ({ year: r.year, record: r })),
+    ...extraYears.map(y => ({ year: y, record: null }))
+  ].sort((a, b) => b.year - a.year);
   const el = document.getElementById('offspring-list');
-  el.innerHTML = records.length ? records.map(r => offspringRowHtml(r, babyName)).join('') : '<p class="empty">No offspring logged yet.</p>';
+  el.innerHTML = entries.length
+    ? entries.map(e => offspringRowHtml(e.record, babyName, c.id, e.year)).join('')
+    : '<p class="empty">No offspring logged yet.</p>';
 }
 
 async function addOffspringYear(){
