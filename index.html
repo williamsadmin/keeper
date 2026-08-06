@@ -67,7 +67,7 @@
   .topbar .brand{font-family:'Oswald',sans-serif;font-weight:600;letter-spacing:.05em;text-transform:uppercase;font-size:15px;display:flex;align-items:center;gap:8px;}
   .topbar .brand-logo{width:26px;height:26px;border-radius:7px;flex-shrink:0;}
   .topbar .email{font-size:12px;color:var(--text-dim);}
-  .flock-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--border);}
+  .flock-bar{display:flex;align-items:center;gap:10px;}
   .flock-bar label{margin:0;flex-shrink:0;}
   .flock-bar select{flex:1;}
   .role-badge{flex-shrink:0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:5px 10px;border-radius:20px;background:var(--surface-alt);color:var(--text-dim);white-space:nowrap;}
@@ -183,7 +183,7 @@
   .unchecked-text{color:var(--text-dim);flex-shrink:0;}
 
   /* Sharing / Account */
-  .share-note{font-size:13px;color:var(--text-dim);line-height:1.6;}
+  .share-note{font-size:13px;color:var(--text-dim);line-height:1.6;margin-top:0;}
   .alert-banner{background:rgba(226,87,76,.14);border:1px solid var(--danger);color:var(--danger);border-radius:8px;padding:10px 12px;font-weight:700;font-size:13px;line-height:1.5;}
   .credit-banner{background:rgba(67,198,172,.14);border:1px solid var(--teal);color:var(--teal);border-radius:8px;padding:10px 12px;font-weight:700;font-size:13px;line-height:1.5;margin-top:8px;}
   code{background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:12px;}
@@ -230,12 +230,6 @@
       <span class="email" id="user-email"></span>
       <button class="btn secondary" style="padding:6px 10px;font-size:12px;margin-left:8px;" onclick="logout()">Log out</button>
     </span>
-  </div>
-
-  <div class="flock-bar" id="flock-bar" style="display:none;">
-    <label>Viewing</label>
-    <select id="flock-select" onchange="onFlockChange()"></select>
-    <span class="role-badge" id="role-badge" style="display:none;"></span>
   </div>
 
   <div class="section-nav" id="section-nav">
@@ -1161,6 +1155,17 @@
         </details>
       </section>
 
+      <section id="flock-bar" style="display:none;">
+        <details>
+          <summary class="sec-title">Viewing</summary>
+          <div class="flock-bar">
+            <label>Flock</label>
+            <select id="flock-select" onchange="onFlockChange()"></select>
+            <span class="role-badge" id="role-badge" style="display:none;"></span>
+          </div>
+        </details>
+      </section>
+
       <section id="share-viewing-note" style="display:none;">
         <details>
           <summary class="sec-title">Access</summary>
@@ -1773,7 +1778,7 @@ function renderFlockSelector(){
     renderRoleBadge();
     return;
   }
-  bar.style.display = 'flex';
+  bar.style.display = 'block';
   sel.innerHTML = flocks.map(f => `<option value="${f.ownerId}" ${f.ownerId === currentFlockOwnerId ? 'selected' : ''}>${escapeHtml(f.label)}</option>`).join('');
   renderRoleBadge();
 }
