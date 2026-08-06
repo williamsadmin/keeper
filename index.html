@@ -824,7 +824,7 @@
           <div><label>Date</label><input type="date" id="sale-date"></div>
         </div>
         <div class="row">
-          <div><label>Search customers</label><input type="text" id="sale-customer-search" oninput="onSaleCustomerSearchChange()" placeholder="Type a name…"></div>
+          <div><label>Search customers</label><input type="text" id="sale-customer-search" oninput="onSaleCustomerSearchChange()" placeholder="Type a name or address…"></div>
         </div>
         <div class="row">
           <div>
@@ -907,7 +907,7 @@
         <details id="customers-section">
           <summary class="sec-title">Customers (<span id="customers-count">0</span>)</summary>
           <div class="row">
-            <div><label>Search</label><input type="text" id="customers-search" oninput="renderCustomersList()" placeholder="Search by name…"></div>
+            <div><label>Search</label><input type="text" id="customers-search" oninput="renderCustomersList()" placeholder="Search by name or address…"></div>
           </div>
           <div id="customers-list"></div>
         </details>
@@ -924,6 +924,9 @@
         <p class="sec-title" id="customer-form-title">Add Customer</p>
         <div class="row">
           <div><label>Name</label><input type="text" id="cust-name" placeholder="e.g. Jane Smith"></div>
+        </div>
+        <div class="row">
+          <div><label>Address</label><input type="text" id="cust-address" placeholder="e.g. 14 Mill Lane, Ashby"></div>
         </div>
         <div class="row">
           <div><label>Notes</label><textarea id="cust-notes" placeholder="e.g. Prefers blue eggs"></textarea></div>
@@ -1015,7 +1018,7 @@
             <div><label>Date</label><input type="date" id="ls-sale-date"></div>
           </div>
           <div class="row">
-            <div><label>Search customers</label><input type="text" id="ls-sale-customer-search" oninput="onLsSaleCustomerSearchChange()" placeholder="Type a name…"></div>
+            <div><label>Search customers</label><input type="text" id="ls-sale-customer-search" oninput="onLsSaleCustomerSearchChange()" placeholder="Type a name or address…"></div>
           </div>
           <div class="row">
             <div>
@@ -1066,7 +1069,7 @@
           <details id="ls-customers-section">
             <summary class="sec-title">Customers (<span id="ls-customers-count">0</span>)</summary>
             <div class="row">
-              <div><label>Search</label><input type="text" id="ls-customers-search" oninput="renderLsCustomersList()" placeholder="Search by name…"></div>
+              <div><label>Search</label><input type="text" id="ls-customers-search" oninput="renderLsCustomersList()" placeholder="Search by name or address…"></div>
             </div>
             <div id="ls-customers-list"></div>
           </details>
@@ -1883,7 +1886,7 @@ function rowToBreed(r){
 }
 function rowToCustomer(r){
   return {
-    id: r.id, name: r.name, notes: r.notes || '',
+    id: r.id, name: r.name, notes: r.notes || '', address: r.address || '',
     priceEgg: r.price_egg != null ? Number(r.price_egg) : null,
     priceHalfDozen: r.price_half_dozen != null ? Number(r.price_half_dozen) : null,
     priceDozen: r.price_dozen != null ? Number(r.price_dozen) : null
@@ -4564,7 +4567,7 @@ function customerHasOwedCredit(customerId){
 
 function filterCustomersByName(list, search){
   const term = (search || '').trim().toLowerCase();
-  return term ? list.filter(c => c.name.toLowerCase().includes(term)) : list;
+  return term ? list.filter(c => c.name.toLowerCase().includes(term) || (c.address || '').toLowerCase().includes(term)) : list;
 }
 
 function populateSaleCustomerOptions(){
@@ -4725,6 +4728,7 @@ function customerCardHtml(c){
       <div class="chicken-card-head">
         <div>
           <div class="chicken-name">${escapeHtml(c.name)}</div>
+          ${c.address ? `<div class="chicken-meta">${escapeHtml(c.address)}</div>` : ''}
           ${customerHasCustomPricing(c) ? '<div class="chicken-meta">Custom pricing</div>' : ''}
           ${creditText !== 'None' ? `<div class="credit-badge">Owed: ${escapeHtml(creditText)}</div>` : ''}
         </div>
@@ -4930,6 +4934,7 @@ function openCustomerDetail(id, returnTab){
     document.getElementById('customer-detail-name').textContent = c ? c.name : 'Customer';
     document.getElementById('customer-form-title').textContent = 'Edit Customer';
     document.getElementById('cust-name').value = c ? c.name : '';
+    document.getElementById('cust-address').value = c ? c.address : '';
     document.getElementById('cust-notes').value = c ? c.notes : '';
     document.getElementById('cust-price-egg').value = c && c.priceEgg != null ? c.priceEgg : '';
     document.getElementById('cust-price-half-dozen').value = c && c.priceHalfDozen != null ? c.priceHalfDozen : '';
@@ -4953,6 +4958,7 @@ function openCustomerDetail(id, returnTab){
     document.getElementById('customer-detail-name').textContent = 'Add Customer';
     document.getElementById('customer-form-title').textContent = 'Add Customer';
     document.getElementById('cust-name').value = '';
+    document.getElementById('cust-address').value = '';
     document.getElementById('cust-notes').value = '';
     document.getElementById('cust-price-egg').value = '';
     document.getElementById('cust-price-half-dozen').value = '';
@@ -4989,7 +4995,8 @@ async function saveCustomer(){
   const name = document.getElementById('cust-name').value.trim();
   if(!name){ setStatus('customer-status', 'Enter a name.', true); return; }
   const payload = {
-    name, notes: document.getElementById('cust-notes').value.trim(),
+    name, address: document.getElementById('cust-address').value.trim(),
+    notes: document.getElementById('cust-notes').value.trim(),
     price_egg: customerPriceFieldValue('cust-price-egg'),
     price_half_dozen: customerPriceFieldValue('cust-price-half-dozen'),
     price_dozen: customerPriceFieldValue('cust-price-dozen')
@@ -5351,6 +5358,7 @@ function lsCustomerCardHtml(c){
       <div class="chicken-card-head">
         <div>
           <div class="chicken-name">${escapeHtml(c.name)}</div>
+          ${c.address ? `<div class="chicken-meta">${escapeHtml(c.address)}</div>` : ''}
         </div>
         <span class="${settled ? 'ok-badge' : 'issue-badge'}">${balLabel}</span>
       </div>

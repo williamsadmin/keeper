@@ -200,6 +200,9 @@ alter table customers add column if not exists price_egg numeric;
 alter table customers add column if not exists price_half_dozen numeric;
 alter table customers add column if not exists price_dozen numeric;
 
+-- Free-text address, searchable alongside name when picking a customer.
+alter table customers add column if not exists address text;
+
 create table if not exists sales (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
