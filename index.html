@@ -130,6 +130,7 @@
   .gender-tag.rooster{background:#3A3F4D;color:var(--teal);}
   .deceased-tag{display:inline-block;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding:2px 7px;border-radius:20px;margin-left:6px;vertical-align:middle;background:transparent;color:var(--danger);border:1px solid var(--danger);}
   .chicken-card.deceased{opacity:.8;border-style:dashed;}
+  .chicken-card.counted{border-color:var(--teal);background:var(--amber-dim);}
   .checkbox-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
   .checkbox-row input[type=checkbox]{width:auto;}
   .checkbox-row label{margin:0;color:var(--text);font-size:13px;}
@@ -471,6 +472,21 @@
         <div class="row">
           <div><button class="btn full" id="add-chicken-to-coop-btn" onclick="addChickenToThisCoop()">+ Add an Animal</button></div>
           <div><button class="btn secondary full" id="coop-mass-move-btn" onclick="toggleCoopSelectionMode()">Mass Move</button></div>
+        </div>
+        <div class="row">
+          <div><button type="button" class="btn secondary full" id="coop-headcount-btn" onclick="toggleHeadCountMode()">Head Count</button></div>
+        </div>
+      </section>
+
+      <section id="coop-headcount-bar" style="display:none;">
+        <p class="sec-title">Head Count</p>
+        <div class="stat-card" style="margin-bottom:10px;">
+          <div class="stat-label">Ticked off</div>
+          <div class="stat-main"><span id="coop-headcount-counted">0</span> <span style="font-size:14px;color:var(--text-dim);font-weight:400;font-family:'Inter',sans-serif;">/ <span id="coop-headcount-total">0</span></span></div>
+        </div>
+        <div class="row">
+          <div><button type="button" class="btn secondary full" onclick="resetHeadCount()">Reset count</button></div>
+          <div><button type="button" class="btn full" onclick="exitHeadCountMode()">Done</button></div>
         </div>
       </section>
 
@@ -3469,15 +3485,18 @@ async function deleteChicken(id){
   renderHcSetupInfo();
 }
 
-function chickenCardHtml(c, readOnly, returnTab, selectable){
+function chickenCardHtml(c, readOnly, returnTab, selectable, headCountMode){
   const isMale = isMaleGender(c.gender);
   const genderClass = isMale ? 'rooster' : 'hen';
   const tagText = [c.tag, c.tagColour].filter(Boolean).join(' &middot; ') || '—';
+  const isCounted = headCountMode && headCountedIds.has(c.id);
   const checkboxHtml = (selectable && !readOnly)
     ? `<input type="checkbox" class="bird-select-checkbox" onclick="event.stopPropagation();" onchange="toggleBirdSelection('${c.id}', this.checked)" ${selectedBirdIds.has(c.id) ? 'checked' : ''} aria-label="Select ${escapeHtml(c.name)}">`
-    : '';
+    : (headCountMode
+      ? `<input type="checkbox" class="bird-select-checkbox" onclick="event.stopPropagation();" onchange="toggleHeadCounted('${c.id}', this.checked)" ${isCounted ? 'checked' : ''} aria-label="Mark ${escapeHtml(c.name)} counted">`
+      : '');
   return `
-    <div class="chicken-card ${c.isDeceased ? 'deceased' : ''}" onclick="openChickenDetail('${c.id}', null, '${returnTab || 'chickens'}')">
+    <div class="chicken-card ${c.isDeceased ? 'deceased' : ''} ${isCounted ? 'counted' : ''}" onclick="openChickenDetail('${c.id}', null, '${returnTab || 'chickens'}')">
       <div class="chicken-card-head">
         <div class="chicken-card-head-main">
           ${checkboxHtml}
@@ -3634,15 +3653,42 @@ function clearBirdSelection(){
   refreshFlockViews();
 }
 
+let headCountMode = false;
+let headCountedIds = new Set();
+
 function toggleCoopSelectionMode(){
   coopSelectionMode = !coopSelectionMode;
   if(!coopSelectionMode) selectedBirdIds.clear();
+  if(coopSelectionMode){ headCountMode = false; headCountedIds.clear(); }
   renderCoopDetailList();
 }
 
 function exitCoopSelectionMode(){
   coopSelectionMode = false;
   selectedBirdIds.clear();
+  renderCoopDetailList();
+}
+
+function toggleHeadCountMode(){
+  headCountMode = !headCountMode;
+  headCountedIds.clear();
+  if(headCountMode){ coopSelectionMode = false; selectedBirdIds.clear(); }
+  renderCoopDetailList();
+}
+
+function exitHeadCountMode(){
+  headCountMode = false;
+  headCountedIds.clear();
+  renderCoopDetailList();
+}
+
+function resetHeadCount(){
+  headCountedIds.clear();
+  renderCoopDetailList();
+}
+
+function toggleHeadCounted(id, checked){
+  if(checked) headCountedIds.add(id); else headCountedIds.delete(id);
   renderCoopDetailList();
 }
 
@@ -3786,13 +3832,22 @@ function renderCoopDetailList(){
   populateTagColourFilterOptions('coop-', allBirds);
   populateAnimalFilterOptions('coop-', allBirds);
   const filters = getChickenFilters('coop-');
-  const filtered = sortChickens(allBirds.filter(c => chickenMatchesFilters(c, filters)), 'coop-');
+  const visibleBirds = headCountMode ? allBirds : allBirds.filter(c => chickenMatchesFilters(c, filters));
+  const filtered = sortChickens(visibleBirds, 'coop-');
   el.innerHTML = filtered.length
-    ? filtered.map(c => chickenCardHtml(c, readOnly, 'coop-detail', coopSelectionMode)).join('')
+    ? filtered.map(c => chickenCardHtml(c, readOnly, 'coop-detail', coopSelectionMode, headCountMode)).join('')
     : (allBirds.length ? '<p class="empty">No birds match these filters.</p>' : `<p class="empty">No animals in this ${coopWordFor(currentCategory).toLowerCase()}.</p>`);
   populateBulkMoveCoopOptions();
   const massMoveBtn = document.getElementById('coop-mass-move-btn');
   if(massMoveBtn) massMoveBtn.style.display = (!readOnly && allBirds.length) ? 'block' : 'none';
+  const headCountBtn = document.getElementById('coop-headcount-btn');
+  if(headCountBtn) headCountBtn.style.display = allBirds.length ? 'block' : 'none';
+  const headCountBar = document.getElementById('coop-headcount-bar');
+  if(headCountBar) headCountBar.style.display = headCountMode ? 'block' : 'none';
+  const headCountCountedEl = document.getElementById('coop-headcount-counted');
+  if(headCountCountedEl) headCountCountedEl.textContent = allBirds.filter(c => headCountedIds.has(c.id)).length;
+  const headCountTotalEl = document.getElementById('coop-headcount-total');
+  if(headCountTotalEl) headCountTotalEl.textContent = allBirds.length;
   const selectAllBtn = document.getElementById('coop-select-all-btn');
   if(selectAllBtn){
     const allSelected = filtered.length > 0 && filtered.every(c => selectedBirdIds.has(c.id));
@@ -3810,6 +3865,8 @@ function openCoopDetail(id, category){
   currentCoopDetailId = id;
   selectedBirdIds.clear();
   coopSelectionMode = false;
+  headCountMode = false;
+  headCountedIds.clear();
   const word = coopWordFor(currentCategory);
   document.getElementById('coop-detail-name').textContent = isUnassigned ? 'Unassigned' : (coop ? coop.name : word);
   document.getElementById('coop-detail-eyebrow').textContent = word;
