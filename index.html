@@ -3137,7 +3137,7 @@ function onChickenFilterChange(prefix){
 
 function clearChickenFilters(prefix){
   prefix = prefix || '';
-  document.getElementById(prefix + 'filter-sort').value = 'tag-asc';
+  document.getElementById(prefix + 'filter-sort').value = currentCategory === 'livestock' ? 'age-oldest' : 'tag-asc';
   document.getElementById(prefix + 'filter-name').value = '';
   document.getElementById(prefix + 'filter-animal').value = '';
   document.getElementById(prefix + 'filter-gender').value = '';
@@ -3156,15 +3156,6 @@ function clearChickenFilters(prefix){
 
 function hasNumericTag(c){ return c.tag !== '' && c.tag != null && !isNaN(Number(c.tag)); }
 
-function compareDob(a, b, oldestFirst){
-  if(!a.dob && !b.dob) return 0;
-  if(!a.dob) return 1;
-  if(!b.dob) return -1;
-  if(a.dob === b.dob) return 0;
-  const earlierFirst = a.dob < b.dob ? -1 : 1;
-  return oldestFirst ? earlierFirst : -earlierFirst;
-}
-
 function sortChickens(list, prefix){
   const mode = document.getElementById((prefix || '') + 'filter-sort').value;
   const arr = list.slice();
@@ -3175,9 +3166,9 @@ function sortChickens(list, prefix){
       return at ? -1 : (bt ? 1 : 0);
     });
   } else if(mode === 'age-oldest'){
-    arr.sort((a, b) => compareDob(a, b, true));
+    arr.sort((a, b) => compareAgeThenName(a, b, true));
   } else if(mode === 'age-youngest'){
-    arr.sort((a, b) => compareDob(a, b, false));
+    arr.sort((a, b) => compareAgeThenName(a, b, false));
   } else if(mode === 'breed'){
     arr.sort((a, b) => {
       const ab = (a.breed || '').trim(), bb = (b.breed || '').trim();
@@ -3588,9 +3579,13 @@ function renderChickens(){
   if(currentCategory === 'livestock') renderAgeList(activeChickens, readOnly);
 }
 
-function compareAgeThenName(a, b){
+function compareAgeThenName(a, b, oldestFirst){
+  if(oldestFirst === undefined) oldestFirst = true;
   if(a.dob && b.dob){
-    if(a.dob !== b.dob) return a.dob < b.dob ? -1 : 1;
+    if(a.dob !== b.dob){
+      const earlierFirst = a.dob < b.dob ? -1 : 1;
+      return oldestFirst ? earlierFirst : -earlierFirst;
+    }
   } else if(a.dob && !b.dob){
     return -1;
   } else if(!a.dob && b.dob){
