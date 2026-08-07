@@ -288,6 +288,24 @@ create table if not exists offspring_records (
   unique (chicken_id, year)
 );
 
+-- ---------- Head counts ----------
+-- One row per counting session for a coop/flock. coop_id null means the
+-- "Unassigned" bucket for that category, matching chickens.coop_id.
+-- animal_ids is a snapshot of who was in the coop when the count was
+-- taken (so history stays accurate even if animals are later moved or
+-- deleted); counted_ids is the subset that were actually ticked.
+create table if not exists head_counts (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  coop_id uuid references coops(id) on delete set null,
+  category text not null default 'poultry' check (category in ('poultry','livestock')),
+  date date not null,
+  animal_ids jsonb not null default '[]',
+  counted_ids jsonb not null default '[]',
+  total int not null default 0,
+  created_at timestamptz not null default now()
+);
+
 -- ---------- Account deletion ----------
 -- Lets a signed-in user permanently delete their own account. All of
 -- profiles, collaborators (both as owner and as an accepted
@@ -322,6 +340,7 @@ alter table sales_settings enable row level security;
 alter table livestock_sales_settings enable row level security;
 alter table livestock_sales enable row level security;
 alter table offspring_records enable row level security;
+alter table head_counts enable row level security;
 
 -- profiles: readable by any signed-in user (needed to resolve owner emails
 -- in the sharing UI); only the owner can update their own row.
@@ -450,3 +469,10 @@ drop policy if exists "offspring_records update" on offspring_records;
 create policy "offspring_records update" on offspring_records for update using (has_flock_access(owner_id, 'editor'));
 drop policy if exists "offspring_records delete" on offspring_records;
 create policy "offspring_records delete" on offspring_records for delete using (has_flock_access(owner_id, 'editor'));
+
+drop policy if exists "head_counts read" on head_counts;
+create policy "head_counts read" on head_counts for select using (has_flock_access(owner_id));
+drop policy if exists "head_counts write" on head_counts;
+create policy "head_counts write" on head_counts for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "head_counts delete" on head_counts;
+create policy "head_counts delete" on head_counts for delete using (has_flock_access(owner_id, 'editor'));
