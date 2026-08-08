@@ -3911,12 +3911,12 @@ function startHeadCount(){
 
 function headCountSessionRowHtml(c){
   const isCounted = headCountSessionIds.has(c.id);
-  const tagText = [c.tag, c.tagColour].filter(Boolean).join(' &middot; ');
+  const tagText = [c.tag, c.tagColour].filter(Boolean).map(escapeHtml).join(' &middot; ');
   return `
     <label class="headcount-row ${isCounted ? 'counted' : ''}">
       <input type="checkbox" onchange="toggleHeadCountSessionId('${c.id}', this.checked)" ${isCounted ? 'checked' : ''}>
       <span class="headcount-row-name">${escapeHtml(animalDisplayName(c))}</span>
-      ${tagText ? `<span class="headcount-row-tag">${escapeHtml(tagText)}</span>` : ''}
+      ${tagText ? `<span class="headcount-row-tag">${tagText}</span>` : ''}
     </label>`;
 }
 
