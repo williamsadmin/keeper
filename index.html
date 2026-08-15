@@ -1147,7 +1147,7 @@
           <div><label>Vendor (optional)</label><input type="text" id="purchase-vendor" placeholder="e.g. Local Feed Store"></div>
         </div>
         <div class="row">
-          <div><label>Total amount</label><input type="number" min="0" step="0.01" id="purchase-total" oninput="renderPurchaseItemsEditor()" placeholder="e.g. 50.00"></div>
+          <div><label>Total amount</label><input type="number" min="0" step="0.01" id="purchase-total" oninput="updatePurchaseOtherAmount()" placeholder="e.g. 50.00"></div>
         </div>
         <div class="row" id="purchase-cost-type-row" style="display:none;">
           <div>
@@ -5954,7 +5954,7 @@ function removePurchaseItemRow(index){
 function updatePurchaseItem(index, field, value){
   if(!pendingPurchaseItems[index]) return;
   pendingPurchaseItems[index][field] = value;
-  renderPurchaseItemsEditor();
+  updatePurchaseOtherAmount();
 }
 
 function purchaseItemRowHtml(item, index){
@@ -5979,9 +5979,7 @@ function purchaseItemRowHtml(item, index){
     </div>`;
 }
 
-function renderPurchaseItemsEditor(){
-  const el = document.getElementById('purchase-items-list');
-  if(el) el.innerHTML = pendingPurchaseItems.map(purchaseItemRowHtml).join('');
+function updatePurchaseOtherAmount(){
   const total = Number(document.getElementById('purchase-total').value) || 0;
   const itemsSum = pendingPurchaseItems.reduce((s, it) => s + (Number(it.amount) || 0), 0);
   const other = total - itemsSum;
@@ -5989,6 +5987,12 @@ function renderPurchaseItemsEditor(){
   otherEl.textContent = formatMoney(Math.abs(other));
   otherEl.style.color = other < 0 ? 'var(--danger)' : '';
   document.getElementById('purchase-other-label').textContent = other < 0 ? 'Over-itemized by' : 'Unattributed / Other';
+}
+
+function renderPurchaseItemsEditor(){
+  const el = document.getElementById('purchase-items-list');
+  if(el) el.innerHTML = pendingPurchaseItems.map(purchaseItemRowHtml).join('');
+  updatePurchaseOtherAmount();
 }
 
 function resetPurchaseForm(){
