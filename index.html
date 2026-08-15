@@ -1196,6 +1196,24 @@
           <div id="purchases-history-list"></div>
         </details>
       </section>
+
+      <section>
+        <details id="purchase-import-section">
+          <summary class="sec-title">Import Previous Purchases</summary>
+          <p class="share-note" style="margin-bottom:10px;">Paste rows copied straight from a spreadsheet — one per line, with a date and a fixed and/or running cost: <code>Date, Fixed cost, Running cost</code>. Leave a cost blank (or 0) to skip it for that row. Dates can be DD/MM/YYYY or YYYY-MM-DD.</p>
+          <textarea id="purchase-import-text" placeholder="02/06/2025, 36.80&#10;28/07/2025, 41.64, 14.37"></textarea>
+          <button class="btn full" style="margin-top:8px;" onclick="previewPurchaseImport()">Preview import</button>
+          <div class="status" id="purchase-import-status"></div>
+          <div id="purchase-import-preview-section" style="display:none;margin-top:14px;">
+            <p class="sec-title">Preview (<span id="purchase-import-count">0</span> purchases)</p>
+            <div id="purchase-import-preview-list"></div>
+            <div class="row" style="margin-top:6px;">
+              <div><button class="btn secondary full" onclick="cancelPurchaseImportPreview()">Cancel</button></div>
+              <div><button class="btn full" onclick="confirmPurchaseImport()">Confirm import</button></div>
+            </div>
+          </div>
+        </details>
+      </section>
     </div>
 
     <!-- ACCOUNT TAB -->
@@ -6154,6 +6172,80 @@ function renderPurchasesTab(){
   renderPurchasesCostTypeBreakdown();
   renderPurchasesProfitLoss();
   renderPurchasesHistoryList();
+}
+
+// ---------- PURCHASE IMPORT ----------
+let pendingPurchaseImports = [];
+
+function parsePurchaseImportDate(raw){
+  const s = (raw || '').trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if(!m) return null;
+  const day = m[1].padStart(2, '0');
+  const month = m[2].padStart(2, '0');
+  return `${m[3]}-${month}-${day}`;
+}
+
+function parsePurchaseImportAmount(raw){
+  if(raw == null) return 0;
+  const cleaned = raw.replace(/[£,\s]/g, '').trim();
+  if(!cleaned || cleaned === '-') return 0;
+  const n = Number(cleaned);
+  return isNaN(n) ? 0 : n;
+}
+
+function previewPurchaseImport(){
+  const text = document.getElementById('purchase-import-text').value;
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const results = [];
+  let skipped = 0;
+  lines.forEach(line => {
+    const parts = (line.includes('\t') ? line.split('\t') : line.split(',')).map(p => p.trim());
+    const date = parsePurchaseImportDate(parts[0]);
+    if(!date){ skipped++; return; }
+    const fixed = parsePurchaseImportAmount(parts[1]);
+    const running = parsePurchaseImportAmount(parts[2]);
+    if(fixed > 0) results.push({ date, total: fixed, costType: 'fixed' });
+    if(running > 0) results.push({ date, total: running, costType: 'running' });
+    if(fixed <= 0 && running <= 0) skipped++;
+  });
+  pendingPurchaseImports = results;
+  document.getElementById('purchase-import-count').textContent = results.length;
+  const el = document.getElementById('purchase-import-preview-list');
+  el.innerHTML = results.length
+    ? results.map(r => `<div class="hc-record-row"><span>${formatDateNice(r.date)} &middot; ${r.costType === 'fixed' ? 'Fixed' : 'Running'}</span><span>${formatMoney(r.total)}</span></div>`).join('')
+    : '<p class="empty">Nothing to import.</p>';
+  document.getElementById('purchase-import-preview-section').style.display = results.length ? 'block' : 'none';
+  setStatus('purchase-import-status', skipped ? `${skipped} row${skipped > 1 ? 's' : ''} skipped — no date, or no cost.` : '', skipped > 0);
+}
+
+function cancelPurchaseImportPreview(){
+  pendingPurchaseImports = [];
+  document.getElementById('purchase-import-preview-section').style.display = 'none';
+  document.getElementById('purchase-import-text').value = '';
+  setStatus('purchase-import-status', '', false);
+}
+
+async function confirmPurchaseImport(){
+  if(!pendingPurchaseImports.length) return;
+  const payload = pendingPurchaseImports.map(r => ({
+    owner_id: currentFlockOwnerId, date: r.date, total: r.total, cost_type: r.costType, vendor: '', notes: ''
+  }));
+  const { error } = await sb.from('purchases').insert(payload);
+  if(error){ setStatus('purchase-import-status', error.message, true); return; }
+
+  if(!(state.purchasesSettings && state.purchasesSettings.trackCostType)){
+    await sb.from('purchases_settings').upsert({ owner_id: currentFlockOwnerId, track_cost_type: true }, { onConflict: 'owner_id' });
+  }
+
+  const count = pendingPurchaseImports.length;
+  pendingPurchaseImports = [];
+  document.getElementById('purchase-import-text').value = '';
+  document.getElementById('purchase-import-preview-section').style.display = 'none';
+  setStatus('purchase-import-status', `Imported ${count} purchase${count > 1 ? 's' : ''}.`, false);
+  await loadFlockData();
+  renderPurchasesTab();
 }
 
 // ---------- SHARING ----------
