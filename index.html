@@ -263,6 +263,12 @@
         <div id="home-quick-links-list"></div>
       </section>
 
+      <section id="home-purchases-section" style="display:none;">
+        <p class="sec-title">Purchases</p>
+        <p class="share-note" style="margin-bottom:10px;">Log what you spend and see profit &amp; loss across every coop and flock.</p>
+        <button class="btn full" onclick="goToQuickLink(currentCategory, 'purchases')">Open Purchases</button>
+      </section>
+
       <section>
         <p class="sec-title">Poultry Coops</p>
         <div id="overall-poultry-list"></div>
@@ -1151,7 +1157,7 @@
         </div>
         <div class="row" id="purchase-cost-type-row" style="display:none;">
           <div>
-            <label>Cost type</label>
+            <label>Default cost type</label>
             <select id="purchase-cost-type">
               <option value="">Not set</option>
               <option value="fixed">Fixed cost</option>
@@ -1159,8 +1165,9 @@
             </select>
           </div>
         </div>
+        <p class="share-note" id="purchase-cost-type-default-note" style="display:none;margin-bottom:10px;">Used for the "Other" amount below, and for any item that doesn't have its own cost type set.</p>
         <p class="sec-title" style="margin-top:14px;font-size:11px;">Items (optional)</p>
-        <p class="share-note" style="margin-bottom:10px;">Break the total down by coop or flock if you know it — whatever's left over is logged as "Other".</p>
+        <p class="share-note" style="margin-bottom:10px;">Break the total down by coop or flock if you know it — whatever's left over is logged as "Other". You can also set each item's own cost type.</p>
         <div id="purchase-items-list"></div>
         <button type="button" class="btn secondary full" onclick="addPurchaseItemRow()">+ Add item</button>
         <div class="stat-card" style="margin-top:12px;">
@@ -1424,12 +1431,19 @@
 
       <section id="purchases-settings-section">
         <details>
-          <summary class="sec-title">Purchase Cost Tracking</summary>
+          <summary class="sec-title">Purchases</summary>
           <div class="checkbox-row">
-            <input type="checkbox" id="purchases-track-cost-type" onchange="onPurchasesTrackCostTypeToggle()">
-            <label for="purchases-track-cost-type">Track whether each purchase is a fixed or running cost</label>
+            <input type="checkbox" id="purchases-enabled" onchange="onPurchasesEnabledToggle()">
+            <label for="purchases-enabled">Track purchases (expenses)</label>
           </div>
-          <p class="share-note" id="purchases-track-cost-type-note" style="display:none;margin-bottom:10px;">A fixed cost stays the same regardless of flock size — e.g. rent, insurance. A running cost scales with what you keep — e.g. feed, bedding, vet bills.</p>
+          <p class="share-note" style="margin-bottom:10px;">Turning this off hides the Purchases tab and its Home shortcut, but keeps anything you've already logged.</p>
+          <div id="purchases-settings-fields">
+            <div class="checkbox-row">
+              <input type="checkbox" id="purchases-track-cost-type" onchange="onPurchasesTrackCostTypeToggle()">
+              <label for="purchases-track-cost-type">Track whether each item is a fixed or running cost</label>
+            </div>
+            <p class="share-note" id="purchases-track-cost-type-note" style="display:none;margin-bottom:10px;">A fixed cost stays the same regardless of flock size — e.g. rent, insurance. A running cost scales with what you keep — e.g. feed, bedding, vet bills.</p>
+          </div>
           <button class="btn full" onclick="savePurchasesSettings()">Save purchase settings</button>
           <div class="status" id="purchases-settings-status"></div>
         </details>
@@ -1697,16 +1711,17 @@ function saveHomeQuickLinks(){
 }
 
 function currentSectionTabs(){
+  const purchasesOn = purchasesEnabled();
   if(currentSection === 'poultry'){
     const salesOn = !!(state.salesSettings && state.salesSettings.enabled);
-    const tabs = POULTRY_TABS.filter(t => t.id !== 'sales' || salesOn);
-    const filtered = tabs.filter(t => t.id === 'sales' || !hiddenPoultryTabIds.includes(t.id));
+    const tabs = POULTRY_TABS.filter(t => (t.id !== 'sales' || salesOn) && (t.id !== 'purchases' || purchasesOn));
+    const filtered = tabs.filter(t => t.id === 'sales' || t.id === 'purchases' || !hiddenPoultryTabIds.includes(t.id));
     return filtered.length ? filtered : tabs;
   }
   if(currentSection === 'livestock'){
     const lsOn = enabledLsSaleTypes().length > 0;
-    const tabs = LIVESTOCK_TABS.filter(t => t.id !== 'livestock-sales' || lsOn);
-    const filtered = tabs.filter(t => t.id === 'livestock-sales' || !hiddenLivestockTabIds.includes(t.id));
+    const tabs = LIVESTOCK_TABS.filter(t => (t.id !== 'livestock-sales' || lsOn) && (t.id !== 'purchases' || purchasesOn));
+    const filtered = tabs.filter(t => t.id === 'livestock-sales' || t.id === 'purchases' || !hiddenLivestockTabIds.includes(t.id));
     return filtered.length ? filtered : tabs;
   }
   return [];
@@ -2107,12 +2122,16 @@ function rowToPurchase(r){
 }
 
 function rowToPurchaseItem(r){
-  return { id: r.id, purchaseId: r.purchase_id, coopId: r.coop_id || null, description: r.description || '', amount: Number(r.amount) || 0 };
+  return { id: r.id, purchaseId: r.purchase_id, coopId: r.coop_id || null, description: r.description || '', amount: Number(r.amount) || 0, costType: r.cost_type || null };
 }
 
 function rowToPurchasesSettings(r){
-  if(!r) return { trackCostType: false };
-  return { trackCostType: !!r.track_cost_type };
+  if(!r) return { enabled: true, trackCostType: false };
+  return { enabled: r.enabled !== false, trackCostType: !!r.track_cost_type };
+}
+
+function purchasesEnabled(){
+  return !state.purchasesSettings || state.purchasesSettings.enabled !== false;
 }
 
 async function loadFlockData(){
@@ -3961,6 +3980,8 @@ function renderOverallSectionHtml(category){
 function renderOverallPage(){
   renderOverallEggReminder();
   renderHomeQuickLinksSection();
+  const purchasesSection = document.getElementById('home-purchases-section');
+  if(purchasesSection) purchasesSection.style.display = purchasesEnabled() ? 'block' : 'none';
   const poultryEl = document.getElementById('overall-poultry-list');
   const livestockEl = document.getElementById('overall-livestock-list');
   if(poultryEl) poultryEl.innerHTML = renderOverallSectionHtml('poultry');
@@ -5910,24 +5931,33 @@ async function deleteLsSale(id){
 }
 
 // ---------- PURCHASES ----------
+function onPurchasesEnabledToggle(){
+  document.getElementById('purchases-settings-fields').style.display = document.getElementById('purchases-enabled').checked ? 'block' : 'none';
+}
+
 function onPurchasesTrackCostTypeToggle(){
   document.getElementById('purchases-track-cost-type-note').style.display = document.getElementById('purchases-track-cost-type').checked ? 'block' : 'none';
 }
 
 function renderPurchasesSettingsForm(){
-  const s = state.purchasesSettings || { trackCostType: false };
+  const s = state.purchasesSettings || { enabled: true, trackCostType: false };
+  document.getElementById('purchases-enabled').checked = s.enabled !== false;
   document.getElementById('purchases-track-cost-type').checked = !!s.trackCostType;
+  onPurchasesEnabledToggle();
   onPurchasesTrackCostTypeToggle();
 }
 
 async function savePurchasesSettings(){
   const payload = {
     owner_id: currentFlockOwnerId,
+    enabled: document.getElementById('purchases-enabled').checked,
     track_cost_type: document.getElementById('purchases-track-cost-type').checked
   };
   const { error } = await sb.from('purchases_settings').upsert(payload, { onConflict: 'owner_id' });
   if(error){ setStatus('purchases-settings-status', error.message, true); return; }
   await loadFlockData();
+  refreshSectionNav();
+  renderOverallPage();
   setStatus('purchases-settings-status', 'Saved.', false);
 }
 
@@ -5942,7 +5972,7 @@ function coopOptionsHtml(selectedId){
 }
 
 function addPurchaseItemRow(){
-  pendingPurchaseItems.push({ description: '', amount: '', coopId: '' });
+  pendingPurchaseItems.push({ description: '', amount: '', coopId: '', costType: '' });
   renderPurchaseItemsEditor();
 }
 
@@ -5957,14 +5987,22 @@ function updatePurchaseItem(index, field, value){
   updatePurchaseOtherAmount();
 }
 
+function purchaseItemCostTypeOptionsHtml(selected){
+  return `
+    <option value="" ${selected ? '' : 'selected'}>Not set</option>
+    <option value="fixed" ${selected === 'fixed' ? 'selected' : ''}>Fixed cost</option>
+    <option value="running" ${selected === 'running' ? 'selected' : ''}>Running cost</option>`;
+}
+
 function purchaseItemRowHtml(item, index){
+  const trackCostType = !!(state.purchasesSettings && state.purchasesSettings.trackCostType);
   return `
     <div class="chicken-card" style="margin-bottom:8px;">
       <div class="row" style="margin-bottom:8px;">
         <div><label>Description</label><input type="text" value="${escapeHtml(item.description)}" oninput="updatePurchaseItem(${index}, 'description', this.value)" placeholder="e.g. Chicken feed"></div>
         <div><label>Amount</label><input type="number" min="0" step="0.01" value="${item.amount}" oninput="updatePurchaseItem(${index}, 'amount', this.value)" placeholder="0.00"></div>
       </div>
-      <div class="row">
+      <div class="row" style="margin-bottom:8px;">
         <div>
           <label>Coop / Flock</label>
           <select onchange="updatePurchaseItem(${index}, 'coopId', this.value)">
@@ -5972,6 +6010,15 @@ function purchaseItemRowHtml(item, index){
             ${coopOptionsHtml(item.coopId)}
           </select>
         </div>
+        ${trackCostType ? `
+        <div>
+          <label>Cost type</label>
+          <select onchange="updatePurchaseItem(${index}, 'costType', this.value)">
+            ${purchaseItemCostTypeOptionsHtml(item.costType)}
+          </select>
+        </div>` : ''}
+      </div>
+      <div class="row">
         <div style="display:flex;align-items:flex-end;">
           <button type="button" class="btn secondary full" onclick="removePurchaseItemRow(${index})">Remove</button>
         </div>
@@ -6025,7 +6072,8 @@ async function savePurchase(){
   if(validItems.length){
     const itemsPayload = validItems.map(it => ({
       owner_id: currentFlockOwnerId, purchase_id: purchaseId,
-      coop_id: it.coopId || null, description: it.description.trim(), amount: Number(it.amount) || 0
+      coop_id: it.coopId || null, description: it.description.trim(), amount: Number(it.amount) || 0,
+      cost_type: it.costType || null
     }));
     const { error: itemsError } = await sb.from('purchase_items').insert(itemsPayload);
     if(itemsError){ setStatus('purchase-status', itemsError.message, true); return; }
@@ -6046,19 +6094,25 @@ function purchaseOtherAmount(purchase){
   return purchase.total - itemsSum;
 }
 
+function costTypeLabelFor(costType){
+  return costType === 'fixed' ? 'Fixed' : (costType === 'running' ? 'Running' : '');
+}
+
 function purchaseHistoryRowHtml(p){
   const items = purchaseItemsForPurchase(p.id);
   const other = purchaseOtherAmount(p);
   const itemRows = items.map(it => {
     const coop = it.coopId ? state.coops.find(c => c.id === it.coopId) : null;
-    return `<div class="hc-record-row"><span>${escapeHtml(it.description || 'Item')}${coop ? ' &mdash; ' + escapeHtml(coop.name) : ''}</span><span>${formatMoney(it.amount)}</span></div>`;
+    const itemCostTypeLabel = costTypeLabelFor(it.costType);
+    return `<div class="hc-record-row"><span>${escapeHtml(it.description || 'Item')}${coop ? ' &mdash; ' + escapeHtml(coop.name) : ''}${itemCostTypeLabel ? ' &middot; ' + itemCostTypeLabel : ''}</span><span>${formatMoney(it.amount)}</span></div>`;
   }).join('');
   const otherRow = Math.abs(other) > 0.005 ? `<div class="hc-record-row"><span>Other (unattributed)</span><span>${formatMoney(other)}</span></div>` : '';
-  const costTypeLabel = p.costType === 'fixed' ? 'Fixed' : (p.costType === 'running' ? 'Running' : '');
+  const costTypeLabel = costTypeLabelFor(p.costType);
+  const costTypeSuffix = costTypeLabel ? ' &middot; ' + costTypeLabel + (items.length ? ' (default)' : '') : '';
   return `
     <details class="hc-record">
       <summary class="hc-record-summary">
-        <span class="who">${formatDateNice(p.date)}${p.vendor ? ' &middot; ' + escapeHtml(p.vendor) : ''}${costTypeLabel ? ' &middot; ' + costTypeLabel : ''}</span>
+        <span class="who">${formatDateNice(p.date)}${p.vendor ? ' &middot; ' + escapeHtml(p.vendor) : ''}${costTypeSuffix}</span>
         <span style="font-weight:700;flex-shrink:0;">${formatMoney(p.total)}</span>
       </summary>
       <div class="hc-record-body">
@@ -6156,14 +6210,21 @@ function renderPurchasesProfitLoss(){
 function renderPurchasesCostTypeBreakdown(){
   const trackCostType = !!(state.purchasesSettings && state.purchasesSettings.trackCostType);
   document.getElementById('purchase-cost-type-row').style.display = trackCostType ? 'flex' : 'none';
+  const defaultNote = document.getElementById('purchase-cost-type-default-note');
+  if(defaultNote) defaultNote.style.display = trackCostType ? 'block' : 'none';
   const card = document.getElementById('purchases-cost-type-card');
   card.style.display = trackCostType ? 'block' : 'none';
   if(!trackCostType) return;
   let fixed = 0, running = 0, unset = 0;
+  const add = (type, amount) => {
+    if(type === 'fixed') fixed += amount;
+    else if(type === 'running') running += amount;
+    else unset += amount;
+  };
   state.purchases.forEach(p => {
-    if(p.costType === 'fixed') fixed += p.total;
-    else if(p.costType === 'running') running += p.total;
-    else unset += p.total;
+    purchaseItemsForPurchase(p.id).forEach(it => add(it.costType || p.costType, it.amount));
+    const other = purchaseOtherAmount(p);
+    if(Math.abs(other) > 0.005) add(p.costType, other);
   });
   document.getElementById('purchases-cost-type-fixed').textContent = formatMoney(fixed);
   document.getElementById('purchases-cost-type-running').textContent = formatMoney(running);

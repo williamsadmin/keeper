@@ -339,18 +339,25 @@ create table if not exists purchase_items (
   created_at timestamptz not null default now()
 );
 
--- Optional classification of a whole purchase as a fixed cost (doesn't
--- vary with flock size, e.g. rent, insurance) or a running cost (scales
--- with what you keep, e.g. feed, bedding, vet bills). Only shown in the
--- UI when purchases_settings.track_cost_type is on for that flock.
+-- Optional classification of a whole purchase (used as the default for its
+-- "Other" remainder, and for purchases with no items at all e.g. imports)
+-- as a fixed cost (doesn't vary with flock size, e.g. rent, insurance) or a
+-- running cost (scales with what you keep, e.g. feed, bedding, vet bills).
+-- Only shown in the UI when purchases_settings.track_cost_type is on.
 alter table purchases add column if not exists cost_type text check (cost_type in ('fixed','running'));
+
+-- Same classification, but per item, so a single purchase can mix fixed and
+-- running items. Falls back to the parent purchase's cost_type when unset.
+alter table purchase_items add column if not exists cost_type text check (cost_type in ('fixed','running'));
 
 -- One row per flock owner, toggled from the Account tab.
 create table if not exists purchases_settings (
   owner_id uuid primary key references auth.users(id) on delete cascade,
+  enabled boolean not null default true,
   track_cost_type boolean not null default false,
   updated_at timestamptz not null default now()
 );
+alter table purchases_settings add column if not exists enabled boolean not null default true;
 
 -- ---------- Account deletion ----------
 -- Lets a signed-in user permanently delete their own account. All of
