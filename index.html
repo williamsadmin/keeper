@@ -265,12 +265,6 @@
         <div id="home-quick-links-list"></div>
       </section>
 
-      <section id="home-purchases-section" style="display:none;">
-        <p class="sec-title">Purchases</p>
-        <p class="share-note" style="margin-bottom:10px;">Log what you spend and see profit &amp; loss across every coop and flock.</p>
-        <button class="btn full" onclick="switchSection('purchases')">Open Purchases</button>
-      </section>
-
       <section>
         <p class="sec-title">Poultry Coops</p>
         <div id="overall-poultry-list"></div>
@@ -4055,8 +4049,6 @@ function renderOverallSectionHtml(category){
 function renderOverallPage(){
   renderOverallEggReminder();
   renderHomeQuickLinksSection();
-  const purchasesSection = document.getElementById('home-purchases-section');
-  if(purchasesSection) purchasesSection.style.display = purchasesEnabled() ? 'block' : 'none';
   const poultryEl = document.getElementById('overall-poultry-list');
   const livestockEl = document.getElementById('overall-livestock-list');
   if(poultryEl) poultryEl.innerHTML = renderOverallSectionHtml('poultry');
