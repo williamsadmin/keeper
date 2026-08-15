@@ -339,6 +339,19 @@ create table if not exists purchase_items (
   created_at timestamptz not null default now()
 );
 
+-- Optional classification of a whole purchase as a fixed cost (doesn't
+-- vary with flock size, e.g. rent, insurance) or a running cost (scales
+-- with what you keep, e.g. feed, bedding, vet bills). Only shown in the
+-- UI when purchases_settings.track_cost_type is on for that flock.
+alter table purchases add column if not exists cost_type text check (cost_type in ('fixed','running'));
+
+-- One row per flock owner, toggled from the Account tab.
+create table if not exists purchases_settings (
+  owner_id uuid primary key references auth.users(id) on delete cascade,
+  track_cost_type boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+
 -- ---------- Account deletion ----------
 -- Lets a signed-in user permanently delete their own account. All of
 -- profiles, collaborators (both as owner and as an accepted
@@ -376,6 +389,7 @@ alter table offspring_records enable row level security;
 alter table head_counts enable row level security;
 alter table purchases enable row level security;
 alter table purchase_items enable row level security;
+alter table purchases_settings enable row level security;
 
 -- profiles: readable by any signed-in user (needed to resolve owner emails
 -- in the sharing UI); only the owner can update their own row.
@@ -525,3 +539,10 @@ drop policy if exists "purchase_items write" on purchase_items;
 create policy "purchase_items write" on purchase_items for insert with check (has_flock_access(owner_id, 'editor'));
 drop policy if exists "purchase_items delete" on purchase_items;
 create policy "purchase_items delete" on purchase_items for delete using (has_flock_access(owner_id, 'editor'));
+
+drop policy if exists "purchases_settings read" on purchases_settings;
+create policy "purchases_settings read" on purchases_settings for select using (has_flock_access(owner_id));
+drop policy if exists "purchases_settings write" on purchases_settings;
+create policy "purchases_settings write" on purchases_settings for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "purchases_settings update" on purchases_settings;
+create policy "purchases_settings update" on purchases_settings for update using (has_flock_access(owner_id, 'editor'));
