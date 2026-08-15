@@ -215,6 +215,10 @@ create table if not exists sales (
   created_at timestamptz not null default now()
 );
 
+-- Optional attribution to which coop the eggs came from, for profit/loss
+-- broken down by coop against purchases.
+alter table sales add column if not exists coop_id uuid references coops(id) on delete set null;
+
 -- Ledger of free/promotional stock owed to a customer, e.g. "2 dozen boxes
 -- from a referral". Positive quantity adds credit owed; negative quantity
 -- records it being claimed. Deleted along with the customer it belongs to.
@@ -274,6 +278,10 @@ create table if not exists livestock_sales (
   created_at timestamptz not null default now()
 );
 
+-- Optional attribution to which flock this sale came from, for profit/loss
+-- broken down by flock against purchases.
+alter table livestock_sales add column if not exists coop_id uuid references coops(id) on delete set null;
+
 -- ---------- Offspring (livestock) ----------
 -- One row per animal per year, with a running male/female young count
 -- adjusted with +/- in the UI rather than re-entered each time.
@@ -303,6 +311,31 @@ create table if not exists head_counts (
   animal_ids jsonb not null default '[]',
   counted_ids jsonb not null default '[]',
   total int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+-- ---------- Purchases ----------
+-- One row per shopping trip / receipt. total is the ground truth for what
+-- was spent; purchase_items optionally break it down by coop/flock, and
+-- the app computes an "Other" remainder on the fly (total minus the sum
+-- of items) rather than storing it, so it can't drift out of sync.
+create table if not exists purchases (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  date date not null,
+  vendor text,
+  total numeric not null default 0,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists purchase_items (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  purchase_id uuid not null references purchases(id) on delete cascade,
+  coop_id uuid references coops(id) on delete set null,
+  description text,
+  amount numeric not null default 0,
   created_at timestamptz not null default now()
 );
 
@@ -341,6 +374,8 @@ alter table livestock_sales_settings enable row level security;
 alter table livestock_sales enable row level security;
 alter table offspring_records enable row level security;
 alter table head_counts enable row level security;
+alter table purchases enable row level security;
+alter table purchase_items enable row level security;
 
 -- profiles: readable by any signed-in user (needed to resolve owner emails
 -- in the sharing UI); only the owner can update their own row.
@@ -476,3 +511,17 @@ drop policy if exists "head_counts write" on head_counts;
 create policy "head_counts write" on head_counts for insert with check (has_flock_access(owner_id, 'editor'));
 drop policy if exists "head_counts delete" on head_counts;
 create policy "head_counts delete" on head_counts for delete using (has_flock_access(owner_id, 'editor'));
+
+drop policy if exists "purchases read" on purchases;
+create policy "purchases read" on purchases for select using (has_flock_access(owner_id));
+drop policy if exists "purchases write" on purchases;
+create policy "purchases write" on purchases for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "purchases delete" on purchases;
+create policy "purchases delete" on purchases for delete using (has_flock_access(owner_id, 'editor'));
+
+drop policy if exists "purchase_items read" on purchase_items;
+create policy "purchase_items read" on purchase_items for select using (has_flock_access(owner_id));
+drop policy if exists "purchase_items write" on purchase_items;
+create policy "purchase_items write" on purchase_items for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "purchase_items delete" on purchase_items;
+create policy "purchase_items delete" on purchase_items for delete using (has_flock_access(owner_id, 'editor'));

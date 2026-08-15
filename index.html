@@ -878,6 +878,14 @@
         <p class="share-note" id="sale-customer-flag" style="display:none;margin-bottom:10px;"></p>
         <div class="row">
           <div>
+            <label>Coop (optional)</label>
+            <select id="sale-coop">
+              <option value="">Not attributed</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div>
             <label>Unit</label>
             <select id="sale-unit" onchange="onSaleUnitChange()"></select>
           </div>
@@ -1072,6 +1080,14 @@
           <p class="share-note" id="ls-sale-customer-flag" style="display:none;margin-bottom:10px;"></p>
           <div class="row">
             <div>
+              <label>Flock (optional)</label>
+              <select id="ls-sale-coop">
+                <option value="">Not attributed</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div>
               <label>Type</label>
               <select id="ls-sale-type" onchange="onLsSaleTypeOrQtyChange()"></select>
             </div>
@@ -1116,6 +1132,54 @@
           </details>
         </section>
       </div>
+    </div>
+
+    <!-- PURCHASES TAB -->
+    <div id="tab-purchases" class="tab-panel">
+      <p class="eyebrow">Purchases</p>
+      <h1>Purchases</h1>
+      <p class="sub">Log what you spend, split it across coops and flocks, and see profit &amp; loss.</p>
+
+      <section id="purchase-log-section">
+        <p class="sec-title">Log A Purchase</p>
+        <div class="row">
+          <div><label>Date</label><input type="date" id="purchase-date"></div>
+          <div><label>Vendor (optional)</label><input type="text" id="purchase-vendor" placeholder="e.g. Local Feed Store"></div>
+        </div>
+        <div class="row">
+          <div><label>Total amount</label><input type="number" min="0" step="0.01" id="purchase-total" oninput="renderPurchaseItemsEditor()" placeholder="e.g. 50.00"></div>
+        </div>
+        <p class="sec-title" style="margin-top:14px;font-size:11px;">Items (optional)</p>
+        <p class="share-note" style="margin-bottom:10px;">Break the total down by coop or flock if you know it — whatever's left over is logged as "Other".</p>
+        <div id="purchase-items-list"></div>
+        <button type="button" class="btn secondary full" onclick="addPurchaseItemRow()">+ Add item</button>
+        <div class="stat-card" style="margin-top:12px;">
+          <div class="stat-label" id="purchase-other-label">Unattributed / Other</div>
+          <div class="stat-main" id="purchase-other-amount">£0.00</div>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <div><label>Notes</label><textarea id="purchase-notes" placeholder="e.g. Winter feed stock-up"></textarea></div>
+        </div>
+        <button class="btn full" onclick="savePurchase()">Log purchase</button>
+        <div class="status" id="purchase-status"></div>
+      </section>
+
+      <section>
+        <p class="sec-title">Profit &amp; Loss</p>
+        <div class="stat-card" style="margin-bottom:12px;">
+          <div class="stat-label">Total (all coops &amp; flocks)</div>
+          <div class="stat-main" id="purchases-pl-total">£0.00</div>
+          <div class="stat-sub"><span id="purchases-pl-sales">£0.00</span> sales &minus; <span id="purchases-pl-spend">£0.00</span> purchases</div>
+        </div>
+        <div id="purchases-pl-breakdown"></div>
+      </section>
+
+      <section>
+        <details id="purchases-history-section">
+          <summary class="sec-title">Purchase History (<span id="purchases-history-count">0</span>)</summary>
+          <div id="purchases-history-list"></div>
+        </details>
+      </section>
     </div>
 
     <!-- ACCOUNT TAB -->
@@ -1377,7 +1441,7 @@ let isSignup = false;
 let flocks = []; // [{ ownerId, label, role: 'owner'|'editor'|'viewer' }]
 let currentFlockOwnerId = null;
 let currentRole = 'owner';
-let state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null, offspringRecords: [], headCounts: [] };
+let state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null, offspringRecords: [], headCounts: [], purchases: [], purchaseItems: [] };
 let editingEggId = null;
 let editingBreedId = null;
 let currentCustomerDetailId = null;
@@ -1438,15 +1502,17 @@ const POULTRY_TABS = [
   { id: 'chickens', label: 'My Flock' },
   { id: 'health', label: 'Health Checks' },
   { id: 'breeds', label: 'Breeds' },
-  { id: 'sales', label: 'Sales' }
+  { id: 'sales', label: 'Sales' },
+  { id: 'purchases', label: 'Purchases' }
 ];
 const LIVESTOCK_TABS = [
   { id: 'chickens', label: 'My Flock' },
   { id: 'health', label: 'Health Checks' },
   { id: 'breeds', label: 'Breeds' },
-  { id: 'livestock-sales', label: 'Sales' }
+  { id: 'livestock-sales', label: 'Sales' },
+  { id: 'purchases', label: 'Purchases' }
 ];
-const CATEGORY_TAB_IDS = ['eggs', 'chickens', 'health', 'breeds', 'sales', 'livestock-sales'];
+const CATEGORY_TAB_IDS = ['eggs', 'chickens', 'health', 'breeds', 'sales', 'livestock-sales', 'purchases'];
 const SECTIONLESS_TABS = ['overall', 'account'];
 const POULTRY_CUSTOMIZABLE_TAB_IDS = ['eggs', 'chickens', 'health', 'breeds'];
 const LIVESTOCK_CUSTOMIZABLE_TAB_IDS = ['chickens', 'health', 'breeds'];
@@ -1648,6 +1714,7 @@ function switchTab(tab){
   if(tab === 'breeds'){ if(!editingBreedId) resetBreedForm(); renderBreedsList(); }
   if(tab === 'sales') renderSalesTab();
   if(tab === 'livestock-sales') renderLivestockSalesTab();
+  if(tab === 'purchases') renderPurchasesTab();
   if(tab === 'account') renderAccountTab();
 }
 
@@ -1722,7 +1789,7 @@ async function logout(){
   flocks = [];
   currentFlockOwnerId = null;
   currentRole = 'owner';
-  state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null, offspringRecords: [], headCounts: [] };
+  state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null, offspringRecords: [], headCounts: [], purchases: [], purchaseItems: [] };
   showPoultrySection = true;
   showLivestockSection = true;
   hiddenPoultryTabIds = [];
@@ -1946,7 +2013,7 @@ function rowToCustomer(r){
 }
 function rowToSale(r){
   return {
-    id: r.id, customerId: r.customer_id, date: r.date, unit: r.unit,
+    id: r.id, customerId: r.customer_id, date: r.date, unit: r.unit, coopId: r.coop_id || null,
     quantity: Number(r.quantity) || 0, charged: Number(r.charged) || 0, paid: Number(r.paid) || 0
   };
 }
@@ -1965,7 +2032,7 @@ function rowToSalesSettings(r){
 }
 function rowToLivestockSale(r){
   return {
-    id: r.id, customerId: r.customer_id, date: r.date, saleType: r.sale_type,
+    id: r.id, customerId: r.customer_id, date: r.date, saleType: r.sale_type, coopId: r.coop_id || null,
     quantity: Number(r.quantity) || 0, charged: Number(r.charged) || 0, paid: Number(r.paid) || 0
   };
 }
@@ -1988,8 +2055,16 @@ function rowToHeadCount(r){
   };
 }
 
+function rowToPurchase(r){
+  return { id: r.id, date: r.date, vendor: r.vendor || '', total: Number(r.total) || 0, notes: r.notes || '' };
+}
+
+function rowToPurchaseItem(r){
+  return { id: r.id, purchaseId: r.purchase_id, coopId: r.coop_id || null, description: r.description || '', amount: Number(r.amount) || 0 };
+}
+
 async function loadFlockData(){
-  const [eggsRes, chickensRes, hcRes, coopsRes, breedsRes, customersRes, salesRes, creditsRes, salesSettingsRes, livestockSalesRes, livestockSalesSettingsRes, offspringRes, headCountsRes] = await Promise.all([
+  const [eggsRes, chickensRes, hcRes, coopsRes, breedsRes, customersRes, salesRes, creditsRes, salesSettingsRes, livestockSalesRes, livestockSalesSettingsRes, offspringRes, headCountsRes, purchasesRes, purchaseItemsRes] = await Promise.all([
     sb.from('eggs').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }).order('created_at', { ascending: false }),
     sb.from('chickens').select('*').eq('owner_id', currentFlockOwnerId).order('created_at'),
     sb.from('health_checks').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
@@ -2002,7 +2077,9 @@ async function loadFlockData(){
     sb.from('livestock_sales').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
     sb.from('livestock_sales_settings').select('*').eq('owner_id', currentFlockOwnerId).maybeSingle(),
     sb.from('offspring_records').select('*').eq('owner_id', currentFlockOwnerId).order('year', { ascending: false }),
-    sb.from('head_counts').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false })
+    sb.from('head_counts').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
+    sb.from('purchases').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
+    sb.from('purchase_items').select('*').eq('owner_id', currentFlockOwnerId)
   ]);
   state.eggs = (eggsRes.data || []).map(rowToEgg);
   state.chickens = (chickensRes.data || []).map(rowToChicken);
@@ -2017,6 +2094,8 @@ async function loadFlockData(){
   state.livestockSalesSettings = rowToLivestockSalesSettings(livestockSalesSettingsRes.data);
   state.offspringRecords = (offspringRes.data || []).map(rowToOffspringRecord);
   state.headCounts = (headCountsRes.data || []).map(rowToHeadCount);
+  state.purchases = (purchasesRes.data || []).map(rowToPurchase);
+  state.purchaseItems = (purchaseItemsRes.data || []).map(rowToPurchaseItem);
 }
 
 // ---------- EGG COUNT ----------
@@ -4889,8 +4968,10 @@ async function saveSale(){
     if(creditError){ setStatus('sale-status', creditError.message, true); return; }
   }
 
+  const coopId = document.getElementById('sale-coop').value || null;
+
   const { error } = await sb.from('sales').insert({
-    owner_id: currentFlockOwnerId, customer_id: customerId, date, unit, quantity, charged, paid
+    owner_id: currentFlockOwnerId, customer_id: customerId, date, unit, quantity, charged, paid, coop_id: coopId
   });
   if(error){ setStatus('sale-status', error.message, true); return; }
 
@@ -5087,10 +5168,20 @@ function renderSalesHistoryList(){
     : (state.sales.length ? '<p class="empty">No sales match your search.</p>' : '<p class="empty">No sales recorded yet.</p>');
 }
 
+function populateSaleCoopOptions(){
+  const sel = document.getElementById('sale-coop');
+  if(!sel) return;
+  const current = sel.value;
+  const coops = state.coops.filter(c => c.category === 'poultry');
+  sel.innerHTML = '<option value="">Not attributed</option>' + coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  sel.value = coops.some(c => c.id === current) ? current : '';
+}
+
 function renderSalesTab(){
   if(!document.getElementById('sale-date').value) document.getElementById('sale-date').value = todayStr();
   populateSaleUnitSelect();
   populateSaleCustomerOptions();
+  populateSaleCoopOptions();
   onSaleCustomerChange();
   renderCustomersList();
   renderSalesStats();
@@ -5523,8 +5614,10 @@ async function saveLivestockSale(){
   const charged = Number(document.getElementById('ls-sale-charged').value) || 0;
   const paid = Number(document.getElementById('ls-sale-paid').value) || 0;
 
+  const coopId = document.getElementById('ls-sale-coop').value || null;
+
   const { error } = await sb.from('livestock_sales').insert({
-    owner_id: currentFlockOwnerId, customer_id: customerId, date, sale_type: saleType, quantity, charged, paid
+    owner_id: currentFlockOwnerId, customer_id: customerId, date, sale_type: saleType, quantity, charged, paid, coop_id: coopId
   });
   if(error){ setStatus('ls-sale-status', error.message, true); return; }
 
@@ -5639,6 +5732,15 @@ function renderLsSalesHistoryList(){
     : (state.livestockSales.length ? '<p class="empty">No sales match your search.</p>' : '<p class="empty">No sales recorded yet.</p>');
 }
 
+function populateLsSaleCoopOptions(){
+  const sel = document.getElementById('ls-sale-coop');
+  if(!sel) return;
+  const current = sel.value;
+  const coops = state.coops.filter(c => c.category === 'livestock');
+  sel.innerHTML = '<option value="">Not attributed</option>' + coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  sel.value = coops.some(c => c.id === current) ? current : '';
+}
+
 function renderLivestockSalesTab(){
   if(!document.getElementById('ls-sale-date').value) document.getElementById('ls-sale-date').value = todayStr();
   const anyEnabled = enabledLsSaleTypes().length > 0;
@@ -5647,6 +5749,7 @@ function renderLivestockSalesTab(){
   if(!anyEnabled) return;
   populateLsSaleTypeSelect();
   populateLsSaleCustomerOptions();
+  populateLsSaleCoopOptions();
   onLsSaleCustomerChange();
   renderLsCustomersList();
   renderLsSalesStats();
@@ -5750,6 +5853,228 @@ async function deleteLsSale(id){
   renderCustomerLsBalance(currentCustomerDetailId);
   renderCustomerLsSalesList(currentCustomerDetailId);
   renderLsCustomersList();
+}
+
+// ---------- PURCHASES ----------
+let pendingPurchaseItems = [];
+
+function allCoopsForAttribution(){
+  return state.coops.slice().sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function coopOptionsHtml(selectedId){
+  return allCoopsForAttribution().map(c => `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${escapeHtml(c.name)} (${coopWordFor(c.category)})</option>`).join('');
+}
+
+function addPurchaseItemRow(){
+  pendingPurchaseItems.push({ description: '', amount: '', coopId: '' });
+  renderPurchaseItemsEditor();
+}
+
+function removePurchaseItemRow(index){
+  pendingPurchaseItems.splice(index, 1);
+  renderPurchaseItemsEditor();
+}
+
+function updatePurchaseItem(index, field, value){
+  if(!pendingPurchaseItems[index]) return;
+  pendingPurchaseItems[index][field] = value;
+  renderPurchaseItemsEditor();
+}
+
+function purchaseItemRowHtml(item, index){
+  return `
+    <div class="chicken-card" style="margin-bottom:8px;">
+      <div class="row" style="margin-bottom:8px;">
+        <div><label>Description</label><input type="text" value="${escapeHtml(item.description)}" oninput="updatePurchaseItem(${index}, 'description', this.value)" placeholder="e.g. Chicken feed"></div>
+        <div><label>Amount</label><input type="number" min="0" step="0.01" value="${item.amount}" oninput="updatePurchaseItem(${index}, 'amount', this.value)" placeholder="0.00"></div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Coop / Flock</label>
+          <select onchange="updatePurchaseItem(${index}, 'coopId', this.value)">
+            <option value="">Not attributed</option>
+            ${coopOptionsHtml(item.coopId)}
+          </select>
+        </div>
+        <div style="display:flex;align-items:flex-end;">
+          <button type="button" class="btn secondary full" onclick="removePurchaseItemRow(${index})">Remove</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderPurchaseItemsEditor(){
+  const el = document.getElementById('purchase-items-list');
+  if(el) el.innerHTML = pendingPurchaseItems.map(purchaseItemRowHtml).join('');
+  const total = Number(document.getElementById('purchase-total').value) || 0;
+  const itemsSum = pendingPurchaseItems.reduce((s, it) => s + (Number(it.amount) || 0), 0);
+  const other = total - itemsSum;
+  const otherEl = document.getElementById('purchase-other-amount');
+  otherEl.textContent = formatMoney(Math.abs(other));
+  otherEl.style.color = other < 0 ? 'var(--danger)' : '';
+  document.getElementById('purchase-other-label').textContent = other < 0 ? 'Over-itemized by' : 'Unattributed / Other';
+}
+
+function resetPurchaseForm(){
+  pendingPurchaseItems = [];
+  document.getElementById('purchase-date').value = todayStr();
+  document.getElementById('purchase-vendor').value = '';
+  document.getElementById('purchase-total').value = '';
+  document.getElementById('purchase-notes').value = '';
+  renderPurchaseItemsEditor();
+}
+
+async function savePurchase(){
+  const date = document.getElementById('purchase-date').value;
+  if(!date){ setStatus('purchase-status', 'Pick a date.', true); return; }
+  const total = Number(document.getElementById('purchase-total').value) || 0;
+  if(!total){ setStatus('purchase-status', 'Enter a total amount.', true); return; }
+  const vendor = document.getElementById('purchase-vendor').value.trim();
+  const notes = document.getElementById('purchase-notes').value.trim();
+  const validItems = pendingPurchaseItems.filter(it => Number(it.amount) > 0);
+
+  const purchaseId = crypto.randomUUID();
+  const { error } = await sb.from('purchases').insert({
+    id: purchaseId, owner_id: currentFlockOwnerId, date, vendor, total, notes
+  });
+  if(error){ setStatus('purchase-status', error.message, true); return; }
+
+  if(validItems.length){
+    const itemsPayload = validItems.map(it => ({
+      owner_id: currentFlockOwnerId, purchase_id: purchaseId,
+      coop_id: it.coopId || null, description: it.description.trim(), amount: Number(it.amount) || 0
+    }));
+    const { error: itemsError } = await sb.from('purchase_items').insert(itemsPayload);
+    if(itemsError){ setStatus('purchase-status', itemsError.message, true); return; }
+  }
+
+  resetPurchaseForm();
+  setStatus('purchase-status', 'Purchase logged.', false);
+  await loadFlockData();
+  renderPurchasesTab();
+}
+
+function purchaseItemsForPurchase(purchaseId){
+  return state.purchaseItems.filter(pi => pi.purchaseId === purchaseId);
+}
+
+function purchaseOtherAmount(purchase){
+  const itemsSum = purchaseItemsForPurchase(purchase.id).reduce((s, it) => s + it.amount, 0);
+  return purchase.total - itemsSum;
+}
+
+function purchaseHistoryRowHtml(p){
+  const items = purchaseItemsForPurchase(p.id);
+  const other = purchaseOtherAmount(p);
+  const itemRows = items.map(it => {
+    const coop = it.coopId ? state.coops.find(c => c.id === it.coopId) : null;
+    return `<div class="hc-record-row"><span>${escapeHtml(it.description || 'Item')}${coop ? ' &mdash; ' + escapeHtml(coop.name) : ''}</span><span>${formatMoney(it.amount)}</span></div>`;
+  }).join('');
+  const otherRow = Math.abs(other) > 0.005 ? `<div class="hc-record-row"><span>Other (unattributed)</span><span>${formatMoney(other)}</span></div>` : '';
+  return `
+    <details class="hc-record">
+      <summary class="hc-record-summary">
+        <span class="who">${formatDateNice(p.date)}${p.vendor ? ' &middot; ' + escapeHtml(p.vendor) : ''}</span>
+        <span style="font-weight:700;flex-shrink:0;">${formatMoney(p.total)}</span>
+      </summary>
+      <div class="hc-record-body">
+        ${itemRows}${otherRow}
+        ${(!itemRows && !otherRow) ? '<p class="empty">No items recorded.</p>' : ''}
+        ${p.notes ? `<p class="hc-record-note">${escapeHtml(p.notes)}</p>` : ''}
+        ${!isReadOnly() ? `<button type="button" class="btn secondary full" style="margin-top:10px;" onclick="deletePurchase('${p.id}')">Delete this purchase</button>` : ''}
+      </div>
+    </details>`;
+}
+
+function renderPurchasesHistoryList(){
+  document.getElementById('purchases-history-count').textContent = state.purchases.length;
+  const el = document.getElementById('purchases-history-list');
+  const sorted = state.purchases.slice().sort((a, b) => (a.date < b.date ? 1 : (a.date > b.date ? -1 : 0)));
+  el.innerHTML = sorted.length ? sorted.map(purchaseHistoryRowHtml).join('') : '<p class="empty">No purchases logged yet.</p>';
+}
+
+async function deletePurchase(id){
+  if(!confirm('Delete this purchase and its items?')) return;
+  const { error } = await sb.from('purchase_items').delete().eq('purchase_id', id);
+  if(error) return;
+  const { error: error2 } = await sb.from('purchases').delete().eq('id', id);
+  if(error2) return;
+  await loadFlockData();
+  renderPurchasesTab();
+}
+
+function purchasesTotalForCoop(coopId){
+  return state.purchaseItems.filter(it => it.coopId === coopId).reduce((s, it) => s + it.amount, 0);
+}
+
+function purchasesUnattributedTotal(){
+  const otherRemainders = state.purchases.reduce((s, p) => s + purchaseOtherAmount(p), 0);
+  const unattributedItems = state.purchaseItems.filter(it => !it.coopId).reduce((s, it) => s + it.amount, 0);
+  return otherRemainders + unattributedItems;
+}
+
+function salesTotalForCoop(coopId){
+  const eggSales = state.sales.filter(s => s.coopId === coopId).reduce((s, x) => s + x.charged, 0);
+  const lsSales = state.livestockSales.filter(s => s.coopId === coopId).reduce((s, x) => s + x.charged, 0);
+  return eggSales + lsSales;
+}
+
+function salesUnattributedTotal(){
+  const eggSales = state.sales.filter(s => !s.coopId).reduce((s, x) => s + x.charged, 0);
+  const lsSales = state.livestockSales.filter(s => !s.coopId).reduce((s, x) => s + x.charged, 0);
+  return eggSales + lsSales;
+}
+
+function plBadgeHtml(pl){
+  if(Math.abs(pl) < 0.005) return `<span class="ok-badge">Break-even</span>`;
+  return pl > 0
+    ? `<span class="ok-badge">+${formatMoney(pl)}</span>`
+    : `<span class="issue-badge">&minus;${formatMoney(-pl)}</span>`;
+}
+
+function plRowHtml(label, sales, spend){
+  return `
+    <div class="log-item">
+      <div>
+        <div style="font-weight:600;">${escapeHtml(label)}</div>
+        <div class="chicken-meta">${formatMoney(sales)} sales &minus; ${formatMoney(spend)} purchases</div>
+      </div>
+      ${plBadgeHtml(sales - spend)}
+    </div>`;
+}
+
+function renderPurchasesProfitLoss(){
+  const totalSales = state.sales.reduce((s, x) => s + x.charged, 0) + state.livestockSales.reduce((s, x) => s + x.charged, 0);
+  const totalSpend = state.purchases.reduce((s, p) => s + p.total, 0);
+  const totalPl = totalSales - totalSpend;
+  const totalEl = document.getElementById('purchases-pl-total');
+  totalEl.innerHTML = (totalPl >= 0 ? '+' : '&minus;') + formatMoney(Math.abs(totalPl));
+  totalEl.style.color = totalPl >= 0 ? 'var(--teal)' : 'var(--danger)';
+  document.getElementById('purchases-pl-sales').textContent = formatMoney(totalSales);
+  document.getElementById('purchases-pl-spend').textContent = formatMoney(totalSpend);
+
+  const coopsWithActivity = state.coops.filter(c => salesTotalForCoop(c.id) > 0.005 || purchasesTotalForCoop(c.id) > 0.005);
+  const rows = coopsWithActivity
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(c => plRowHtml(`${c.name} (${coopWordFor(c.category)})`, salesTotalForCoop(c.id), purchasesTotalForCoop(c.id)));
+
+  const unattributedSales = salesUnattributedTotal();
+  const unattributedSpend = purchasesUnattributedTotal();
+  if(unattributedSales > 0.005 || Math.abs(unattributedSpend) > 0.005){
+    rows.push(plRowHtml('Unattributed', unattributedSales, unattributedSpend));
+  }
+
+  document.getElementById('purchases-pl-breakdown').innerHTML = rows.length
+    ? rows.join('')
+    : '<p class="empty">No coop/flock-specific sales or purchases logged yet.</p>';
+}
+
+function renderPurchasesTab(){
+  if(!document.getElementById('purchase-date').value) document.getElementById('purchase-date').value = todayStr();
+  renderPurchaseItemsEditor();
+  renderPurchasesProfitLoss();
+  renderPurchasesHistoryList();
 }
 
 // ---------- SHARING ----------
