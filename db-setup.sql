@@ -361,6 +361,19 @@ create table if not exists purchases_settings (
 alter table purchases_settings add column if not exists enabled boolean not null default true;
 alter table purchases_settings add column if not exists predict_future boolean not null default false;
 
+-- Reusable purchase-item templates (e.g. "Layers feed" -> £11.99, Main Coop,
+-- running cost) so a common purchase can be added to the items list in one
+-- tap from the Purchases > Presets subtab.
+create table if not exists purchase_item_presets (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  amount numeric not null default 0,
+  coop_id uuid references coops(id) on delete set null,
+  cost_type text check (cost_type in ('fixed','running')),
+  created_at timestamptz not null default now()
+);
+
 -- ---------- Account deletion ----------
 -- Lets a signed-in user permanently delete their own account. All of
 -- profiles, collaborators (both as owner and as an accepted
@@ -399,6 +412,7 @@ alter table head_counts enable row level security;
 alter table purchases enable row level security;
 alter table purchase_items enable row level security;
 alter table purchases_settings enable row level security;
+alter table purchase_item_presets enable row level security;
 
 -- profiles: readable by any signed-in user (needed to resolve owner emails
 -- in the sharing UI); only the owner can update their own row.
@@ -539,6 +553,8 @@ drop policy if exists "purchases read" on purchases;
 create policy "purchases read" on purchases for select using (has_flock_access(owner_id));
 drop policy if exists "purchases write" on purchases;
 create policy "purchases write" on purchases for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "purchases update" on purchases;
+create policy "purchases update" on purchases for update using (has_flock_access(owner_id, 'editor'));
 drop policy if exists "purchases delete" on purchases;
 create policy "purchases delete" on purchases for delete using (has_flock_access(owner_id, 'editor'));
 
@@ -555,3 +571,12 @@ drop policy if exists "purchases_settings write" on purchases_settings;
 create policy "purchases_settings write" on purchases_settings for insert with check (has_flock_access(owner_id, 'editor'));
 drop policy if exists "purchases_settings update" on purchases_settings;
 create policy "purchases_settings update" on purchases_settings for update using (has_flock_access(owner_id, 'editor'));
+
+drop policy if exists "purchase_item_presets read" on purchase_item_presets;
+create policy "purchase_item_presets read" on purchase_item_presets for select using (has_flock_access(owner_id));
+drop policy if exists "purchase_item_presets write" on purchase_item_presets;
+create policy "purchase_item_presets write" on purchase_item_presets for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "purchase_item_presets update" on purchase_item_presets;
+create policy "purchase_item_presets update" on purchase_item_presets for update using (has_flock_access(owner_id, 'editor'));
+drop policy if exists "purchase_item_presets delete" on purchase_item_presets;
+create policy "purchase_item_presets delete" on purchase_item_presets for delete using (has_flock_access(owner_id, 'editor'));
