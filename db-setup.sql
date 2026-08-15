@@ -355,9 +355,11 @@ create table if not exists purchases_settings (
   owner_id uuid primary key references auth.users(id) on delete cascade,
   enabled boolean not null default true,
   track_cost_type boolean not null default false,
+  predict_future boolean not null default false,
   updated_at timestamptz not null default now()
 );
 alter table purchases_settings add column if not exists enabled boolean not null default true;
+alter table purchases_settings add column if not exists predict_future boolean not null default false;
 
 -- ---------- Account deletion ----------
 -- Lets a signed-in user permanently delete their own account. All of

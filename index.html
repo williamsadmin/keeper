@@ -1147,7 +1147,7 @@
       <p class="sub">Log what you spend, split it across coops and flocks, and see profit &amp; loss.</p>
 
       <section id="purchase-log-section">
-        <p class="sec-title">Log A Purchase</p>
+        <p class="sec-title" id="purchase-form-title">Log A Purchase</p>
         <div class="row">
           <div><label>Date</label><input type="date" id="purchase-date"></div>
           <div><label>Vendor (optional)</label><input type="text" id="purchase-vendor" placeholder="e.g. Local Feed Store"></div>
@@ -1178,6 +1178,7 @@
           <div><label>Notes</label><textarea id="purchase-notes" placeholder="e.g. Winter feed stock-up"></textarea></div>
         </div>
         <button class="btn full" onclick="savePurchase()">Log purchase</button>
+        <button class="btn secondary full" id="purchase-cancel-btn" style="display:none;margin-top:8px;" onclick="cancelEditPurchase()">Cancel edit</button>
         <div class="status" id="purchase-status"></div>
       </section>
 
@@ -1193,6 +1194,13 @@
           <div class="stat-row"><span>Fixed</span><strong id="purchases-cost-type-fixed">£0.00</strong></div>
           <div class="stat-row"><span>Running</span><strong id="purchases-cost-type-running">£0.00</strong></div>
           <div class="stat-row"><span>Not set</span><strong id="purchases-cost-type-unset">£0.00</strong></div>
+        </div>
+        <div class="stat-card" id="purchases-predict-card" style="display:none;margin-bottom:12px;">
+          <div class="stat-label">Expected Per Week</div>
+          <div class="stat-row"><span>Running costs</span><strong id="purchases-predict-running">£0.00</strong></div>
+          <div class="stat-row"><span>Sales</span><strong id="purchases-predict-sales">£0.00</strong></div>
+          <div class="stat-row"><span>Profit/loss</span><strong id="purchases-predict-pl">£0.00</strong></div>
+          <p class="share-note" id="purchases-predict-basis" style="margin-top:8px;margin-bottom:0;"></p>
         </div>
         <div id="purchases-pl-breakdown"></div>
       </section>
@@ -1443,6 +1451,13 @@
               <label for="purchases-track-cost-type">Track whether each item is a fixed or running cost</label>
             </div>
             <p class="share-note" id="purchases-track-cost-type-note" style="display:none;margin-bottom:10px;">A fixed cost stays the same regardless of flock size — e.g. rent, insurance. A running cost scales with what you keep — e.g. feed, bedding, vet bills.</p>
+            <div id="purchases-predict-wrap" style="display:none;">
+              <div class="checkbox-row">
+                <input type="checkbox" id="purchases-predict-future">
+                <label for="purchases-predict-future">Show future predictions</label>
+              </div>
+              <p class="share-note" style="margin-bottom:10px;">Estimates expected running costs, sales and profit/loss per week, based on your recent history.</p>
+            </div>
           </div>
           <button class="btn full" onclick="savePurchasesSettings()">Save purchase settings</button>
           <div class="status" id="purchases-settings-status"></div>
@@ -2126,8 +2141,8 @@ function rowToPurchaseItem(r){
 }
 
 function rowToPurchasesSettings(r){
-  if(!r) return { enabled: true, trackCostType: false };
-  return { enabled: r.enabled !== false, trackCostType: !!r.track_cost_type };
+  if(!r) return { enabled: true, trackCostType: false, predictFuture: false };
+  return { enabled: r.enabled !== false, trackCostType: !!r.track_cost_type, predictFuture: !!r.predict_future };
 }
 
 function purchasesEnabled(){
@@ -5936,13 +5951,16 @@ function onPurchasesEnabledToggle(){
 }
 
 function onPurchasesTrackCostTypeToggle(){
-  document.getElementById('purchases-track-cost-type-note').style.display = document.getElementById('purchases-track-cost-type').checked ? 'block' : 'none';
+  const on = document.getElementById('purchases-track-cost-type').checked;
+  document.getElementById('purchases-track-cost-type-note').style.display = on ? 'block' : 'none';
+  document.getElementById('purchases-predict-wrap').style.display = on ? 'block' : 'none';
 }
 
 function renderPurchasesSettingsForm(){
-  const s = state.purchasesSettings || { enabled: true, trackCostType: false };
+  const s = state.purchasesSettings || { enabled: true, trackCostType: false, predictFuture: false };
   document.getElementById('purchases-enabled').checked = s.enabled !== false;
   document.getElementById('purchases-track-cost-type').checked = !!s.trackCostType;
+  document.getElementById('purchases-predict-future').checked = !!s.predictFuture;
   onPurchasesEnabledToggle();
   onPurchasesTrackCostTypeToggle();
 }
@@ -5951,7 +5969,8 @@ async function savePurchasesSettings(){
   const payload = {
     owner_id: currentFlockOwnerId,
     enabled: document.getElementById('purchases-enabled').checked,
-    track_cost_type: document.getElementById('purchases-track-cost-type').checked
+    track_cost_type: document.getElementById('purchases-track-cost-type').checked,
+    predict_future: document.getElementById('purchases-predict-future').checked
   };
   const { error } = await sb.from('purchases_settings').upsert(payload, { onConflict: 'owner_id' });
   if(error){ setStatus('purchases-settings-status', error.message, true); return; }
@@ -6042,14 +6061,41 @@ function renderPurchaseItemsEditor(){
   updatePurchaseOtherAmount();
 }
 
+let editingPurchaseId = null;
+
 function resetPurchaseForm(){
+  editingPurchaseId = null;
   pendingPurchaseItems = [];
   document.getElementById('purchase-date').value = todayStr();
   document.getElementById('purchase-vendor').value = '';
   document.getElementById('purchase-total').value = '';
   document.getElementById('purchase-cost-type').value = '';
   document.getElementById('purchase-notes').value = '';
+  document.getElementById('purchase-form-title').textContent = 'Log A Purchase';
+  document.getElementById('purchase-cancel-btn').style.display = 'none';
   renderPurchaseItemsEditor();
+}
+
+function editPurchase(id){
+  const p = state.purchases.find(x => x.id === id);
+  if(!p) return;
+  editingPurchaseId = id;
+  document.getElementById('purchase-date').value = p.date;
+  document.getElementById('purchase-vendor').value = p.vendor;
+  document.getElementById('purchase-total').value = p.total || '';
+  document.getElementById('purchase-cost-type').value = p.costType || '';
+  document.getElementById('purchase-notes').value = p.notes;
+  pendingPurchaseItems = purchaseItemsForPurchase(id).map(it => ({
+    description: it.description, amount: it.amount, coopId: it.coopId || '', costType: it.costType || ''
+  }));
+  renderPurchaseItemsEditor();
+  document.getElementById('purchase-form-title').textContent = 'Edit Purchase';
+  document.getElementById('purchase-cancel-btn').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function cancelEditPurchase(){
+  resetPurchaseForm();
 }
 
 async function savePurchase(){
@@ -6059,15 +6105,24 @@ async function savePurchase(){
   if(!total){ setStatus('purchase-status', 'Enter a total amount.', true); return; }
   const vendor = document.getElementById('purchase-vendor').value.trim();
   const notes = document.getElementById('purchase-notes').value.trim();
-  const trackCostType = !!(state.purchasesSettings && state.purchasesSettings.trackCostType);
-  const costType = trackCostType ? (document.getElementById('purchase-cost-type').value || null) : null;
+  const costType = document.getElementById('purchase-cost-type').value || null;
   const validItems = pendingPurchaseItems.filter(it => Number(it.amount) > 0);
 
-  const purchaseId = crypto.randomUUID();
-  const { error } = await sb.from('purchases').insert({
-    id: purchaseId, owner_id: currentFlockOwnerId, date, vendor, total, notes, cost_type: costType
-  });
+  const wasEditing = !!editingPurchaseId;
+  const purchaseId = editingPurchaseId || crypto.randomUUID();
+  const purchasePayload = { date, vendor, total, notes, cost_type: costType };
+  let error;
+  if(wasEditing){
+    ({ error } = await sb.from('purchases').update(purchasePayload).eq('id', purchaseId));
+  } else {
+    ({ error } = await sb.from('purchases').insert({ id: purchaseId, owner_id: currentFlockOwnerId, ...purchasePayload }));
+  }
   if(error){ setStatus('purchase-status', error.message, true); return; }
+
+  if(wasEditing){
+    const { error: delError } = await sb.from('purchase_items').delete().eq('purchase_id', purchaseId);
+    if(delError){ setStatus('purchase-status', delError.message, true); return; }
+  }
 
   if(validItems.length){
     const itemsPayload = validItems.map(it => ({
@@ -6080,7 +6135,7 @@ async function savePurchase(){
   }
 
   resetPurchaseForm();
-  setStatus('purchase-status', 'Purchase logged.', false);
+  setStatus('purchase-status', wasEditing ? 'Purchase updated.' : 'Purchase logged.', false);
   await loadFlockData();
   renderPurchasesTab();
 }
@@ -6119,7 +6174,11 @@ function purchaseHistoryRowHtml(p){
         ${itemRows}${otherRow}
         ${(!itemRows && !otherRow) ? '<p class="empty">No items recorded.</p>' : ''}
         ${p.notes ? `<p class="hc-record-note">${escapeHtml(p.notes)}</p>` : ''}
-        ${!isReadOnly() ? `<button type="button" class="btn secondary full" style="margin-top:10px;" onclick="deletePurchase('${p.id}')">Delete this purchase</button>` : ''}
+        ${!isReadOnly() ? `
+        <div class="row" style="margin-top:10px;">
+          <div><button type="button" class="btn secondary full" onclick="editPurchase('${p.id}')">Edit</button></div>
+          <div><button type="button" class="btn secondary full" onclick="deletePurchase('${p.id}')">Delete</button></div>
+        </div>` : ''}
       </div>
     </details>`;
 }
@@ -6137,6 +6196,7 @@ async function deletePurchase(id){
   if(error) return;
   const { error: error2 } = await sb.from('purchases').delete().eq('id', id);
   if(error2) return;
+  if(editingPurchaseId === id) resetPurchaseForm();
   await loadFlockData();
   renderPurchasesTab();
 }
@@ -6231,10 +6291,82 @@ function renderPurchasesCostTypeBreakdown(){
   document.getElementById('purchases-cost-type-unset').textContent = formatMoney(unset);
 }
 
+// ---------- PURCHASES: FUTURE PREDICTIONS ----------
+// Averages recent complete Mon-Sun weeks (most recent first), never reaching
+// back further than the week the earliest relevant record falls in, so a
+// flock with only a couple of weeks of history isn't dragged down by empty
+// weeks before it started logging anything.
+const PREDICTION_MAX_WEEKS = 6;
+
+function weeksBackRanges(maxWeeksBack, earliestDate){
+  const currentWeekStart = startOfWeek(new Date());
+  const earliestWeekStart = earliestDate ? startOfWeek(earliestDate) : null;
+  const ranges = [];
+  for(let i = 1; i <= maxWeeksBack; i++){
+    const start = new Date(currentWeekStart); start.setDate(start.getDate() - 7 * i);
+    if(earliestWeekStart && start < earliestWeekStart) break;
+    const end = new Date(start); end.setDate(end.getDate() + 6); end.setHours(23, 59, 59, 999);
+    ranges.push({ start, end });
+  }
+  return ranges;
+}
+
+function weeklyAverageFromDatedAmounts(datedAmounts){
+  if(!datedAmounts.length) return { avg: 0, weeks: 0 };
+  const earliest = datedAmounts.reduce((min, x) => (x.date < min ? x.date : min), datedAmounts[0].date);
+  const ranges = weeksBackRanges(PREDICTION_MAX_WEEKS, new Date(earliest + 'T00:00:00'));
+  if(!ranges.length) return { avg: 0, weeks: 0 };
+  const total = ranges.reduce((sum, r) => sum + datedAmounts
+    .filter(x => { const d = new Date(x.date + 'T00:00:00'); return d >= r.start && d <= r.end; })
+    .reduce((s, x) => s + x.amount, 0), 0);
+  return { avg: total / ranges.length, weeks: ranges.length };
+}
+
+function runningCostDatedAmounts(){
+  const out = [];
+  state.purchases.forEach(p => {
+    purchaseItemsForPurchase(p.id).forEach(it => {
+      if((it.costType || p.costType) === 'running') out.push({ date: p.date, amount: it.amount });
+    });
+    const other = purchaseOtherAmount(p);
+    if(Math.abs(other) > 0.005 && p.costType === 'running') out.push({ date: p.date, amount: other });
+  });
+  return out;
+}
+
+function salesDatedAmounts(){
+  return state.sales.map(s => ({ date: s.date, amount: s.charged }))
+    .concat(state.livestockSales.map(s => ({ date: s.date, amount: s.charged })));
+}
+
+function renderPurchasesPredictions(){
+  const trackCostType = !!(state.purchasesSettings && state.purchasesSettings.trackCostType);
+  const predictOn = trackCostType && !!(state.purchasesSettings && state.purchasesSettings.predictFuture);
+  const card = document.getElementById('purchases-predict-card');
+  if(!card) return;
+  card.style.display = predictOn ? 'block' : 'none';
+  if(!predictOn) return;
+
+  const running = weeklyAverageFromDatedAmounts(runningCostDatedAmounts());
+  const sales = weeklyAverageFromDatedAmounts(salesDatedAmounts());
+  const weeks = Math.max(running.weeks, sales.weeks);
+  const pl = sales.avg - running.avg;
+
+  document.getElementById('purchases-predict-running').textContent = formatMoney(running.avg);
+  document.getElementById('purchases-predict-sales').textContent = formatMoney(sales.avg);
+  const plEl = document.getElementById('purchases-predict-pl');
+  plEl.innerHTML = (pl >= 0 ? '+' : '&minus;') + formatMoney(Math.abs(pl));
+  plEl.style.color = pl >= 0 ? 'var(--teal)' : 'var(--danger)';
+  document.getElementById('purchases-predict-basis').textContent = weeks
+    ? `Based on the last ${weeks} complete week${weeks > 1 ? 's' : ''} of running costs and sales.`
+    : 'Not enough history yet — log a few weeks of purchases and sales first.';
+}
+
 function renderPurchasesTab(){
   if(!document.getElementById('purchase-date').value) document.getElementById('purchase-date').value = todayStr();
   renderPurchaseItemsEditor();
   renderPurchasesCostTypeBreakdown();
+  renderPurchasesPredictions();
   renderPurchasesProfitLoss();
   renderPurchasesHistoryList();
 }
