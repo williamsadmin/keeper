@@ -286,14 +286,11 @@
 
       <section id="egg-form-section">
         <p class="sec-title" id="egg-form-title">Log Eggs</p>
-        <p class="share-note" style="margin-bottom:10px;">You can log more than one entry for the same day — e.g. a morning and evening collection.</p>
+        <p class="share-note" style="margin-bottom:10px;">Enter each coop's count separately. You can log more than one entry for the same day — e.g. a morning and evening collection.</p>
         <div class="row">
           <div><label>Date</label><input type="date" id="egg-date"></div>
         </div>
-        <div class="row">
-          <div><label>Total eggs</label><input type="number" min="0" inputmode="numeric" id="egg-total" placeholder="0"></div>
-          <div><label>Cracked / deformed</label><input type="number" min="0" inputmode="numeric" id="egg-cracked" placeholder="0"></div>
-        </div>
+        <div id="egg-coop-rows"></div>
         <button class="btn full" onclick="saveEggEntry()">Save entry</button>
         <button class="btn secondary full" id="egg-cancel-btn" style="display:none;margin-top:8px;" onclick="cancelEditEggEntry()">Cancel edit</button>
         <div class="status" id="egg-status"></div>
@@ -1833,6 +1830,7 @@ function switchTab(tab){
     else if(currentSection === 'livestock') lastLivestockTab = tab;
     else if(currentSection === 'purchases') lastPurchasesTab = tab;
   }
+  if(tab === 'eggs') renderEggCoopRows();
   if(tab === 'chickens'){ refreshFlockViews(); populateCoopSelectOptions(); }
   if(tab === 'health'){ populateHcCoopSelectOptions(); renderHcSetupInfo(); renderHealthHistory(); }
   if(tab === 'breeds'){ if(!editingBreedId) resetBreedForm(); renderBreedsList(); }
@@ -2100,7 +2098,7 @@ function renderAll(){
 }
 
 // ---------- DATA LOADING ----------
-function rowToEgg(r){ return { id: r.id, date: r.date, total: r.total, cracked: r.cracked }; }
+function rowToEgg(r){ return { id: r.id, date: r.date, total: r.total, cracked: r.cracked, coopId: r.coop_id || null }; }
 function rowToChicken(r){
   return {
     id: r.id, name: r.name, tag: r.tag, tagColour: r.tag_colour, breed: r.breed,
@@ -2241,29 +2239,66 @@ async function loadFlockData(){
 }
 
 // ---------- EGG COUNT ----------
+function poultryCoopsForEggForm(){
+  return state.coops.filter(c => c.category === 'poultry').slice().sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function eggCoopRowHtml(coop, total, cracked, soleUnattributed){
+  const coopId = coop ? coop.id : '';
+  const label = coop ? coop.name : (soleUnattributed ? 'Total eggs' : 'Unassigned');
+  return `
+    <div class="row egg-coop-row" data-coop-id="${coopId}" style="margin-bottom:8px;">
+      <div><label>${escapeHtml(label)}</label><input type="number" min="0" inputmode="numeric" class="egg-coop-total" value="${total != null ? total : ''}" placeholder="0"></div>
+      <div><label>Cracked / deformed</label><input type="number" min="0" inputmode="numeric" class="egg-coop-cracked" value="${cracked != null ? cracked : ''}" placeholder="0"></div>
+    </div>`;
+}
+
+function renderEggCoopRows(){
+  const el = document.getElementById('egg-coop-rows');
+  if(!el) return;
+  if(editingEggId){
+    const e = state.eggs.find(x => x.id === editingEggId);
+    if(!e){ resetEggForm(); return; }
+    const coop = e.coopId ? state.coops.find(c => c.id === e.coopId) : null;
+    el.innerHTML = eggCoopRowHtml(coop, e.total, e.cracked, false);
+    return;
+  }
+  const coops = poultryCoopsForEggForm();
+  el.innerHTML = coops.map(c => eggCoopRowHtml(c)).join('') + eggCoopRowHtml(null, null, null, coops.length === 0);
+}
+
 function resetEggForm(){
   editingEggId = null;
-  document.getElementById('egg-total').value = '';
-  document.getElementById('egg-cracked').value = '';
   document.getElementById('egg-date').value = todayStr();
   document.getElementById('egg-form-title').textContent = 'Log Eggs';
   document.getElementById('egg-cancel-btn').style.display = 'none';
+  renderEggCoopRows();
 }
 
 async function saveEggEntry(){
   const date = document.getElementById('egg-date').value;
-  const total = parseInt(document.getElementById('egg-total').value, 10);
-  const cracked = parseInt(document.getElementById('egg-cracked').value, 10) || 0;
-
   if(!date){ setStatus('egg-status', 'Pick a date.', true); return; }
-  if(isNaN(total) || total < 0){ setStatus('egg-status', 'Enter a valid total.', true); return; }
-  if(cracked > total){ setStatus('egg-status', "Cracked can't exceed total.", true); return; }
+
+  const rowEls = [...document.querySelectorAll('#egg-coop-rows .egg-coop-row')];
+  const rows = rowEls.map(rowEl => {
+    const total = parseInt(rowEl.querySelector('.egg-coop-total').value, 10);
+    const cracked = parseInt(rowEl.querySelector('.egg-coop-cracked').value, 10) || 0;
+    return { coopId: rowEl.dataset.coopId || null, total: isNaN(total) ? 0 : total, cracked };
+  });
+  for(const r of rows){
+    if(r.cracked > r.total){ setStatus('egg-status', "Cracked can't exceed total for one of the coops.", true); return; }
+  }
 
   let error;
   if(editingEggId){
-    ({ error } = await sb.from('eggs').update({ date, total, cracked }).eq('id', editingEggId));
+    const r = rows[0];
+    if(!r || !r.total){ setStatus('egg-status', 'Enter a valid total.', true); return; }
+    ({ error } = await sb.from('eggs').update({ date, total: r.total, cracked: r.cracked }).eq('id', editingEggId));
   } else {
-    ({ error } = await sb.from('eggs').insert({ owner_id: currentFlockOwnerId, date, total, cracked }));
+    const toSave = rows.filter(r => r.total > 0);
+    if(!toSave.length){ setStatus('egg-status', "Enter at least one coop's total.", true); return; }
+    const payload = toSave.map(r => ({ owner_id: currentFlockOwnerId, date, total: r.total, cracked: r.cracked, coop_id: r.coopId }));
+    ({ error } = await sb.from('eggs').insert(payload));
   }
   if(error){ setStatus('egg-status', error.message, true); return; }
 
@@ -2278,8 +2313,7 @@ function editEggEntry(id){
   if(!e) return;
   editingEggId = id;
   document.getElementById('egg-date').value = e.date;
-  document.getElementById('egg-total').value = e.total;
-  document.getElementById('egg-cracked').value = e.cracked;
+  renderEggCoopRows();
   document.getElementById('egg-form-title').textContent = 'Edit Entry';
   document.getElementById('egg-cancel-btn').style.display = 'block';
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2402,18 +2436,22 @@ function renderEggLog(){
   const el = document.getElementById('egg-log');
   if(!state.eggs.length){ el.innerHTML = '<p class="empty">No entries yet.</p>'; return; }
   const readOnly = isReadOnly();
-  el.innerHTML = state.eggs.slice(0, 90).map(e => `
+  el.innerHTML = state.eggs.slice(0, 90).map(e => {
+    const coop = e.coopId ? state.coops.find(c => c.id === e.coopId) : null;
+    const coopLabel = coop ? coop.name : 'Unassigned';
+    return `
     <div class="log-item">
       <div>
         <strong>${formatDateNice(e.date)}</strong>
-        <div class="text-dim" style="font-size:12px;">${e.total} total &middot; ${e.cracked} cracked &middot; ${e.total - e.cracked} good</div>
+        <div class="text-dim" style="font-size:12px;">${escapeHtml(coopLabel)} &middot; ${e.total} total &middot; ${e.cracked} cracked &middot; ${e.total - e.cracked} good</div>
       </div>
       ${readOnly ? '' : `
       <div class="icon-row">
         <button class="icon-btn" onclick="editEggEntry('${e.id}')" aria-label="Edit">&#9998;</button>
         <button class="icon-btn danger" onclick="deleteEggEntry('${e.id}')" aria-label="Delete">&#10005;</button>
       </div>`}
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderEggs(){

@@ -160,6 +160,11 @@ alter table coops add column if not exists category text not null default 'poult
 
 alter table chickens add column if not exists coop_id uuid references coops(id) on delete set null;
 
+-- Optional coop attribution per egg entry, so a day's count can be split
+-- across coops (e.g. Main Coop 10, Duck Coop 4) instead of one flock-wide
+-- total. Null means "Unassigned", same convention as chickens.coop_id.
+alter table eggs add column if not exists coop_id uuid references coops(id) on delete set null;
+
 -- ---------- Breeds ----------
 -- User-defined breed presets per animal type, shown alongside the app's
 -- built-in chicken breed list when picking a breed on the animal form.
