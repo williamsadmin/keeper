@@ -296,6 +296,17 @@
         <div class="status" id="egg-status"></div>
       </section>
 
+      <section id="egg-coop-filter-section" style="display:none;">
+        <div class="row">
+          <div>
+            <label>Filter by coop</label>
+            <select id="egg-coop-filter" onchange="onEggCoopFilterChange()">
+              <option value="">All coops</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
       <section>
         <p class="sec-title">Totals &amp; Averages</p>
         <div class="stat-grid" id="egg-stats"></div>
@@ -1555,6 +1566,7 @@ let currentFlockOwnerId = null;
 let currentRole = 'owner';
 let state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null, offspringRecords: [], headCounts: [], purchases: [], purchaseItems: [], purchasesSettings: null, purchasePresets: [] };
 let editingEggId = null;
+let eggCoopFilter = ''; // '' = all coops, '__unassigned', or a coop id
 let editingBreedId = null;
 let currentCustomerDetailId = null;
 let currentCustomerDetailReturnTab = 'sales';
@@ -1830,7 +1842,7 @@ function switchTab(tab){
     else if(currentSection === 'livestock') lastLivestockTab = tab;
     else if(currentSection === 'purchases') lastPurchasesTab = tab;
   }
-  if(tab === 'eggs') renderEggCoopRows();
+  if(tab === 'eggs'){ renderEggCoopRows(); renderEggCoopFilterOptions(); renderEggs(); }
   if(tab === 'chickens'){ refreshFlockViews(); populateCoopSelectOptions(); }
   if(tab === 'health'){ populateHcCoopSelectOptions(); renderHcSetupInfo(); renderHealthHistory(); }
   if(tab === 'breeds'){ if(!editingBreedId) resetBreedForm(); renderBreedsList(); }
@@ -2071,6 +2083,7 @@ function renderHcSetupInfo(){
 function renderAll(){
   applyRolePermissions();
   resetEggForm();
+  renderEggCoopFilterOptions();
   renderEggs();
   populateCoopSelectOptions();
   populateHcCoopSelectOptions();
@@ -2243,6 +2256,26 @@ function poultryCoopsForEggForm(){
   return state.coops.filter(c => c.category === 'poultry').slice().sort((a, b) => a.name.localeCompare(b.name));
 }
 
+function renderEggCoopFilterOptions(){
+  const section = document.getElementById('egg-coop-filter-section');
+  const sel = document.getElementById('egg-coop-filter');
+  if(!section || !sel) return;
+  const coops = poultryCoopsForEggForm();
+  section.style.display = coops.length ? 'block' : 'none';
+  if(!coops.length){ eggCoopFilter = ''; return; }
+  sel.innerHTML = '<option value="">All coops</option>' +
+    coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('') +
+    '<option value="__unassigned">Unassigned</option>';
+  const validValues = ['', '__unassigned', ...coops.map(c => c.id)];
+  if(!validValues.includes(eggCoopFilter)) eggCoopFilter = '';
+  sel.value = eggCoopFilter;
+}
+
+function onEggCoopFilterChange(){
+  eggCoopFilter = document.getElementById('egg-coop-filter').value;
+  renderEggs();
+}
+
 function eggCoopRowHtml(coop, total, cracked, soleUnattributed){
   const coopId = coop ? coop.id : '';
   const label = coop ? coop.name : (soleUnattributed ? 'Total eggs' : 'Unassigned');
@@ -2354,9 +2387,16 @@ function statHeadlineRow(good, sub){
     </div>`;
 }
 
+function eggMatchesCoopFilter(e){
+  if(!eggCoopFilter) return true;
+  if(eggCoopFilter === '__unassigned') return !e.coopId;
+  return e.coopId === eggCoopFilter;
+}
+
 function firstEggDateObj(){
-  if(!state.eggs.length) return null;
-  const earliest = state.eggs.reduce((min, e) => (e.date < min ? e.date : min), state.eggs[0].date);
+  const rows = state.eggs.filter(eggMatchesCoopFilter);
+  if(!rows.length) return null;
+  const earliest = rows.reduce((min, e) => (e.date < min ? e.date : min), rows[0].date);
   return new Date(earliest + 'T00:00:00');
 }
 
@@ -2376,11 +2416,15 @@ function elapsedDaysInRange(start, end){
   return Math.round((e - s) / 86400000) + 1;
 }
 
-function computePeriodStats(start, end){
-  const rows = state.eggs.filter(e => {
+function eggsInRange(start, end){
+  return state.eggs.filter(e => {
     const t = new Date(e.date + 'T00:00:00');
-    return t >= start && t <= end;
+    return t >= start && t <= end && eggMatchesCoopFilter(e);
   });
+}
+
+function computePeriodStats(start, end){
+  const rows = eggsInRange(start, end);
   const total = rows.reduce((s, e) => s + e.total, 0);
   const cracked = rows.reduce((s, e) => s + e.cracked, 0);
   const good = total - cracked;
@@ -2390,7 +2434,32 @@ function computePeriodStats(start, end){
   return { total, cracked, good, avg, days };
 }
 
-function eggStatCardHtml(label, s, sub, showDaysLogged){
+// Per-coop split of a period's totals, for the "smaller numbers" under each
+// aggregate stat card. Only meaningful when viewing "All coops" -- callers
+// pass an empty array while a specific coop filter is active.
+function eggCoopBreakdownEntries(start, end, elapsed){
+  const rowsInRange = state.eggs.filter(e => {
+    const t = new Date(e.date + 'T00:00:00');
+    return t >= start && t <= end;
+  });
+  const bucket = (matchFn) => {
+    const rows = rowsInRange.filter(matchFn);
+    const total = rows.reduce((s, e) => s + e.total, 0);
+    const cracked = rows.reduce((s, e) => s + e.cracked, 0);
+    return { total, cracked, avg: elapsed ? total / elapsed : 0 };
+  };
+  const entries = poultryCoopsForEggForm().map(c => ({ label: c.name, ...bucket(e => e.coopId === c.id) }));
+  entries.push({ label: 'Unassigned', ...bucket(e => !e.coopId) });
+  return entries.filter(e => e.total > 0 || e.cracked > 0);
+}
+
+function eggCoopBreakdownHtml(entries){
+  if(entries.length < 2) return '';
+  return `<div class="stat-row" style="margin-top:6px;font-weight:600;"><span>By coop</span></div>` +
+    entries.map(e => `<div class="stat-row"><span>${escapeHtml(e.label)}</span><span>${e.total} total &middot; ${e.cracked} cracked &middot; ${e.avg.toFixed(1)}/day</span></div>`).join('');
+}
+
+function eggStatCardHtml(label, s, sub, showDaysLogged, breakdownEntries){
   return `
     <div class="stat-card">
       <div class="stat-label">${escapeHtml(label)}</div>
@@ -2399,7 +2468,14 @@ function eggStatCardHtml(label, s, sub, showDaysLogged){
       <div class="stat-row"><span>Cracked</span><strong>${s.cracked}</strong></div>
       <div class="stat-row"><span>Avg / day</span><strong>${s.avg.toFixed(1)}</strong></div>
       ${showDaysLogged ? `<div class="stat-row"><span>Days logged</span><strong>${s.days}</strong></div>` : ''}
+      ${breakdownEntries ? eggCoopBreakdownHtml(breakdownEntries) : ''}
     </div>`;
+}
+
+function eggStatCardHtmlForRange(label, start, end, sub, showDaysLogged){
+  const s = computePeriodStats(start, end);
+  const breakdown = eggCoopFilter ? [] : eggCoopBreakdownEntries(start, end, elapsedDaysInRange(start, end));
+  return eggStatCardHtml(label, s, sub, showDaysLogged, breakdown);
 }
 
 function renderEggStats(){
@@ -2409,12 +2485,9 @@ function renderEggStats(){
   const runningStart = new Date(now); runningStart.setDate(runningStart.getDate() - 6); runningStart.setHours(0, 0, 0, 0);
   const runningEnd = new Date(now); runningEnd.setHours(23, 59, 59, 999);
 
-  const w = computePeriodStats(weekStart, weekEnd);
-  const r = computePeriodStats(runningStart, runningEnd);
-
   document.getElementById('egg-stats').innerHTML =
-    eggStatCardHtml('This Week', w, 'good eggs (Mon&ndash;Sun)') +
-    eggStatCardHtml('Running Week', r, 'good eggs (last 7 days)');
+    eggStatCardHtmlForRange('This Week', weekStart, weekEnd, 'good eggs (Mon&ndash;Sun)') +
+    eggStatCardHtmlForRange('Running Week', runningStart, runningEnd, 'good eggs (last 7 days)');
 
   renderEggMoreStats();
 }
@@ -2427,16 +2500,15 @@ function renderEggMoreStats(){
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
   const yearStart = new Date(now.getFullYear(), 0, 1);
   const yearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
-  const m = computePeriodStats(monthStart, monthEnd);
-  const y = computePeriodStats(yearStart, yearEnd);
-  el.innerHTML = eggStatCardHtml('This Month', m) + eggStatCardHtml('This Year', y);
+  el.innerHTML = eggStatCardHtmlForRange('This Month', monthStart, monthEnd) + eggStatCardHtmlForRange('This Year', yearStart, yearEnd);
 }
 
 function renderEggLog(){
   const el = document.getElementById('egg-log');
-  if(!state.eggs.length){ el.innerHTML = '<p class="empty">No entries yet.</p>'; return; }
+  const filtered = state.eggs.filter(eggMatchesCoopFilter);
+  if(!filtered.length){ el.innerHTML = '<p class="empty">No entries yet.</p>'; return; }
   const readOnly = isReadOnly();
-  el.innerHTML = state.eggs.slice(0, 90).map(e => {
+  el.innerHTML = filtered.slice(0, 90).map(e => {
     const coop = e.coopId ? state.coops.find(c => c.id === e.coopId) : null;
     const coopLabel = coop ? coop.name : 'Unassigned';
     return `
@@ -2509,8 +2581,9 @@ function renderHistoryStats(){
   let start, end, label;
 
   if(type === 'lifetime'){
-    if(!state.eggs.length){ el.innerHTML = '<p class="empty">No entries yet.</p>'; return; }
-    const dates = state.eggs.map(e => e.date).sort();
+    const filteredEggs = state.eggs.filter(eggMatchesCoopFilter);
+    if(!filteredEggs.length){ el.innerHTML = '<p class="empty">No entries yet.</p>'; return; }
+    const dates = filteredEggs.map(e => e.date).sort();
     start = new Date(dates[0] + 'T00:00:00');
     end = new Date(8640000000000000);
     label = 'Lifetime';
@@ -2529,8 +2602,7 @@ function renderHistoryStats(){
     label = String(y);
   }
 
-  const s = computePeriodStats(start, end);
-  el.innerHTML = eggStatCardHtml(label, s, null, true);
+  el.innerHTML = eggStatCardHtmlForRange(label, start, end, null, true);
 }
 
 // ---------- CHICKENS ----------
