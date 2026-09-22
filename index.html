@@ -2276,14 +2276,27 @@ function onEggCoopFilterChange(){
   renderEggs();
 }
 
-function eggCoopRowHtml(coop, total, cracked, soleUnattributed){
+function eggCoopRowHtml(coop, good, cracked, soleUnattributed){
   const coopId = coop ? coop.id : '';
-  const label = coop ? coop.name : (soleUnattributed ? 'Total eggs' : 'Unassigned');
+  const label = coop ? coop.name : (soleUnattributed ? 'Good eggs' : 'Unassigned');
+  const totalNow = (good || 0) + (cracked || 0);
   return `
-    <div class="row egg-coop-row" data-coop-id="${coopId}" style="margin-bottom:8px;">
-      <div><label>${escapeHtml(label)}</label><input type="number" min="0" inputmode="numeric" class="egg-coop-total" value="${total != null ? total : ''}" placeholder="0"></div>
-      <div><label>Cracked / deformed</label><input type="number" min="0" inputmode="numeric" class="egg-coop-cracked" value="${cracked != null ? cracked : ''}" placeholder="0"></div>
+    <div class="egg-coop-row" data-coop-id="${coopId}" style="margin-bottom:10px;">
+      <div class="row">
+        <div><label>${escapeHtml(label)}</label><input type="number" min="0" inputmode="numeric" class="egg-coop-good" value="${good != null ? good : ''}" placeholder="0" oninput="updateEggCoopRowTotal(this)"></div>
+        <div><label>Cracked / deformed</label><input type="number" min="0" inputmode="numeric" class="egg-coop-cracked" value="${cracked != null ? cracked : ''}" placeholder="0" oninput="updateEggCoopRowTotal(this)"></div>
+      </div>
+      <p class="share-note egg-coop-row-total" style="margin:2px 0 0;">Total: ${totalNow}</p>
     </div>`;
+}
+
+function updateEggCoopRowTotal(inputEl){
+  const row = inputEl.closest('.egg-coop-row');
+  if(!row) return;
+  const good = parseInt(row.querySelector('.egg-coop-good').value, 10) || 0;
+  const cracked = parseInt(row.querySelector('.egg-coop-cracked').value, 10) || 0;
+  const totalEl = row.querySelector('.egg-coop-row-total');
+  if(totalEl) totalEl.textContent = `Total: ${good + cracked}`;
 }
 
 function renderEggCoopRows(){
@@ -2293,7 +2306,7 @@ function renderEggCoopRows(){
     const e = state.eggs.find(x => x.id === editingEggId);
     if(!e){ resetEggForm(); return; }
     const coop = e.coopId ? state.coops.find(c => c.id === e.coopId) : null;
-    el.innerHTML = eggCoopRowHtml(coop, e.total, e.cracked, false);
+    el.innerHTML = eggCoopRowHtml(coop, e.total - e.cracked, e.cracked, false);
     return;
   }
   const coops = poultryCoopsForEggForm();
@@ -2314,22 +2327,19 @@ async function saveEggEntry(){
 
   const rowEls = [...document.querySelectorAll('#egg-coop-rows .egg-coop-row')];
   const rows = rowEls.map(rowEl => {
-    const total = parseInt(rowEl.querySelector('.egg-coop-total').value, 10);
+    const good = parseInt(rowEl.querySelector('.egg-coop-good').value, 10) || 0;
     const cracked = parseInt(rowEl.querySelector('.egg-coop-cracked').value, 10) || 0;
-    return { coopId: rowEl.dataset.coopId || null, total: isNaN(total) ? 0 : total, cracked };
+    return { coopId: rowEl.dataset.coopId || null, total: good + cracked, cracked };
   });
-  for(const r of rows){
-    if(r.cracked > r.total){ setStatus('egg-status', "Cracked can't exceed total for one of the coops.", true); return; }
-  }
 
   let error;
   if(editingEggId){
     const r = rows[0];
-    if(!r || !r.total){ setStatus('egg-status', 'Enter a valid total.', true); return; }
+    if(!r || !r.total){ setStatus('egg-status', 'Enter at least one egg.', true); return; }
     ({ error } = await sb.from('eggs').update({ date, total: r.total, cracked: r.cracked }).eq('id', editingEggId));
   } else {
     const toSave = rows.filter(r => r.total > 0);
-    if(!toSave.length){ setStatus('egg-status', "Enter at least one coop's total.", true); return; }
+    if(!toSave.length){ setStatus('egg-status', "Enter at least one coop's eggs.", true); return; }
     const payload = toSave.map(r => ({ owner_id: currentFlockOwnerId, date, total: r.total, cracked: r.cracked, coop_id: r.coopId }));
     ({ error } = await sb.from('eggs').insert(payload));
   }
