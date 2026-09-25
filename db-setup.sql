@@ -319,6 +319,22 @@ create table if not exists head_counts (
   created_at timestamptz not null default now()
 );
 
+-- ---------- Egg stock checks ----------
+-- A physical "how many eggs do I actually have" reconciliation. expected_count
+-- and difference are computed and frozen at save time (last check's
+-- actual_count, plus good eggs collected since, minus eggs sold since --
+-- or everything logged so far if there's no prior check) so history stays
+-- accurate even as later eggs/sales are logged.
+create table if not exists egg_stock_checks (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  date date not null,
+  actual_count int not null,
+  expected_count int not null,
+  difference int not null,
+  created_at timestamptz not null default now()
+);
+
 -- ---------- Purchases ----------
 -- One row per shopping trip / receipt. total is the ground truth for what
 -- was spent; purchase_items optionally break it down by coop/flock, and
@@ -414,6 +430,7 @@ alter table livestock_sales_settings enable row level security;
 alter table livestock_sales enable row level security;
 alter table offspring_records enable row level security;
 alter table head_counts enable row level security;
+alter table egg_stock_checks enable row level security;
 alter table purchases enable row level security;
 alter table purchase_items enable row level security;
 alter table purchases_settings enable row level security;
@@ -553,6 +570,13 @@ drop policy if exists "head_counts write" on head_counts;
 create policy "head_counts write" on head_counts for insert with check (has_flock_access(owner_id, 'editor'));
 drop policy if exists "head_counts delete" on head_counts;
 create policy "head_counts delete" on head_counts for delete using (has_flock_access(owner_id, 'editor'));
+
+drop policy if exists "egg_stock_checks read" on egg_stock_checks;
+create policy "egg_stock_checks read" on egg_stock_checks for select using (has_flock_access(owner_id));
+drop policy if exists "egg_stock_checks write" on egg_stock_checks;
+create policy "egg_stock_checks write" on egg_stock_checks for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "egg_stock_checks delete" on egg_stock_checks;
+create policy "egg_stock_checks delete" on egg_stock_checks for delete using (has_flock_access(owner_id, 'editor'));
 
 drop policy if exists "purchases read" on purchases;
 create policy "purchases read" on purchases for select using (has_flock_access(owner_id));

@@ -347,6 +347,27 @@
           <div id="egg-log"></div>
         </details>
       </section>
+
+      <section>
+        <details>
+          <summary class="sec-title">Stock Check</summary>
+          <p class="share-note" style="margin-bottom:10px;">Count how many eggs you actually have on hand and compare it to what your daily counts and sales say you should have.</p>
+          <p class="share-note" id="egg-stock-check-expected-note" style="margin-bottom:10px;"></p>
+          <div class="row">
+            <div><label>Date</label><input type="date" id="stock-check-date"></div>
+          </div>
+          <div class="row">
+            <div><label>You have</label><input type="number" min="0" step="1" id="stock-check-quantity" placeholder="e.g. 4"></div>
+            <div>
+              <label>Unit</label>
+              <select id="stock-check-unit"></select>
+            </div>
+          </div>
+          <button class="btn full" onclick="saveEggStockCheck()">Save check</button>
+          <div class="status" id="stock-check-status"></div>
+          <div id="egg-stock-check-history" style="margin-top:12px;"></div>
+        </details>
+      </section>
     </div>
 
     <!-- CHICKENS TAB (MY FLOCK LANDING) -->
@@ -1564,7 +1585,7 @@ let isSignup = false;
 let flocks = []; // [{ ownerId, label, role: 'owner'|'editor'|'viewer' }]
 let currentFlockOwnerId = null;
 let currentRole = 'owner';
-let state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null, offspringRecords: [], headCounts: [], purchases: [], purchaseItems: [], purchasesSettings: null, purchasePresets: [] };
+let state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null, offspringRecords: [], headCounts: [], purchases: [], purchaseItems: [], purchasesSettings: null, purchasePresets: [], eggStockChecks: [] };
 let editingEggId = null;
 let eggCoopFilter = ''; // '' = all coops, '__unassigned', or a coop id
 let editingBreedId = null;
@@ -1924,7 +1945,7 @@ async function logout(){
   flocks = [];
   currentFlockOwnerId = null;
   currentRole = 'owner';
-  state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null, offspringRecords: [], headCounts: [], purchases: [], purchaseItems: [], purchasesSettings: null, purchasePresets: [] };
+  state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null, offspringRecords: [], headCounts: [], purchases: [], purchaseItems: [], purchasesSettings: null, purchasePresets: [], eggStockChecks: [] };
   showPoultrySection = true;
   showLivestockSection = true;
   hiddenPoultryTabIds = [];
@@ -2111,7 +2132,7 @@ function renderAll(){
 }
 
 // ---------- DATA LOADING ----------
-function rowToEgg(r){ return { id: r.id, date: r.date, total: r.total, cracked: r.cracked, coopId: r.coop_id || null }; }
+function rowToEgg(r){ return { id: r.id, date: r.date, total: r.total, cracked: r.cracked, coopId: r.coop_id || null, createdAt: r.created_at }; }
 function rowToChicken(r){
   return {
     id: r.id, name: r.name, tag: r.tag, tagColour: r.tag_colour, breed: r.breed,
@@ -2150,7 +2171,8 @@ function rowToCustomer(r){
 function rowToSale(r){
   return {
     id: r.id, customerId: r.customer_id, date: r.date, unit: r.unit, coopId: r.coop_id || null,
-    quantity: Number(r.quantity) || 0, charged: Number(r.charged) || 0, paid: Number(r.paid) || 0
+    quantity: Number(r.quantity) || 0, charged: Number(r.charged) || 0, paid: Number(r.paid) || 0,
+    createdAt: r.created_at
   };
 }
 function rowToCustomerCredit(r){
@@ -2208,12 +2230,16 @@ function rowToPurchasePreset(r){
   return { id: r.id, name: r.name || '', amount: Number(r.amount) || 0, coopId: r.coop_id || null, costType: r.cost_type || null };
 }
 
+function rowToEggStockCheck(r){
+  return { id: r.id, date: r.date, actualCount: r.actual_count, expectedCount: r.expected_count, difference: r.difference, createdAt: r.created_at };
+}
+
 function purchasesEnabled(){
   return !state.purchasesSettings || state.purchasesSettings.enabled !== false;
 }
 
 async function loadFlockData(){
-  const [eggsRes, chickensRes, hcRes, coopsRes, breedsRes, customersRes, salesRes, creditsRes, salesSettingsRes, livestockSalesRes, livestockSalesSettingsRes, offspringRes, headCountsRes, purchasesRes, purchaseItemsRes, purchasesSettingsRes, purchasePresetsRes] = await Promise.all([
+  const [eggsRes, chickensRes, hcRes, coopsRes, breedsRes, customersRes, salesRes, creditsRes, salesSettingsRes, livestockSalesRes, livestockSalesSettingsRes, offspringRes, headCountsRes, purchasesRes, purchaseItemsRes, purchasesSettingsRes, purchasePresetsRes, eggStockChecksRes] = await Promise.all([
     sb.from('eggs').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }).order('created_at', { ascending: false }),
     sb.from('chickens').select('*').eq('owner_id', currentFlockOwnerId).order('created_at'),
     sb.from('health_checks').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
@@ -2230,7 +2256,8 @@ async function loadFlockData(){
     sb.from('purchases').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
     sb.from('purchase_items').select('*').eq('owner_id', currentFlockOwnerId),
     sb.from('purchases_settings').select('*').eq('owner_id', currentFlockOwnerId).maybeSingle(),
-    sb.from('purchase_item_presets').select('*').eq('owner_id', currentFlockOwnerId).order('name')
+    sb.from('purchase_item_presets').select('*').eq('owner_id', currentFlockOwnerId).order('name'),
+    sb.from('egg_stock_checks').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false })
   ]);
   state.eggs = (eggsRes.data || []).map(rowToEgg);
   state.chickens = (chickensRes.data || []).map(rowToChicken);
@@ -2249,6 +2276,7 @@ async function loadFlockData(){
   state.purchaseItems = (purchaseItemsRes.data || []).map(rowToPurchaseItem);
   state.purchasesSettings = rowToPurchasesSettings(purchasesSettingsRes.data);
   state.purchasePresets = (purchasePresetsRes.data || []).map(rowToPurchasePreset);
+  state.eggStockChecks = (eggStockChecksRes.data || []).map(rowToEggStockCheck);
 }
 
 // ---------- EGG COUNT ----------
@@ -2264,9 +2292,8 @@ function renderEggCoopFilterOptions(){
   section.style.display = coops.length ? 'block' : 'none';
   if(!coops.length){ eggCoopFilter = ''; return; }
   sel.innerHTML = '<option value="">All coops</option>' +
-    coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('') +
-    '<option value="__unassigned">Unassigned</option>';
-  const validValues = ['', '__unassigned', ...coops.map(c => c.id)];
+    coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  const validValues = ['', ...coops.map(c => c.id)];
   if(!validValues.includes(eggCoopFilter)) eggCoopFilter = '';
   sel.value = eggCoopFilter;
 }
@@ -2310,7 +2337,9 @@ function renderEggCoopRows(){
     return;
   }
   const coops = poultryCoopsForEggForm();
-  el.innerHTML = coops.map(c => eggCoopRowHtml(c)).join('') + eggCoopRowHtml(null, null, null, coops.length === 0);
+  el.innerHTML = coops.length
+    ? coops.map(c => eggCoopRowHtml(c)).join('')
+    : eggCoopRowHtml(null, null, null, true);
 }
 
 function resetEggForm(){
@@ -2459,7 +2488,6 @@ function eggCoopBreakdownEntries(start, end, elapsed){
     return { total, cracked, avg: elapsed ? total / elapsed : 0 };
   };
   const entries = poultryCoopsForEggForm().map(c => ({ label: c.name, ...bucket(e => e.coopId === c.id) }));
-  entries.push({ label: 'Unassigned', ...bucket(e => !e.coopId) });
   return entries.filter(e => e.total > 0 || e.cracked > 0);
 }
 
@@ -2536,12 +2564,126 @@ function renderEggLog(){
   }).join('');
 }
 
+// ---------- EGG STOCK CHECK ----------
+const EGGS_PER_UNIT = { egg: 1, half_dozen: 6, dozen: 12 };
+
+function stockCheckUnitOptionsHtml(selected){
+  return ['egg', 'half_dozen', 'dozen'].map(u => `<option value="${u}" ${u === selected ? 'selected' : ''}>${SALE_UNIT_LABELS[u]}</option>`).join('');
+}
+
+function latestEggStockCheckOnOrBefore(date){
+  return state.eggStockChecks
+    .filter(c => c.date <= date)
+    .slice()
+    .sort((a, b) => {
+      if(a.date !== b.date) return a.date < b.date ? 1 : -1;
+      return a.createdAt < b.createdAt ? 1 : -1;
+    })[0] || null;
+}
+
+// Expected eggs on hand as of a date: the last check's own count, plus
+// everything good collected since that check, minus everything sold since
+// (in egg-equivalent units) -- or, with no prior check, everything ever
+// logged. The "since" boundary compares createdAt timestamps, not just the
+// date field, so an egg entry or check logged later the same day as a prior
+// check is still correctly counted as happening after it. Immutable once a
+// check is saved, matching Head Count's history.
+function computeExpectedEggStock(asOfDate){
+  const previous = latestEggStockCheckOnOrBefore(asOfDate);
+  const sinceCreatedAt = previous ? previous.createdAt : null;
+  const baseline = previous ? previous.actualCount : 0;
+  const collected = state.eggs
+    .filter(e => (!sinceCreatedAt || e.createdAt > sinceCreatedAt) && e.date <= asOfDate)
+    .reduce((s, e) => s + (e.total - e.cracked), 0);
+  const sold = state.sales
+    .filter(s => (!sinceCreatedAt || s.createdAt > sinceCreatedAt) && s.date <= asOfDate)
+    .reduce((s, x) => s + x.quantity * (EGGS_PER_UNIT[x.unit] || 1), 0);
+  return { expected: baseline + collected - sold, previous };
+}
+
+function renderEggStockCheckStatus(){
+  const el = document.getElementById('egg-stock-check-expected-note');
+  if(!el) return;
+  const { expected, previous } = computeExpectedEggStock(todayStr());
+  el.textContent = previous
+    ? `Since your last check on ${formatDateNice(previous.date)}, you should have ${expected} egg${expected === 1 ? '' : 's'} on hand now.`
+    : `Based on everything logged so far, you should have ${expected} egg${expected === 1 ? '' : 's'} on hand now.`;
+}
+
+function eggStockCheckBadgeHtml(diff){
+  if(Math.abs(diff) < 0.5) return `<span class="ok-badge">Matches</span>`;
+  return diff > 0
+    ? `<span class="ok-badge">+${diff} extra</span>`
+    : `<span class="issue-badge">${Math.abs(diff)} unaccounted for</span>`;
+}
+
+function eggStockCheckRowHtml(c){
+  return `
+    <div class="log-item">
+      <div>
+        <strong>${formatDateNice(c.date)}</strong>
+        <div class="text-dim" style="font-size:12px;">Had ${c.actualCount} &middot; Expected ${c.expectedCount}</div>
+      </div>
+      <div class="icon-row">
+        ${eggStockCheckBadgeHtml(c.difference)}
+        ${!isReadOnly() ? `<button class="icon-btn danger" onclick="deleteEggStockCheck('${c.id}')" aria-label="Delete">&#10005;</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function renderEggStockCheckHistory(){
+  const el = document.getElementById('egg-stock-check-history');
+  if(!el) return;
+  const sorted = state.eggStockChecks.slice().sort((a, b) => (a.date < b.date ? 1 : (a.date > b.date ? -1 : 0)));
+  el.innerHTML = sorted.length ? sorted.map(eggStockCheckRowHtml).join('') : '<p class="empty">No stock checks yet.</p>';
+}
+
+function renderEggStockCheckSection(){
+  const dateEl = document.getElementById('stock-check-date');
+  if(dateEl && !dateEl.value) dateEl.value = todayStr();
+  const unitSel = document.getElementById('stock-check-unit');
+  if(unitSel && !unitSel.innerHTML) unitSel.innerHTML = stockCheckUnitOptionsHtml('half_dozen');
+  renderEggStockCheckStatus();
+  renderEggStockCheckHistory();
+}
+
+async function saveEggStockCheck(){
+  const date = document.getElementById('stock-check-date').value;
+  if(!date){ setStatus('stock-check-status', 'Pick a date.', true); return; }
+  const qty = Number(document.getElementById('stock-check-quantity').value);
+  if(!qty || qty <= 0){ setStatus('stock-check-status', 'Enter how many you have.', true); return; }
+  const unit = document.getElementById('stock-check-unit').value;
+  const actualCount = Math.round(qty * (EGGS_PER_UNIT[unit] || 1));
+
+  const { expected } = computeExpectedEggStock(date);
+  const difference = actualCount - expected;
+
+  const { error } = await sb.from('egg_stock_checks').insert({
+    owner_id: currentFlockOwnerId, date, actual_count: actualCount, expected_count: expected, difference
+  });
+  if(error){ setStatus('stock-check-status', error.message, true); return; }
+
+  await loadFlockData();
+  setStatus('stock-check-status', 'Saved.', false);
+  document.getElementById('stock-check-quantity').value = '';
+  renderEggStockCheckSection();
+}
+
+async function deleteEggStockCheck(id){
+  if(!confirm('Delete this stock check?')) return;
+  const { error } = await sb.from('egg_stock_checks').delete().eq('id', id);
+  if(error) return;
+  await loadFlockData();
+  renderEggStockCheckSection();
+}
+
 function renderEggs(){
   renderEggReminder();
   renderEggStats();
   renderEggLog();
   initHistoryDefaults();
   renderHistoryStats();
+  renderEggStockCheckSection();
 }
 
 function renderEggReminder(){
