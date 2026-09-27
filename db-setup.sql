@@ -335,6 +335,10 @@ create table if not exists egg_stock_checks (
   created_at timestamptz not null default now()
 );
 
+-- Each coop is reconciled separately -- null means the whole-flock check
+-- used before per-coop tracking, or the fallback when no coops exist yet.
+alter table egg_stock_checks add column if not exists coop_id uuid references coops(id) on delete set null;
+
 -- ---------- Purchases ----------
 -- One row per shopping trip / receipt. total is the ground truth for what
 -- was spent; purchase_items optionally break it down by coop/flock, and

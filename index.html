@@ -350,22 +350,25 @@
 
       <section>
         <details>
-          <summary class="sec-title">Stock Check</summary>
-          <p class="share-note" style="margin-bottom:10px;">Count how many eggs you actually have on hand and compare it to what your daily counts and sales say you should have.</p>
-          <p class="share-note" id="egg-stock-check-expected-note" style="margin-bottom:10px;"></p>
-          <div class="row">
-            <div><label>Date</label><input type="date" id="stock-check-date"></div>
-          </div>
-          <div class="row">
-            <div><label>You have</label><input type="number" min="0" step="1" id="stock-check-quantity" placeholder="e.g. 4"></div>
-            <div>
-              <label>Unit</label>
-              <select id="stock-check-unit"></select>
+          <summary class="sec-title">Stock Check<span id="egg-stock-check-coop-name"></span></summary>
+          <p class="share-note" style="margin-bottom:10px;">Count how many eggs you actually have on hand and compare it to what your daily counts and sales say you should have. Each coop is tracked separately.</p>
+          <p class="share-note" id="egg-stock-check-prompt" style="display:none;">Pick a coop from the filter above to do a stock check for it.</p>
+          <div id="egg-stock-check-body">
+            <p class="share-note" id="egg-stock-check-expected-note" style="margin-bottom:10px;"></p>
+            <div class="row">
+              <div><label>Date</label><input type="date" id="stock-check-date"></div>
             </div>
+            <div class="row">
+              <div><label>You have</label><input type="number" min="0" step="1" id="stock-check-quantity" placeholder="e.g. 4"></div>
+              <div>
+                <label>Unit</label>
+                <select id="stock-check-unit"></select>
+              </div>
+            </div>
+            <button class="btn full" onclick="saveEggStockCheck()">Save check</button>
+            <div class="status" id="stock-check-status"></div>
+            <div id="egg-stock-check-history" style="margin-top:12px;"></div>
           </div>
-          <button class="btn full" onclick="saveEggStockCheck()">Save check</button>
-          <div class="status" id="stock-check-status"></div>
-          <div id="egg-stock-check-history" style="margin-top:12px;"></div>
         </details>
       </section>
     </div>
@@ -2231,7 +2234,7 @@ function rowToPurchasePreset(r){
 }
 
 function rowToEggStockCheck(r){
-  return { id: r.id, date: r.date, actualCount: r.actual_count, expectedCount: r.expected_count, difference: r.difference, createdAt: r.created_at };
+  return { id: r.id, date: r.date, actualCount: r.actual_count, expectedCount: r.expected_count, difference: r.difference, createdAt: r.created_at, coopId: r.coop_id || null };
 }
 
 function purchasesEnabled(){
@@ -2571,9 +2574,16 @@ function stockCheckUnitOptionsHtml(selected){
   return ['egg', 'half_dozen', 'dozen'].map(u => `<option value="${u}" ${u === selected ? 'selected' : ''}>${SALE_UNIT_LABELS[u]}</option>`).join('');
 }
 
+// A stock check "belongs" to whichever coop is currently selected in the
+// page's coop filter -- same matching rule as eggMatchesCoopFilter, applied
+// to the check's own coop_id instead of an egg's.
+function stockCheckMatchesCoopFilter(c){
+  return eggCoopFilter ? c.coopId === eggCoopFilter : !c.coopId;
+}
+
 function latestEggStockCheckOnOrBefore(date){
   return state.eggStockChecks
-    .filter(c => c.date <= date)
+    .filter(c => c.date <= date && stockCheckMatchesCoopFilter(c))
     .slice()
     .sort((a, b) => {
       if(a.date !== b.date) return a.date < b.date ? 1 : -1;
@@ -2581,22 +2591,23 @@ function latestEggStockCheckOnOrBefore(date){
     })[0] || null;
 }
 
-// Expected eggs on hand as of a date: the last check's own count, plus
-// everything good collected since that check, minus everything sold since
-// (in egg-equivalent units) -- or, with no prior check, everything ever
-// logged. The "since" boundary compares createdAt timestamps, not just the
-// date field, so an egg entry or check logged later the same day as a prior
-// check is still correctly counted as happening after it. Immutable once a
-// check is saved, matching Head Count's history.
+// Expected eggs on hand as of a date, scoped to the currently-filtered coop:
+// the last check's own count for that coop, plus everything good collected
+// for it since, minus everything sold for it since (in egg-equivalent
+// units) -- or, with no prior check, everything ever logged for it. The
+// "since" boundary compares createdAt timestamps, not just the date field,
+// so an egg entry or check logged later the same day as a prior check is
+// still correctly counted as happening after it. Immutable once a check is
+// saved, matching Head Count's history.
 function computeExpectedEggStock(asOfDate){
   const previous = latestEggStockCheckOnOrBefore(asOfDate);
   const sinceCreatedAt = previous ? previous.createdAt : null;
   const baseline = previous ? previous.actualCount : 0;
   const collected = state.eggs
-    .filter(e => (!sinceCreatedAt || e.createdAt > sinceCreatedAt) && e.date <= asOfDate)
+    .filter(e => eggMatchesCoopFilter(e) && (!sinceCreatedAt || e.createdAt > sinceCreatedAt) && e.date <= asOfDate)
     .reduce((s, e) => s + (e.total - e.cracked), 0);
   const sold = state.sales
-    .filter(s => (!sinceCreatedAt || s.createdAt > sinceCreatedAt) && s.date <= asOfDate)
+    .filter(s => eggMatchesCoopFilter(s) && (!sinceCreatedAt || s.createdAt > sinceCreatedAt) && s.date <= asOfDate)
     .reduce((s, x) => s + x.quantity * (EGGS_PER_UNIT[x.unit] || 1), 0);
   return { expected: baseline + collected - sold, previous };
 }
@@ -2634,11 +2645,25 @@ function eggStockCheckRowHtml(c){
 function renderEggStockCheckHistory(){
   const el = document.getElementById('egg-stock-check-history');
   if(!el) return;
-  const sorted = state.eggStockChecks.slice().sort((a, b) => (a.date < b.date ? 1 : (a.date > b.date ? -1 : 0)));
+  const sorted = state.eggStockChecks.filter(stockCheckMatchesCoopFilter).slice().sort((a, b) => (a.date < b.date ? 1 : (a.date > b.date ? -1 : 0)));
   el.innerHTML = sorted.length ? sorted.map(eggStockCheckRowHtml).join('') : '<p class="empty">No stock checks yet.</p>';
 }
 
 function renderEggStockCheckSection(){
+  const bodyEl = document.getElementById('egg-stock-check-body');
+  const promptEl = document.getElementById('egg-stock-check-prompt');
+  const nameEl = document.getElementById('egg-stock-check-coop-name');
+  if(!bodyEl || !promptEl) return;
+
+  const needsCoopPick = poultryCoopsForEggForm().length > 0 && !eggCoopFilter;
+  bodyEl.style.display = needsCoopPick ? 'none' : 'block';
+  promptEl.style.display = needsCoopPick ? 'block' : 'none';
+  if(nameEl){
+    const coop = eggCoopFilter ? state.coops.find(c => c.id === eggCoopFilter) : null;
+    nameEl.textContent = coop ? ` — ${coop.name}` : '';
+  }
+  if(needsCoopPick) return;
+
   const dateEl = document.getElementById('stock-check-date');
   if(dateEl && !dateEl.value) dateEl.value = todayStr();
   const unitSel = document.getElementById('stock-check-unit');
@@ -2659,7 +2684,8 @@ async function saveEggStockCheck(){
   const difference = actualCount - expected;
 
   const { error } = await sb.from('egg_stock_checks').insert({
-    owner_id: currentFlockOwnerId, date, actual_count: actualCount, expected_count: expected, difference
+    owner_id: currentFlockOwnerId, date, actual_count: actualCount, expected_count: expected, difference,
+    coop_id: eggCoopFilter || null
   });
   if(error){ setStatus('stock-check-status', error.message, true); return; }
 
