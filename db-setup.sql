@@ -319,6 +319,30 @@ create table if not exists head_counts (
   created_at timestamptz not null default now()
 );
 
+-- ---------- Treatments ----------
+-- Medicine/treatment records, e.g. worming, vaccination, antibiotics.
+-- animal_ids is a snapshot of who was treated (so history stays accurate
+-- even if animals are later moved, renamed, or deleted). withdrawal_days
+-- plus date gives the date it's safe to sell meat/milk/eggs from a treated
+-- animal -- shown in the app as "Withdrawal until <date>" vs "Cleared".
+create table if not exists treatments (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  coop_id uuid references coops(id) on delete set null,
+  category text not null default 'livestock' check (category in ('poultry','livestock')),
+  date date not null,
+  animal_ids jsonb not null default '[]',
+  product text not null,
+  batch_number text,
+  dose text,
+  route text,
+  reason text,
+  withdrawal_days int,
+  administered_by text,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
 -- ---------- Egg stock checks ----------
 -- A physical "how many eggs do I actually have" reconciliation. expected_count
 -- and difference are computed and frozen at save time (last check's
@@ -338,6 +362,38 @@ create table if not exists egg_stock_checks (
 -- Each coop is reconciled separately -- null means the whole-flock check
 -- used before per-coop tracking, or the fallback when no coops exist yet.
 alter table egg_stock_checks add column if not exists coop_id uuid references coops(id) on delete set null;
+
+-- ---------- Holding register: movements ----------
+-- Animals arriving on ('on') or leaving ('off') the holding, for keeping a
+-- holding/flock register alongside the app's own animal records. Modelled
+-- on the standard GB paper register columns (date, quantity, species,
+-- other holding's name/CPH, movement reference, reason) -- covers the
+-- whole holding regardless of category, since a holding register isn't
+-- split by species.
+create table if not exists holding_movements (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  coop_id uuid references coops(id) on delete set null,
+  category text not null default 'livestock' check (category in ('poultry','livestock')),
+  date date not null,
+  direction text not null check (direction in ('on','off')),
+  animal_type text,
+  quantity int not null default 1,
+  other_holding_name text,
+  other_cph text,
+  movement_reference text,
+  reason text,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+-- One row per flock owner, toggled from the Account tab. Off by default --
+-- this is a niche compliance feature most keepers won't need.
+create table if not exists holding_movements_settings (
+  owner_id uuid primary key references auth.users(id) on delete cascade,
+  enabled boolean not null default false,
+  updated_at timestamptz not null default now()
+);
 
 -- ---------- Purchases ----------
 -- One row per shopping trip / receipt. total is the ground truth for what
@@ -434,7 +490,10 @@ alter table livestock_sales_settings enable row level security;
 alter table livestock_sales enable row level security;
 alter table offspring_records enable row level security;
 alter table head_counts enable row level security;
+alter table treatments enable row level security;
 alter table egg_stock_checks enable row level security;
+alter table holding_movements enable row level security;
+alter table holding_movements_settings enable row level security;
 alter table purchases enable row level security;
 alter table purchase_items enable row level security;
 alter table purchases_settings enable row level security;
@@ -575,12 +634,33 @@ create policy "head_counts write" on head_counts for insert with check (has_floc
 drop policy if exists "head_counts delete" on head_counts;
 create policy "head_counts delete" on head_counts for delete using (has_flock_access(owner_id, 'editor'));
 
+drop policy if exists "treatments read" on treatments;
+create policy "treatments read" on treatments for select using (has_flock_access(owner_id));
+drop policy if exists "treatments write" on treatments;
+create policy "treatments write" on treatments for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "treatments delete" on treatments;
+create policy "treatments delete" on treatments for delete using (has_flock_access(owner_id, 'editor'));
+
 drop policy if exists "egg_stock_checks read" on egg_stock_checks;
 create policy "egg_stock_checks read" on egg_stock_checks for select using (has_flock_access(owner_id));
 drop policy if exists "egg_stock_checks write" on egg_stock_checks;
 create policy "egg_stock_checks write" on egg_stock_checks for insert with check (has_flock_access(owner_id, 'editor'));
 drop policy if exists "egg_stock_checks delete" on egg_stock_checks;
 create policy "egg_stock_checks delete" on egg_stock_checks for delete using (has_flock_access(owner_id, 'editor'));
+
+drop policy if exists "holding_movements read" on holding_movements;
+create policy "holding_movements read" on holding_movements for select using (has_flock_access(owner_id));
+drop policy if exists "holding_movements write" on holding_movements;
+create policy "holding_movements write" on holding_movements for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "holding_movements delete" on holding_movements;
+create policy "holding_movements delete" on holding_movements for delete using (has_flock_access(owner_id, 'editor'));
+
+drop policy if exists "holding_movements_settings read" on holding_movements_settings;
+create policy "holding_movements_settings read" on holding_movements_settings for select using (has_flock_access(owner_id));
+drop policy if exists "holding_movements_settings write" on holding_movements_settings;
+create policy "holding_movements_settings write" on holding_movements_settings for insert with check (has_flock_access(owner_id, 'editor'));
+drop policy if exists "holding_movements_settings update" on holding_movements_settings;
+create policy "holding_movements_settings update" on holding_movements_settings for update using (has_flock_access(owner_id, 'editor'));
 
 drop policy if exists "purchases read" on purchases;
 create policy "purchases read" on purchases for select using (has_flock_access(owner_id));

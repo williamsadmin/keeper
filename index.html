@@ -515,6 +515,10 @@
           <div><button type="button" class="btn secondary full" id="coop-headcount-btn" onclick="startHeadCount()">Head Count</button></div>
           <div><button type="button" class="btn secondary full" id="coop-headcount-history-btn" onclick="openHeadCountHistory()">Count History</button></div>
         </div>
+        <div class="row">
+          <div><button type="button" class="btn secondary full" id="coop-treatment-btn" onclick="startTreatmentSession()">Log Treatment</button></div>
+          <div><button type="button" class="btn secondary full" id="coop-treatment-history-btn" onclick="openTreatmentHistory()">Treatment History</button></div>
+        </div>
       </section>
 
       <details id="coop-filter-section">
@@ -611,6 +615,70 @@
 
       <section>
         <div id="headcount-history-list"></div>
+      </section>
+    </div>
+
+    <!-- TREATMENT SESSION PAGE -->
+    <div id="tab-treatment-session" class="tab-panel">
+      <button type="button" class="btn secondary" style="margin-bottom:14px;" onclick="cancelTreatmentSession()">&larr; Cancel</button>
+      <p class="eyebrow">Treatment</p>
+      <h1 id="treatment-session-title">Coop</h1>
+      <p class="sub">Record a medicine treatment, and which animals got it.</p>
+
+      <section>
+        <div class="row">
+          <div><label>Date</label><input type="date" id="treatment-date"></div>
+        </div>
+        <div class="row">
+          <div><label>Product / medicine</label><input type="text" id="treatment-product" placeholder="e.g. Panacur, Heptavac P Plus"></div>
+          <div><label>Batch number</label><input type="text" id="treatment-batch" placeholder="e.g. B12345"></div>
+        </div>
+        <div class="row">
+          <div><label>Dose</label><input type="text" id="treatment-dose" placeholder="e.g. 2ml per 10kg"></div>
+          <div>
+            <label>Route</label>
+            <select id="treatment-route">
+              <option value="">Not set</option>
+              <option value="Injection">Injection</option>
+              <option value="Oral">Oral</option>
+              <option value="Topical">Topical</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div><label>Reason</label><input type="text" id="treatment-reason" placeholder="e.g. Routine worming"></div>
+          <div><label>Withdrawal period (days)</label><input type="number" min="0" id="treatment-withdrawal" placeholder="e.g. 28"></div>
+        </div>
+        <div class="row">
+          <div><label>Administered by (optional)</label><input type="text" id="treatment-administered-by" placeholder="e.g. Vet name, or yourself"></div>
+        </div>
+        <div class="row">
+          <div><label>Notes</label><textarea id="treatment-notes"></textarea></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="row" style="margin-bottom:8px;">
+          <p class="sec-title" style="margin:0;">Animals Treated</p>
+          <button type="button" class="btn secondary" id="treatment-select-all-btn" onclick="toggleAllTreatmentSessionIds()">Deselect all</button>
+        </div>
+        <div id="treatment-session-list"></div>
+      </section>
+
+      <button class="btn full" onclick="saveTreatment()">Save treatment</button>
+      <div class="status" id="treatment-session-status"></div>
+    </div>
+
+    <!-- TREATMENT HISTORY PAGE -->
+    <div id="tab-treatment-history" class="tab-panel">
+      <button type="button" class="btn secondary" style="margin-bottom:14px;" onclick="closeTreatmentHistory()">&larr; Back</button>
+      <p class="eyebrow">Treatment</p>
+      <h1 id="treatment-history-title">History</h1>
+      <p class="sub">Every medicine treatment logged here, most recent first.</p>
+
+      <section>
+        <div id="treatment-history-list"></div>
       </section>
     </div>
 
@@ -1168,6 +1236,60 @@
       </div>
     </div>
 
+    <!-- MOVEMENTS TAB -->
+    <div id="tab-movements" class="tab-panel">
+      <p class="eyebrow">Holding Register</p>
+      <h1>Movements</h1>
+      <p class="sub">Record animals arriving on or leaving the holding.</p>
+
+      <section id="movement-form-section">
+        <p class="sec-title" id="movement-form-title">Log A Movement</p>
+        <p class="share-note" style="margin-bottom:10px;">This covers your whole holding, so it's the same list whether you're viewing it from Poultry or Livestock.</p>
+        <div class="row">
+          <div><label>Date</label><input type="date" id="movement-date"></div>
+          <div>
+            <label>Direction</label>
+            <select id="movement-direction" onchange="onMovementDirectionChange()">
+              <option value="on">On to the holding</option>
+              <option value="off">Off the holding</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div><label>Animal type</label><input type="text" id="movement-animal-type" placeholder="e.g. Sheep"></div>
+          <div><label>Quantity</label><input type="number" min="1" id="movement-quantity" placeholder="e.g. 5"></div>
+        </div>
+        <div class="row">
+          <div>
+            <label>Coop / Flock (optional)</label>
+            <select id="movement-coop">
+              <option value="">Not attributed</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div><label id="movement-other-holding-label">Other holding's name</label><input type="text" id="movement-other-holding-name" placeholder="e.g. Hillside Farm"></div>
+          <div><label>Other holding's CPH / holding number</label><input type="text" id="movement-other-cph" placeholder="e.g. 12/345/6789"></div>
+        </div>
+        <div class="row">
+          <div><label>Movement reference</label><input type="text" id="movement-reference" placeholder="e.g. eAML2 / AML reference"></div>
+          <div><label>Reason</label><input type="text" id="movement-reason" placeholder="e.g. Sale, purchase, show and return"></div>
+        </div>
+        <div class="row">
+          <div><label>Notes</label><textarea id="movement-notes"></textarea></div>
+        </div>
+        <button class="btn full" onclick="saveMovement()">Save movement</button>
+        <div class="status" id="movement-status"></div>
+      </section>
+
+      <section>
+        <details id="movements-history-section">
+          <summary class="sec-title">Movement History (<span id="movements-history-count">0</span>)</summary>
+          <div id="movements-history-list"></div>
+        </details>
+      </section>
+    </div>
+
     <!-- PURCHASES TAB -->
     <div id="tab-purchases" class="tab-panel">
       <p class="eyebrow">Purchases</p>
@@ -1535,6 +1657,19 @@
         </details>
       </section>
 
+      <section id="holding-movements-settings-section">
+        <details>
+          <summary class="sec-title">Holding Register (Movements)</summary>
+          <div class="checkbox-row">
+            <input type="checkbox" id="movements-enabled">
+            <label for="movements-enabled">Track animal movements on/off the holding</label>
+          </div>
+          <p class="share-note" style="margin-bottom:10px;">Adds a "Movements" tab for recording animals arriving or leaving — for keeping your own holding register alongside your flock/herd records. Turning this off hides the tab, but keeps anything you've already logged.</p>
+          <button class="btn full" onclick="saveHoldingMovementsSettings()">Save movements settings</button>
+          <div class="status" id="movements-settings-status"></div>
+        </details>
+      </section>
+
       <section id="chicken-import-section">
         <details>
           <summary class="sec-title">Import Chickens</summary>
@@ -1588,7 +1723,7 @@ let isSignup = false;
 let flocks = []; // [{ ownerId, label, role: 'owner'|'editor'|'viewer' }]
 let currentFlockOwnerId = null;
 let currentRole = 'owner';
-let state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null, offspringRecords: [], headCounts: [], purchases: [], purchaseItems: [], purchasesSettings: null, purchasePresets: [], eggStockChecks: [] };
+let state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null, offspringRecords: [], headCounts: [], purchases: [], purchaseItems: [], purchasesSettings: null, purchasePresets: [], eggStockChecks: [], treatments: [], holdingMovements: [], holdingMovementsSettings: null };
 let editingEggId = null;
 let eggCoopFilter = ''; // '' = all coops, '__unassigned', or a coop id
 let editingBreedId = null;
@@ -1650,13 +1785,15 @@ const POULTRY_TABS = [
   { id: 'chickens', label: 'My Flock' },
   { id: 'health', label: 'Health Checks' },
   { id: 'breeds', label: 'Breeds' },
-  { id: 'sales', label: 'Sales' }
+  { id: 'sales', label: 'Sales' },
+  { id: 'movements', label: 'Movements' }
 ];
 const LIVESTOCK_TABS = [
   { id: 'chickens', label: 'My Flock' },
   { id: 'health', label: 'Health Checks' },
   { id: 'breeds', label: 'Breeds' },
-  { id: 'livestock-sales', label: 'Sales' }
+  { id: 'livestock-sales', label: 'Sales' },
+  { id: 'movements', label: 'Movements' }
 ];
 const PURCHASES_TABS = [
   { id: 'purchases', label: 'Log Purchase' },
@@ -1805,16 +1942,17 @@ function saveHomeQuickLinks(){
 }
 
 function currentSectionTabs(){
+  const movementsOn = holdingMovementsEnabled();
   if(currentSection === 'poultry'){
     const salesOn = !!(state.salesSettings && state.salesSettings.enabled);
-    const tabs = POULTRY_TABS.filter(t => t.id !== 'sales' || salesOn);
-    const filtered = tabs.filter(t => t.id === 'sales' || !hiddenPoultryTabIds.includes(t.id));
+    const tabs = POULTRY_TABS.filter(t => (t.id !== 'sales' || salesOn) && (t.id !== 'movements' || movementsOn));
+    const filtered = tabs.filter(t => t.id === 'sales' || t.id === 'movements' || !hiddenPoultryTabIds.includes(t.id));
     return filtered.length ? filtered : tabs;
   }
   if(currentSection === 'livestock'){
     const lsOn = enabledLsSaleTypes().length > 0;
-    const tabs = LIVESTOCK_TABS.filter(t => t.id !== 'livestock-sales' || lsOn);
-    const filtered = tabs.filter(t => t.id === 'livestock-sales' || !hiddenLivestockTabIds.includes(t.id));
+    const tabs = LIVESTOCK_TABS.filter(t => (t.id !== 'livestock-sales' || lsOn) && (t.id !== 'movements' || movementsOn));
+    const filtered = tabs.filter(t => t.id === 'livestock-sales' || t.id === 'movements' || !hiddenLivestockTabIds.includes(t.id));
     return filtered.length ? filtered : tabs;
   }
   if(currentSection === 'purchases') return PURCHASES_TABS;
@@ -1874,6 +2012,7 @@ function switchTab(tab){
   if(tab === 'livestock-sales') renderLivestockSalesTab();
   if(tab === 'purchases') renderPurchasesTab();
   if(tab === 'purchase-presets') renderPurchasePresetsTab();
+  if(tab === 'movements') renderMovementsTab();
   if(tab === 'account') renderAccountTab();
 }
 
@@ -1948,7 +2087,7 @@ async function logout(){
   flocks = [];
   currentFlockOwnerId = null;
   currentRole = 'owner';
-  state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null, offspringRecords: [], headCounts: [], purchases: [], purchaseItems: [], purchasesSettings: null, purchasePresets: [], eggStockChecks: [] };
+  state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null, offspringRecords: [], headCounts: [], purchases: [], purchaseItems: [], purchasesSettings: null, purchasePresets: [], eggStockChecks: [], treatments: [], holdingMovements: [], holdingMovementsSettings: null };
   showPoultrySection = true;
   showLivestockSection = true;
   hiddenPoultryTabIds = [];
@@ -2216,6 +2355,16 @@ function rowToHeadCount(r){
   };
 }
 
+function rowToTreatment(r){
+  return {
+    id: r.id, coopId: r.coop_id || null, category: r.category || 'livestock', date: r.date,
+    animalIds: r.animal_ids || [], product: r.product || '', batchNumber: r.batch_number || '',
+    dose: r.dose || '', route: r.route || '', reason: r.reason || '',
+    withdrawalDays: r.withdrawal_days == null ? null : Number(r.withdrawal_days),
+    administeredBy: r.administered_by || '', notes: r.notes || ''
+  };
+}
+
 function rowToPurchase(r){
   return { id: r.id, date: r.date, vendor: r.vendor || '', total: Number(r.total) || 0, notes: r.notes || '', costType: r.cost_type || null };
 }
@@ -2237,12 +2386,30 @@ function rowToEggStockCheck(r){
   return { id: r.id, date: r.date, actualCount: r.actual_count, expectedCount: r.expected_count, difference: r.difference, createdAt: r.created_at, coopId: r.coop_id || null };
 }
 
+function rowToHoldingMovement(r){
+  return {
+    id: r.id, date: r.date, direction: r.direction, category: r.category || 'livestock',
+    animalType: r.animal_type || '', quantity: Number(r.quantity) || 0, coopId: r.coop_id || null,
+    otherHoldingName: r.other_holding_name || '', otherCph: r.other_cph || '',
+    movementReference: r.movement_reference || '', reason: r.reason || '', notes: r.notes || ''
+  };
+}
+
+function rowToHoldingMovementsSettings(r){
+  if(!r) return { enabled: false };
+  return { enabled: !!r.enabled };
+}
+
+function holdingMovementsEnabled(){
+  return !!(state.holdingMovementsSettings && state.holdingMovementsSettings.enabled);
+}
+
 function purchasesEnabled(){
   return !state.purchasesSettings || state.purchasesSettings.enabled !== false;
 }
 
 async function loadFlockData(){
-  const [eggsRes, chickensRes, hcRes, coopsRes, breedsRes, customersRes, salesRes, creditsRes, salesSettingsRes, livestockSalesRes, livestockSalesSettingsRes, offspringRes, headCountsRes, purchasesRes, purchaseItemsRes, purchasesSettingsRes, purchasePresetsRes, eggStockChecksRes] = await Promise.all([
+  const [eggsRes, chickensRes, hcRes, coopsRes, breedsRes, customersRes, salesRes, creditsRes, salesSettingsRes, livestockSalesRes, livestockSalesSettingsRes, offspringRes, headCountsRes, purchasesRes, purchaseItemsRes, purchasesSettingsRes, purchasePresetsRes, eggStockChecksRes, treatmentsRes, holdingMovementsRes, holdingMovementsSettingsRes] = await Promise.all([
     sb.from('eggs').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }).order('created_at', { ascending: false }),
     sb.from('chickens').select('*').eq('owner_id', currentFlockOwnerId).order('created_at'),
     sb.from('health_checks').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
@@ -2260,7 +2427,10 @@ async function loadFlockData(){
     sb.from('purchase_items').select('*').eq('owner_id', currentFlockOwnerId),
     sb.from('purchases_settings').select('*').eq('owner_id', currentFlockOwnerId).maybeSingle(),
     sb.from('purchase_item_presets').select('*').eq('owner_id', currentFlockOwnerId).order('name'),
-    sb.from('egg_stock_checks').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false })
+    sb.from('egg_stock_checks').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
+    sb.from('treatments').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
+    sb.from('holding_movements').select('*').eq('owner_id', currentFlockOwnerId).order('date', { ascending: false }),
+    sb.from('holding_movements_settings').select('*').eq('owner_id', currentFlockOwnerId).maybeSingle()
   ]);
   state.eggs = (eggsRes.data || []).map(rowToEgg);
   state.chickens = (chickensRes.data || []).map(rowToChicken);
@@ -2280,6 +2450,9 @@ async function loadFlockData(){
   state.purchasesSettings = rowToPurchasesSettings(purchasesSettingsRes.data);
   state.purchasePresets = (purchasePresetsRes.data || []).map(rowToPurchasePreset);
   state.eggStockChecks = (eggStockChecksRes.data || []).map(rowToEggStockCheck);
+  state.treatments = (treatmentsRes.data || []).map(rowToTreatment);
+  state.holdingMovements = (holdingMovementsRes.data || []).map(rowToHoldingMovement);
+  state.holdingMovementsSettings = rowToHoldingMovementsSettings(holdingMovementsSettingsRes.data);
 }
 
 // ---------- EGG COUNT ----------
@@ -4360,6 +4533,8 @@ function renderCoopDetailList(){
   if(massMoveBtn) massMoveBtn.style.display = (!readOnly && allBirds.length) ? 'block' : 'none';
   const headCountBtn = document.getElementById('coop-headcount-btn');
   if(headCountBtn) headCountBtn.style.display = (!readOnly && allBirds.length) ? 'block' : 'none';
+  const treatmentBtn = document.getElementById('coop-treatment-btn');
+  if(treatmentBtn) treatmentBtn.style.display = (!readOnly && allBirds.length) ? 'block' : 'none';
   const selectAllBtn = document.getElementById('coop-select-all-btn');
   if(selectAllBtn){
     const allSelected = filtered.length > 0 && filtered.every(c => selectedBirdIds.has(c.id));
@@ -4523,6 +4698,176 @@ async function deleteHeadCount(id){
   if(error) return;
   await loadFlockData();
   renderHeadCountHistory();
+}
+
+// ---------- TREATMENTS ----------
+let treatmentSessionCoopId = null;
+let treatmentSessionCategory = null;
+let treatmentSessionAnimalIds = [];
+let treatmentSessionIds = new Set();
+let treatmentHistoryCoopId = null;
+let treatmentHistoryCategory = null;
+
+function startTreatmentSession(){
+  if(!currentCoopDetailId) return;
+  treatmentSessionCoopId = currentCoopDetailId;
+  treatmentSessionCategory = currentCategory;
+  treatmentSessionAnimalIds = sortChickens(birdsInCurrentCoop(), 'coop-').map(c => c.id);
+  treatmentSessionIds = new Set(treatmentSessionAnimalIds);
+  document.getElementById('treatment-session-title').textContent = document.getElementById('coop-detail-name').textContent;
+  document.getElementById('treatment-date').value = todayStr();
+  document.getElementById('treatment-product').value = '';
+  document.getElementById('treatment-batch').value = '';
+  document.getElementById('treatment-dose').value = '';
+  document.getElementById('treatment-route').value = '';
+  document.getElementById('treatment-reason').value = '';
+  document.getElementById('treatment-withdrawal').value = '';
+  document.getElementById('treatment-administered-by').value = '';
+  document.getElementById('treatment-notes').value = '';
+  setStatus('treatment-session-status', '', false);
+  renderTreatmentSession();
+  switchTab('treatment-session');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function treatmentSessionRowHtml(c){
+  const isSelected = treatmentSessionIds.has(c.id);
+  const tagText = [c.tag, c.tagColour].filter(Boolean).map(escapeHtml).join(' &middot; ');
+  return `
+    <label class="headcount-row ${isSelected ? 'counted' : ''}">
+      <input type="checkbox" onchange="toggleTreatmentSessionId('${c.id}', this.checked)" ${isSelected ? 'checked' : ''}>
+      <span class="headcount-row-name">${escapeHtml(animalDisplayName(c))}</span>
+      ${tagText ? `<span class="headcount-row-tag">${tagText}</span>` : ''}
+    </label>`;
+}
+
+function renderTreatmentSession(){
+  const el = document.getElementById('treatment-session-list');
+  if(!el) return;
+  const idToChicken = new Map(state.chickens.map(c => [c.id, c]));
+  const birds = treatmentSessionAnimalIds.map(id => idToChicken.get(id)).filter(Boolean);
+  el.innerHTML = birds.length
+    ? birds.map(treatmentSessionRowHtml).join('')
+    : `<p class="empty">No animals in this ${coopWordFor(treatmentSessionCategory).toLowerCase()}.</p>`;
+  const selectAllBtn = document.getElementById('treatment-select-all-btn');
+  if(selectAllBtn){
+    const allSelected = birds.length > 0 && birds.every(c => treatmentSessionIds.has(c.id));
+    selectAllBtn.textContent = allSelected ? 'Deselect all' : 'Select all';
+  }
+}
+
+function toggleTreatmentSessionId(id, checked){
+  if(checked) treatmentSessionIds.add(id); else treatmentSessionIds.delete(id);
+  renderTreatmentSession();
+}
+
+function toggleAllTreatmentSessionIds(){
+  const allSelected = treatmentSessionAnimalIds.length > 0 && treatmentSessionAnimalIds.every(id => treatmentSessionIds.has(id));
+  treatmentSessionIds = allSelected ? new Set() : new Set(treatmentSessionAnimalIds);
+  renderTreatmentSession();
+}
+
+function cancelTreatmentSession(){
+  switchTab('coop-detail');
+}
+
+async function saveTreatment(){
+  const date = document.getElementById('treatment-date').value;
+  if(!date){ setStatus('treatment-session-status', 'Pick a date.', true); return; }
+  const product = document.getElementById('treatment-product').value.trim();
+  if(!product){ setStatus('treatment-session-status', 'Enter the product / medicine name.', true); return; }
+  if(!treatmentSessionIds.size){ setStatus('treatment-session-status', 'Select at least one animal.', true); return; }
+  const withdrawalRaw = document.getElementById('treatment-withdrawal').value;
+  const withdrawalDays = withdrawalRaw === '' ? null : parseInt(withdrawalRaw, 10);
+
+  const payload = {
+    owner_id: currentFlockOwnerId,
+    coop_id: treatmentSessionCoopId === '__unassigned' ? null : treatmentSessionCoopId,
+    category: treatmentSessionCategory,
+    date,
+    animal_ids: Array.from(treatmentSessionIds),
+    product,
+    batch_number: document.getElementById('treatment-batch').value.trim(),
+    dose: document.getElementById('treatment-dose').value.trim(),
+    route: document.getElementById('treatment-route').value,
+    reason: document.getElementById('treatment-reason').value.trim(),
+    withdrawal_days: (withdrawalDays == null || isNaN(withdrawalDays)) ? null : withdrawalDays,
+    administered_by: document.getElementById('treatment-administered-by').value.trim(),
+    notes: document.getElementById('treatment-notes').value.trim()
+  };
+  const { error } = await sb.from('treatments').insert(payload);
+  if(error){ setStatus('treatment-session-status', error.message, true); return; }
+  await loadFlockData();
+  switchTab('coop-detail');
+}
+
+function treatmentsForCoop(coopId, category){
+  const normId = coopId === '__unassigned' ? null : coopId;
+  return state.treatments
+    .filter(t => t.coopId === normId && t.category === category)
+    .sort((a, b) => (a.date < b.date ? 1 : (a.date > b.date ? -1 : 0)));
+}
+
+function treatmentWithdrawalStatusHtml(t){
+  if(t.withdrawalDays == null) return '';
+  const clearDate = new Date(t.date + 'T00:00:00');
+  clearDate.setDate(clearDate.getDate() + t.withdrawalDays);
+  const isActive = clearDate > new Date();
+  return isActive
+    ? `<span class="issue-badge">Withdrawal until ${formatDateNice(clearDate.toISOString().slice(0, 10))}</span>`
+    : `<span class="ok-badge">Cleared</span>`;
+}
+
+function treatmentHistoryRowHtml(t){
+  const nameFor = (id) => { const c = state.chickens.find(x => x.id === id); return c ? animalDisplayName(c) : 'Deleted animal'; };
+  const animalsText = t.animalIds.map(nameFor).join(', ') || 'None recorded';
+  return `
+    <details class="hc-record">
+      <summary class="hc-record-summary">
+        <span class="who">${formatDateNice(t.date)} &middot; ${escapeHtml(t.product)}</span>
+        ${treatmentWithdrawalStatusHtml(t)}
+      </summary>
+      <div class="hc-record-body">
+        <div class="hc-record-row"><span>Animals treated</span><span>${escapeHtml(animalsText)}</span></div>
+        ${t.batchNumber ? `<div class="hc-record-row"><span>Batch</span><span>${escapeHtml(t.batchNumber)}</span></div>` : ''}
+        ${t.dose ? `<div class="hc-record-row"><span>Dose</span><span>${escapeHtml(t.dose)}</span></div>` : ''}
+        ${t.route ? `<div class="hc-record-row"><span>Route</span><span>${escapeHtml(t.route)}</span></div>` : ''}
+        ${t.reason ? `<div class="hc-record-row"><span>Reason</span><span>${escapeHtml(t.reason)}</span></div>` : ''}
+        ${t.withdrawalDays != null ? `<div class="hc-record-row"><span>Withdrawal period</span><span>${t.withdrawalDays} day${t.withdrawalDays === 1 ? '' : 's'}</span></div>` : ''}
+        ${t.administeredBy ? `<div class="hc-record-row"><span>Administered by</span><span>${escapeHtml(t.administeredBy)}</span></div>` : ''}
+        ${t.notes ? `<p class="hc-record-note">${escapeHtml(t.notes)}</p>` : ''}
+        ${!isReadOnly() ? `<button type="button" class="btn secondary full" style="margin-top:10px;" onclick="deleteTreatment('${t.id}')">Delete this record</button>` : ''}
+      </div>
+    </details>`;
+}
+
+function openTreatmentHistory(){
+  if(!currentCoopDetailId) return;
+  treatmentHistoryCoopId = currentCoopDetailId;
+  treatmentHistoryCategory = currentCategory;
+  document.getElementById('treatment-history-title').textContent = document.getElementById('coop-detail-name').textContent;
+  renderTreatmentHistory();
+  switchTab('treatment-history');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function closeTreatmentHistory(){
+  switchTab('coop-detail');
+}
+
+function renderTreatmentHistory(){
+  const el = document.getElementById('treatment-history-list');
+  if(!el) return;
+  const records = treatmentsForCoop(treatmentHistoryCoopId, treatmentHistoryCategory);
+  el.innerHTML = records.length ? records.map(treatmentHistoryRowHtml).join('') : '<p class="empty">No treatments logged yet.</p>';
+}
+
+async function deleteTreatment(id){
+  if(!confirm('Delete this treatment record?')) return;
+  const { error } = await sb.from('treatments').delete().eq('id', id);
+  if(error) return;
+  await loadFlockData();
+  renderTreatmentHistory();
 }
 
 async function addCoop(){
@@ -6321,6 +6666,130 @@ async function savePurchasesSettings(){
   setStatus('purchases-settings-status', 'Saved.', false);
 }
 
+function renderHoldingMovementsSettingsForm(){
+  const el = document.getElementById('movements-enabled');
+  if(!el) return;
+  el.checked = holdingMovementsEnabled();
+}
+
+async function saveHoldingMovementsSettings(){
+  const payload = {
+    owner_id: currentFlockOwnerId,
+    enabled: document.getElementById('movements-enabled').checked
+  };
+  const { error } = await sb.from('holding_movements_settings').upsert(payload, { onConflict: 'owner_id' });
+  if(error){ setStatus('movements-settings-status', error.message, true); return; }
+  await loadFlockData();
+  refreshSectionNav();
+  setStatus('movements-settings-status', 'Saved.', false);
+}
+
+// ---------- MOVEMENTS (HOLDING REGISTER) ----------
+function populateMovementCoopOptions(){
+  const sel = document.getElementById('movement-coop');
+  if(!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Not attributed</option>' + coopOptionsHtml(null);
+  sel.value = current;
+}
+
+function onMovementDirectionChange(){
+  const dir = document.getElementById('movement-direction').value;
+  document.getElementById('movement-other-holding-label').textContent = dir === 'off' ? "Destination holding's name" : "Origin holding's name";
+}
+
+async function saveMovement(){
+  const date = document.getElementById('movement-date').value;
+  if(!date){ setStatus('movement-status', 'Pick a date.', true); return; }
+  const animalType = document.getElementById('movement-animal-type').value.trim();
+  if(!animalType){ setStatus('movement-status', 'Enter the animal type.', true); return; }
+  const quantity = parseInt(document.getElementById('movement-quantity').value, 10);
+  if(!quantity || quantity < 1){ setStatus('movement-status', 'Enter how many animals.', true); return; }
+
+  const payload = {
+    owner_id: currentFlockOwnerId,
+    date,
+    direction: document.getElementById('movement-direction').value,
+    category: currentCategory,
+    animal_type: animalType,
+    quantity,
+    coop_id: document.getElementById('movement-coop').value || null,
+    other_holding_name: document.getElementById('movement-other-holding-name').value.trim(),
+    other_cph: document.getElementById('movement-other-cph').value.trim(),
+    movement_reference: document.getElementById('movement-reference').value.trim(),
+    reason: document.getElementById('movement-reason').value.trim(),
+    notes: document.getElementById('movement-notes').value.trim()
+  };
+  const { error } = await sb.from('holding_movements').insert(payload);
+  if(error){ setStatus('movement-status', error.message, true); return; }
+
+  resetMovementForm();
+  setStatus('movement-status', 'Movement logged.', false);
+  await loadFlockData();
+  renderMovementsTab();
+}
+
+function resetMovementForm(){
+  document.getElementById('movement-date').value = todayStr();
+  document.getElementById('movement-direction').value = 'on';
+  document.getElementById('movement-animal-type').value = '';
+  document.getElementById('movement-quantity').value = '';
+  document.getElementById('movement-coop').value = '';
+  document.getElementById('movement-other-holding-name').value = '';
+  document.getElementById('movement-other-cph').value = '';
+  document.getElementById('movement-reference').value = '';
+  document.getElementById('movement-reason').value = '';
+  document.getElementById('movement-notes').value = '';
+  onMovementDirectionChange();
+}
+
+function movementHistoryRowHtml(m){
+  const coop = m.coopId ? state.coops.find(c => c.id === m.coopId) : null;
+  const directionLabel = m.direction === 'off' ? 'Off' : 'On';
+  const holdingBits = [m.otherHoldingName, m.otherCph].filter(Boolean).map(escapeHtml).join(' &middot; ');
+  return `
+    <details class="hc-record">
+      <summary class="hc-record-summary">
+        <span class="who">${formatDateNice(m.date)} &middot; ${directionLabel} &middot; ${m.quantity} &times; ${escapeHtml(m.animalType)}</span>
+        <span class="${m.direction === 'off' ? 'issue-badge' : 'ok-badge'}">${directionLabel}</span>
+      </summary>
+      <div class="hc-record-body">
+        ${coop ? `<div class="hc-record-row"><span>${coopWordFor(coop.category)}</span><span>${escapeHtml(coop.name)}</span></div>` : ''}
+        ${holdingBits ? `<div class="hc-record-row"><span>${m.direction === 'off' ? 'Destination' : 'Origin'}</span><span>${holdingBits}</span></div>` : ''}
+        ${m.movementReference ? `<div class="hc-record-row"><span>Movement reference</span><span>${escapeHtml(m.movementReference)}</span></div>` : ''}
+        ${m.reason ? `<div class="hc-record-row"><span>Reason</span><span>${escapeHtml(m.reason)}</span></div>` : ''}
+        ${m.notes ? `<p class="hc-record-note">${escapeHtml(m.notes)}</p>` : ''}
+        ${!isReadOnly() ? `<button type="button" class="btn secondary full" style="margin-top:10px;" onclick="deleteMovement('${m.id}')">Delete this movement</button>` : ''}
+      </div>
+    </details>`;
+}
+
+// The holding register covers every species on the holding, not just
+// whichever section (Poultry/Livestock) you're viewing it from -- so this
+// always shows everything, regardless of currentCategory.
+function renderMovementsHistoryList(){
+  const countEl = document.getElementById('movements-history-count');
+  const el = document.getElementById('movements-history-list');
+  if(!countEl || !el) return;
+  const records = state.holdingMovements.slice().sort((a, b) => (a.date < b.date ? 1 : (a.date > b.date ? -1 : 0)));
+  countEl.textContent = records.length;
+  el.innerHTML = records.length ? records.map(movementHistoryRowHtml).join('') : '<p class="empty">No movements logged yet.</p>';
+}
+
+async function deleteMovement(id){
+  if(!confirm('Delete this movement?')) return;
+  const { error } = await sb.from('holding_movements').delete().eq('id', id);
+  if(error) return;
+  await loadFlockData();
+  renderMovementsTab();
+}
+
+function renderMovementsTab(){
+  if(!document.getElementById('movement-date').value) resetMovementForm();
+  populateMovementCoopOptions();
+  renderMovementsHistoryList();
+}
+
 let pendingPurchaseItems = [];
 
 function allCoopsForAttribution(){
@@ -7012,6 +7481,7 @@ function renderAccountTab(){
   renderSalesSettingsForm();
   renderLivestockSalesSettingsForm();
   renderPurchasesSettingsForm();
+  renderHoldingMovementsSettingsForm();
   renderSharingTab();
   renderMainTabsSettingsForm();
   renderHomeQuickLinksForm();
