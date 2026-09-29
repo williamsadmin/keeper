@@ -359,11 +359,9 @@
               <div><label>Date</label><input type="date" id="stock-check-date"></div>
             </div>
             <div class="row">
-              <div><label>You have</label><input type="number" min="0" step="1" id="stock-check-quantity" placeholder="e.g. 4"></div>
-              <div>
-                <label>Unit</label>
-                <select id="stock-check-unit"></select>
-              </div>
+              <div><label>Dozens</label><input type="number" min="0" step="1" id="stock-check-dozens" placeholder="0"></div>
+              <div><label>Half dozens</label><input type="number" min="0" step="1" id="stock-check-half-dozens" placeholder="0"></div>
+              <div><label>Loose eggs</label><input type="number" min="0" step="1" id="stock-check-eggs" placeholder="0"></div>
             </div>
             <button class="btn full" onclick="saveEggStockCheck()">Save check</button>
             <div class="status" id="stock-check-status"></div>
@@ -2754,10 +2752,6 @@ function renderEggLog(){
 // ---------- EGG STOCK CHECK ----------
 const EGGS_PER_UNIT = { egg: 1, half_dozen: 6, dozen: 12 };
 
-function stockCheckUnitOptionsHtml(selected){
-  return ['egg', 'half_dozen', 'dozen'].map(u => `<option value="${u}" ${u === selected ? 'selected' : ''}>${SALE_UNIT_LABELS[u]}</option>`).join('');
-}
-
 // A stock check "belongs" to whichever coop is currently selected in the
 // page's coop filter -- same matching rule as eggMatchesCoopFilter, applied
 // to the check's own coop_id instead of an egg's.
@@ -2802,7 +2796,7 @@ function renderEggStockCheckStatus(){
   const { expected, previous } = computeExpectedEggStock(todayStr());
   el.textContent = previous
     ? `Since your last check on ${formatDateNice(previous.date)}, you should have ${expected} egg${expected === 1 ? '' : 's'} on hand now.`
-    : `Based on everything logged so far, you should have ${expected} egg${expected === 1 ? '' : 's'} on hand now.`;
+    : `This is your first stock check for this coop, so whatever you count becomes your starting point.`;
 }
 
 function eggStockCheckBadgeHtml(diff){
@@ -2850,8 +2844,6 @@ function renderEggStockCheckSection(){
 
   const dateEl = document.getElementById('stock-check-date');
   if(dateEl && !dateEl.value) dateEl.value = todayStr();
-  const unitSel = document.getElementById('stock-check-unit');
-  if(unitSel && !unitSel.innerHTML) unitSel.innerHTML = stockCheckUnitOptionsHtml('half_dozen');
   renderEggStockCheckStatus();
   renderEggStockCheckHistory();
 }
@@ -2859,23 +2851,29 @@ function renderEggStockCheckSection(){
 async function saveEggStockCheck(){
   const date = document.getElementById('stock-check-date').value;
   if(!date){ setStatus('stock-check-status', 'Pick a date.', true); return; }
-  const qty = Number(document.getElementById('stock-check-quantity').value);
-  if(!qty || qty <= 0){ setStatus('stock-check-status', 'Enter how many you have.', true); return; }
-  const unit = document.getElementById('stock-check-unit').value;
-  const actualCount = Math.round(qty * (EGGS_PER_UNIT[unit] || 1));
+  const dozens = Number(document.getElementById('stock-check-dozens').value) || 0;
+  const halfDozens = Number(document.getElementById('stock-check-half-dozens').value) || 0;
+  const looseEggs = Number(document.getElementById('stock-check-eggs').value) || 0;
+  const actualCount = Math.round(dozens * EGGS_PER_UNIT.dozen + halfDozens * EGGS_PER_UNIT.half_dozen + looseEggs * EGGS_PER_UNIT.egg);
+  if(actualCount <= 0){ setStatus('stock-check-status', 'Enter how many you have.', true); return; }
 
-  const { expected } = computeExpectedEggStock(date);
-  const difference = actualCount - expected;
+  const { expected, previous } = computeExpectedEggStock(date);
+  // A first check has nothing to reconcile against, so it just establishes
+  // the starting point rather than flagging a (meaningless) discrepancy.
+  const expectedCount = previous ? expected : actualCount;
+  const difference = actualCount - expectedCount;
 
   const { error } = await sb.from('egg_stock_checks').insert({
-    owner_id: currentFlockOwnerId, date, actual_count: actualCount, expected_count: expected, difference,
+    owner_id: currentFlockOwnerId, date, actual_count: actualCount, expected_count: expectedCount, difference,
     coop_id: eggCoopFilter || null
   });
   if(error){ setStatus('stock-check-status', error.message, true); return; }
 
   await loadFlockData();
   setStatus('stock-check-status', 'Saved.', false);
-  document.getElementById('stock-check-quantity').value = '';
+  document.getElementById('stock-check-dozens').value = '';
+  document.getElementById('stock-check-half-dozens').value = '';
+  document.getElementById('stock-check-eggs').value = '';
   renderEggStockCheckSection();
 }
 
