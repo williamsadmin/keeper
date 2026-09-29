@@ -339,9 +339,11 @@ create table if not exists treatments (
   reason text,
   withdrawal_days int,
   administered_by text,
+  vet_name text,
   notes text,
   created_at timestamptz not null default now()
 );
+alter table treatments add column if not exists vet_name text;
 
 -- ---------- Egg stock checks ----------
 -- A physical "how many eggs do I actually have" reconciliation. expected_count
@@ -379,6 +381,7 @@ create table if not exists holding_movements (
   direction text not null check (direction in ('on','off')),
   animal_type text,
   quantity int not null default 1,
+  animal_ids jsonb not null default '[]',
   other_holding_name text,
   other_cph text,
   movement_reference text,
@@ -386,6 +389,7 @@ create table if not exists holding_movements (
   notes text,
   created_at timestamptz not null default now()
 );
+alter table holding_movements add column if not exists animal_ids jsonb not null default '[]';
 
 -- One row per flock owner, toggled from the Account tab. Off by default --
 -- this is a niche compliance feature most keepers won't need.

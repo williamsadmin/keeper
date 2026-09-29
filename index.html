@@ -651,7 +651,8 @@
           <div><label>Withdrawal period (days)</label><input type="number" min="0" id="treatment-withdrawal" placeholder="e.g. 28"></div>
         </div>
         <div class="row">
-          <div><label>Administered by (optional)</label><input type="text" id="treatment-administered-by" placeholder="e.g. Vet name, or yourself"></div>
+          <div><label>Administered by (optional)</label><input type="text" id="treatment-administered-by" placeholder="e.g. Yourself, or vet name"></div>
+          <div><label>Supplied by (optional)</label><input type="text" id="treatment-vet" placeholder="e.g. Supplying vet or vet practice"></div>
         </div>
         <div class="row">
           <div><label>Notes</label><textarea id="treatment-notes"></textarea></div>
@@ -1262,7 +1263,7 @@
         <div class="row">
           <div>
             <label>Coop / Flock (optional)</label>
-            <select id="movement-coop">
+            <select id="movement-coop" onchange="onMovementCoopChange()">
               <option value="">Not attributed</option>
             </select>
           </div>
@@ -1278,9 +1279,18 @@
         <div class="row">
           <div><label>Notes</label><textarea id="movement-notes"></textarea></div>
         </div>
-        <button class="btn full" onclick="saveMovement()">Save movement</button>
-        <div class="status" id="movement-status"></div>
       </section>
+
+      <section id="movement-animals-section" style="display:none;">
+        <div class="row" style="margin-bottom:8px;">
+          <p class="sec-title" style="margin:0;">Animals Moved</p>
+          <button type="button" class="btn secondary" id="movement-select-all-btn" onclick="toggleAllMovementAnimalIds()">Deselect all</button>
+        </div>
+        <div id="movement-animals-list"></div>
+      </section>
+
+      <button class="btn full" onclick="saveMovement()">Save movement</button>
+      <div class="status" id="movement-status"></div>
 
       <section>
         <details id="movements-history-section">
@@ -2361,7 +2371,7 @@ function rowToTreatment(r){
     animalIds: r.animal_ids || [], product: r.product || '', batchNumber: r.batch_number || '',
     dose: r.dose || '', route: r.route || '', reason: r.reason || '',
     withdrawalDays: r.withdrawal_days == null ? null : Number(r.withdrawal_days),
-    administeredBy: r.administered_by || '', notes: r.notes || ''
+    administeredBy: r.administered_by || '', vetName: r.vet_name || '', notes: r.notes || ''
   };
 }
 
@@ -2390,6 +2400,7 @@ function rowToHoldingMovement(r){
   return {
     id: r.id, date: r.date, direction: r.direction, category: r.category || 'livestock',
     animalType: r.animal_type || '', quantity: Number(r.quantity) || 0, coopId: r.coop_id || null,
+    animalIds: r.animal_ids || [],
     otherHoldingName: r.other_holding_name || '', otherCph: r.other_cph || '',
     movementReference: r.movement_reference || '', reason: r.reason || '', notes: r.notes || ''
   };
@@ -4723,6 +4734,7 @@ function startTreatmentSession(){
   document.getElementById('treatment-reason').value = '';
   document.getElementById('treatment-withdrawal').value = '';
   document.getElementById('treatment-administered-by').value = '';
+  document.getElementById('treatment-vet').value = '';
   document.getElementById('treatment-notes').value = '';
   setStatus('treatment-session-status', '', false);
   renderTreatmentSession();
@@ -4793,6 +4805,7 @@ async function saveTreatment(){
     reason: document.getElementById('treatment-reason').value.trim(),
     withdrawal_days: (withdrawalDays == null || isNaN(withdrawalDays)) ? null : withdrawalDays,
     administered_by: document.getElementById('treatment-administered-by').value.trim(),
+    vet_name: document.getElementById('treatment-vet').value.trim(),
     notes: document.getElementById('treatment-notes').value.trim()
   };
   const { error } = await sb.from('treatments').insert(payload);
@@ -4835,6 +4848,7 @@ function treatmentHistoryRowHtml(t){
         ${t.reason ? `<div class="hc-record-row"><span>Reason</span><span>${escapeHtml(t.reason)}</span></div>` : ''}
         ${t.withdrawalDays != null ? `<div class="hc-record-row"><span>Withdrawal period</span><span>${t.withdrawalDays} day${t.withdrawalDays === 1 ? '' : 's'}</span></div>` : ''}
         ${t.administeredBy ? `<div class="hc-record-row"><span>Administered by</span><span>${escapeHtml(t.administeredBy)}</span></div>` : ''}
+        ${t.vetName ? `<div class="hc-record-row"><span>Supplied by</span><span>${escapeHtml(t.vetName)}</span></div>` : ''}
         ${t.notes ? `<p class="hc-record-note">${escapeHtml(t.notes)}</p>` : ''}
         ${!isReadOnly() ? `<button type="button" class="btn secondary full" style="margin-top:10px;" onclick="deleteTreatment('${t.id}')">Delete this record</button>` : ''}
       </div>
@@ -6685,12 +6699,70 @@ async function saveHoldingMovementsSettings(){
 }
 
 // ---------- MOVEMENTS (HOLDING REGISTER) ----------
+let movementCoopAnimalIds = [];
+let movementSelectedAnimalIds = new Set();
+
 function populateMovementCoopOptions(){
   const sel = document.getElementById('movement-coop');
   if(!sel) return;
   const current = sel.value;
   sel.innerHTML = '<option value="">Not attributed</option>' + coopOptionsHtml(null);
   sel.value = current;
+}
+
+function onMovementCoopChange(){
+  const coopId = document.getElementById('movement-coop').value;
+  if(!coopId){
+    movementCoopAnimalIds = [];
+    movementSelectedAnimalIds = new Set();
+  } else {
+    const animals = state.chickens.filter(c => !c.isDeceased && c.coopId === coopId)
+      .sort((a, b) => animalDisplayName(a).localeCompare(animalDisplayName(b)));
+    movementCoopAnimalIds = animals.map(c => c.id);
+    movementSelectedAnimalIds = new Set(movementCoopAnimalIds);
+  }
+  renderMovementAnimalsSection();
+}
+
+function movementAnimalRowHtml(c){
+  const isSelected = movementSelectedAnimalIds.has(c.id);
+  const tagText = [c.tag, c.tagColour].filter(Boolean).map(escapeHtml).join(' &middot; ');
+  return `
+    <label class="headcount-row ${isSelected ? 'counted' : ''}">
+      <input type="checkbox" onchange="toggleMovementAnimalId('${c.id}', this.checked)" ${isSelected ? 'checked' : ''}>
+      <span class="headcount-row-name">${escapeHtml(animalDisplayName(c))}</span>
+      ${tagText ? `<span class="headcount-row-tag">${tagText}</span>` : ''}
+    </label>`;
+}
+
+function renderMovementAnimalsSection(){
+  const section = document.getElementById('movement-animals-section');
+  const el = document.getElementById('movement-animals-list');
+  if(!section || !el) return;
+  const coopId = document.getElementById('movement-coop').value;
+  if(!coopId){ section.style.display = 'none'; return; }
+  section.style.display = '';
+  const idToChicken = new Map(state.chickens.map(c => [c.id, c]));
+  const animals = movementCoopAnimalIds.map(id => idToChicken.get(id)).filter(Boolean);
+  el.innerHTML = animals.length
+    ? animals.map(movementAnimalRowHtml).join('')
+    : '<p class="empty">No animals in this coop/flock.</p>';
+  const selectAllBtn = document.getElementById('movement-select-all-btn');
+  if(selectAllBtn){
+    const allSelected = animals.length > 0 && animals.every(c => movementSelectedAnimalIds.has(c.id));
+    selectAllBtn.textContent = allSelected ? 'Deselect all' : 'Select all';
+  }
+}
+
+function toggleMovementAnimalId(id, checked){
+  if(checked) movementSelectedAnimalIds.add(id); else movementSelectedAnimalIds.delete(id);
+  renderMovementAnimalsSection();
+}
+
+function toggleAllMovementAnimalIds(){
+  const allSelected = movementCoopAnimalIds.length > 0 && movementCoopAnimalIds.every(id => movementSelectedAnimalIds.has(id));
+  movementSelectedAnimalIds = allSelected ? new Set() : new Set(movementCoopAnimalIds);
+  renderMovementAnimalsSection();
 }
 
 function onMovementDirectionChange(){
@@ -6714,6 +6786,7 @@ async function saveMovement(){
     animal_type: animalType,
     quantity,
     coop_id: document.getElementById('movement-coop').value || null,
+    animal_ids: Array.from(movementSelectedAnimalIds),
     other_holding_name: document.getElementById('movement-other-holding-name').value.trim(),
     other_cph: document.getElementById('movement-other-cph').value.trim(),
     movement_reference: document.getElementById('movement-reference').value.trim(),
@@ -6741,12 +6814,15 @@ function resetMovementForm(){
   document.getElementById('movement-reason').value = '';
   document.getElementById('movement-notes').value = '';
   onMovementDirectionChange();
+  onMovementCoopChange();
 }
 
 function movementHistoryRowHtml(m){
   const coop = m.coopId ? state.coops.find(c => c.id === m.coopId) : null;
   const directionLabel = m.direction === 'off' ? 'Off' : 'On';
   const holdingBits = [m.otherHoldingName, m.otherCph].filter(Boolean).map(escapeHtml).join(' &middot; ');
+  const nameFor = (id) => { const c = state.chickens.find(x => x.id === id); return c ? animalDisplayName(c) : 'Deleted animal'; };
+  const animalsText = m.animalIds.map(nameFor).join(', ');
   return `
     <details class="hc-record">
       <summary class="hc-record-summary">
@@ -6755,6 +6831,7 @@ function movementHistoryRowHtml(m){
       </summary>
       <div class="hc-record-body">
         ${coop ? `<div class="hc-record-row"><span>${coopWordFor(coop.category)}</span><span>${escapeHtml(coop.name)}</span></div>` : ''}
+        ${animalsText ? `<div class="hc-record-row"><span>Animals moved</span><span>${escapeHtml(animalsText)}</span></div>` : ''}
         ${holdingBits ? `<div class="hc-record-row"><span>${m.direction === 'off' ? 'Destination' : 'Origin'}</span><span>${holdingBits}</span></div>` : ''}
         ${m.movementReference ? `<div class="hc-record-row"><span>Movement reference</span><span>${escapeHtml(m.movementReference)}</span></div>` : ''}
         ${m.reason ? `<div class="hc-record-row"><span>Reason</span><span>${escapeHtml(m.reason)}</span></div>` : ''}
@@ -6787,6 +6864,7 @@ async function deleteMovement(id){
 function renderMovementsTab(){
   if(!document.getElementById('movement-date').value) resetMovementForm();
   populateMovementCoopOptions();
+  renderMovementAnimalsSection();
   renderMovementsHistoryList();
 }
 
