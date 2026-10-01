@@ -57,8 +57,9 @@
   .empty{color:var(--text-dim);font-size:13px;}
 
   /* Auth screen */
-  #auth-screen{max-width:380px;margin:calc(60px + env(safe-area-inset-top)) auto 0;padding:0 16px;}
-  #auth-screen .toggle-row{display:flex;gap:8px;margin-top:14px;justify-content:center;font-size:13px;color:var(--text-dim);}
+  #auth-screen, #reset-screen{max-width:380px;margin:calc(60px + env(safe-area-inset-top)) auto 0;padding:0 16px;}
+  #reset-screen{display:none;}
+  #auth-screen .toggle-row, #reset-screen .toggle-row{display:flex;gap:8px;margin-top:14px;justify-content:center;font-size:13px;color:var(--text-dim);}
   #auth-screen .toggle-row a{color:var(--amber);cursor:pointer;text-decoration:underline;}
 
   /* Top nav */
@@ -224,6 +225,22 @@
     </div>
     <div class="toggle-row">
       <a onclick="forgotPassword()">Forgot password?</a>
+    </div>
+  </section>
+</div>
+
+<!-- RESET PASSWORD SCREEN (reached from the emailed reset link) -->
+<div id="reset-screen">
+  <p class="eyebrow">Chicken Keeper</p>
+  <h1>Set a new password</h1>
+  <p class="sub" style="margin-bottom:16px;" id="reset-email-note">Choose a new password for your account.</p>
+  <section>
+    <div class="row"><div><label>New password</label><input type="password" id="reset-new-password" autocomplete="new-password"></div></div>
+    <div class="row"><div><label>Confirm new password</label><input type="password" id="reset-confirm-password" autocomplete="new-password"></div></div>
+    <button class="btn full" id="reset-submit-btn" onclick="saveNewPassword()">Save new password</button>
+    <div class="status" id="reset-status"></div>
+    <div class="toggle-row">
+      <a onclick="cancelPasswordReset()">Cancel</a>
     </div>
   </section>
 </div>
@@ -1714,14 +1731,18 @@
 // ---------- SUPABASE ----------
 const SUPABASE_URL = 'https://hiaqlvjsbxhiqgxkyclt.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_Yge5Ho0X4NPg6UK4aEfcgw_XJhN3Mpa';
+// Read before createClient: Supabase strips the token hash from the URL
+// once it has turned it into a session.
+let inPasswordRecovery = /(^#|&)type=recovery(&|$)/.test(window.location.hash);
+
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Only DOM work in here -- calling other sb.auth methods inside this
+// callback can deadlock supabase-js.
 sb.auth.onAuthStateChange((event, session) => {
   if(event === 'PASSWORD_RECOVERY' && session && session.user){
-    onLoggedIn(session.user).then(() => {
-      switchTab('account');
-      setStatus('account-status', 'Enter a new password below to finish resetting it.', false);
-    });
+    inPasswordRecovery = true;
+    showResetScreen(session.user);
   }
 });
 
@@ -2075,6 +2096,7 @@ async function forgotPassword(){
   if(!email){
     statusEl.style.color = 'var(--danger)';
     statusEl.textContent = 'Enter your email above first, then tap "Forgot password?".';
+    document.getElementById('auth-email').focus();
     return;
   }
   statusEl.style.color = 'var(--text-dim)';
@@ -2086,7 +2108,7 @@ async function forgotPassword(){
     return;
   }
   statusEl.style.color = 'var(--teal)';
-  statusEl.textContent = 'Check your email for a password reset link.';
+  statusEl.textContent = `If an account exists for ${email}, a reset link is on its way. Check your inbox (and spam folder).`;
 }
 
 async function logout(){
@@ -2126,8 +2148,51 @@ async function onLoggedIn(user){
 async function checkExistingSession(){
   const { data } = await sb.auth.getSession();
   if(data && data.session && data.session.user){
+    if(inPasswordRecovery){ showResetScreen(data.session.user); return; }
     await onLoggedIn(data.session.user);
   }
+}
+
+function showResetScreen(user){
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app-screen').style.display = 'none';
+  document.getElementById('reset-screen').style.display = 'block';
+  if(user && user.email) document.getElementById('reset-email-note').textContent = `Choose a new password for ${user.email}.`;
+}
+
+function hideResetScreen(){
+  inPasswordRecovery = false;
+  document.getElementById('reset-screen').style.display = 'none';
+  document.getElementById('reset-new-password').value = '';
+  document.getElementById('reset-confirm-password').value = '';
+  setStatus('reset-status', '', false);
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+}
+
+async function saveNewPassword(){
+  const pw = document.getElementById('reset-new-password').value;
+  const pw2 = document.getElementById('reset-confirm-password').value;
+  if(!pw || pw.length < 6){ setStatus('reset-status', 'Password must be at least 6 characters.', true); return; }
+  if(pw !== pw2){ setStatus('reset-status', "Passwords don't match.", true); return; }
+
+  const btn = document.getElementById('reset-submit-btn');
+  btn.disabled = true;
+  setStatus('reset-status', 'Saving…', false);
+  const { data, error } = await sb.auth.updateUser({ password: pw });
+  btn.disabled = false;
+  if(error){ setStatus('reset-status', error.message, true); return; }
+
+  hideResetScreen();
+  await onLoggedIn(data.user);
+}
+
+async function cancelPasswordReset(){
+  hideResetScreen();
+  await sb.auth.signOut();
+  document.getElementById('auth-screen').style.display = 'block';
+  const statusEl = document.getElementById('auth-status');
+  statusEl.style.color = 'var(--text-dim)';
+  statusEl.textContent = 'Password not changed. Log in with your current password, or tap "Forgot password?" to try again.';
 }
 
 async function ensureProfile(){
@@ -7657,8 +7722,9 @@ function handleAuthRedirectHash(){
   if(!error) return;
   const statusEl = document.getElementById('auth-status');
   statusEl.style.color = 'var(--danger)';
-  statusEl.textContent = params.get('error_description')
-    || 'That link has expired or already been used — please log in below, or sign up again to get a new one.';
+  statusEl.textContent = params.get('error_code') === 'otp_expired'
+    ? 'That email link has expired or was already used. To reset your password, enter your email below and tap "Forgot password?" for a new link.'
+    : (params.get('error_description') || 'That link has expired or already been used — please log in below, or sign up again to get a new one.');
   history.replaceState(null, '', window.location.pathname + window.location.search);
 }
 
