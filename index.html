@@ -20,7 +20,7 @@
   :root{
     --bg:#203143; --surface:#1F3D54; --surface-alt:#24455E; --border:#2E5573;
     --text:#F5F8F9; --text-dim:#9FB3C4; --amber:#A49F68; --amber-dim:#3A462C;
-    --teal:#43C6AC; --danger:#E2574C;
+    --teal:#43C6AC; --danger:#E2574C; --green:#6CC24A;
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
@@ -178,7 +178,8 @@
   summary.hc-record-summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px;font-size:13px;font-weight:600;gap:8px;}
   summary.hc-record-summary::-webkit-details-marker{display:none;}
   summary.hc-record-summary .who{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .issue-badge, .ok-badge, .credit-badge{flex-shrink:0;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;}
+  .issue-badge, .ok-badge, .match-badge, .credit-badge{flex-shrink:0;font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;}
+  .match-badge{background:var(--green);color:#203143;}
   .issue-badge{background:var(--danger);color:#203143;}
   .ok-badge{background:var(--teal);color:#203143;}
   .credit-badge{display:inline-block;margin-top:4px;background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber);}
@@ -2867,7 +2868,7 @@ function renderEggStockCheckStatus(){
 }
 
 function eggStockCheckBadgeHtml(diff){
-  if(Math.abs(diff) < 0.5) return `<span class="ok-badge">Matches</span>`;
+  if(Math.abs(diff) < 0.5) return `<span class="match-badge">Matches</span>`;
   return diff > 0
     ? `<span class="ok-badge">+${diff} extra</span>`
     : `<span class="issue-badge">${Math.abs(diff)} unaccounted for</span>`;
