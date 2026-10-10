@@ -5996,6 +5996,24 @@ function customerNameById(id){
   return c ? c.name : 'Unknown customer';
 }
 
+// Leads a sale's detail line. Unattributed sales are flagged in red (only
+// when coops of that kind exist) so they're easy to spot and fix.
+function saleCoopLabelHtml(coopId, category){
+  const coop = coopId ? state.coops.find(c => c.id === coopId) : null;
+  if(coop) return `${escapeHtml(coop.name)} &middot; `;
+  if(!state.coops.some(c => c.category === category)) return '';
+  return `<span class="issue-text">No ${coopWordFor(category).toLowerCase()} set</span> &middot; `;
+}
+
+function saleCoopSelectHtml(selectId, coopId, category){
+  const coops = state.coops.filter(c => c.category === category);
+  const word = coopWordFor(category).toLowerCase();
+  const placeholder = coops.length ? `Select a ${word}…` : `No ${word}s yet`;
+  return `<select id="${selectId}"><option value="">${placeholder}</option>`
+    + coops.map(c => `<option value="${c.id}" ${c.id === coopId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')
+    + '</select>';
+}
+
 function allSalesSorted(){
   return state.sales.slice().sort((a, b) => a.date < b.date ? 1 : -1);
 }
@@ -6011,7 +6029,7 @@ function salesHistoryRowHtml(s){
         <strong>${escapeHtml(customerNameById(s.customerId))}</strong>
         <span class="${settled ? 'good-text' : 'issue-text'}">${diffLabel}</span>
       </div>
-      <div class="text-dim" style="font-size:12px;">${formatDateNice(s.date)} &middot; ${s.quantity} &times; ${escapeHtml(SALE_UNIT_LABELS[s.unit] || s.unit)} &middot; Charged ${formatMoney(s.charged)} &middot; Paid ${formatMoney(s.paid)}</div>
+      <div class="text-dim" style="font-size:12px;">${formatDateNice(s.date)} &middot; ${saleCoopLabelHtml(s.coopId, 'poultry')}${s.quantity} &times; ${escapeHtml(SALE_UNIT_LABELS[s.unit] || s.unit)} &middot; Charged ${formatMoney(s.charged)} &middot; Paid ${formatMoney(s.paid)}</div>
     </div>`;
 }
 
@@ -6234,6 +6252,7 @@ function saleRowHtml(s, readOnly){
     <div class="hc-record" style="padding:12px;">
       <div class="row">
         <div><label>Date</label><input type="date" id="edit-sale-date-${s.id}" value="${s.date}"></div>
+        <div><label>Coop</label>${saleCoopSelectHtml('edit-sale-coop-' + s.id, s.coopId, 'poultry')}</div>
       </div>
       <div class="row">
         <div>
@@ -6262,7 +6281,7 @@ function saleRowHtml(s, readOnly){
         <strong>${formatDateNice(s.date)}</strong>
         <span class="${settled ? 'good-text' : 'issue-text'}">${diffLabel}</span>
       </div>
-      <div class="text-dim" style="font-size:12px;">${s.quantity} &times; ${escapeHtml(SALE_UNIT_LABELS[s.unit] || s.unit)} &middot; Charged ${formatMoney(s.charged)} &middot; Paid ${formatMoney(s.paid)}</div>
+      <div class="text-dim" style="font-size:12px;">${saleCoopLabelHtml(s.coopId, 'poultry')}${s.quantity} &times; ${escapeHtml(SALE_UNIT_LABELS[s.unit] || s.unit)} &middot; Charged ${formatMoney(s.charged)} &middot; Paid ${formatMoney(s.paid)}</div>
       ${readOnly ? '' : `
       <div class="row" style="margin-top:4px;width:100%;">
         <div><button type="button" class="btn secondary full" onclick="startEditSale('${s.id}')">Edit</button></div>
@@ -6295,7 +6314,9 @@ async function saveEditedSale(id){
   const quantity = Number(document.getElementById('edit-sale-qty-' + id).value) || 0;
   const charged = Number(document.getElementById('edit-sale-charged-' + id).value) || 0;
   const paid = Number(document.getElementById('edit-sale-paid-' + id).value) || 0;
-  const { error } = await sb.from('sales').update({ date, unit, quantity, charged, paid }).eq('id', id);
+  const coopId = document.getElementById('edit-sale-coop-' + id).value || null;
+  if(!coopId && state.coops.some(c => c.category === 'poultry')){ setStatus('edit-sale-status-' + id, 'Pick which coop this sale is from.', true); return; }
+  const { error } = await sb.from('sales').update({ date, unit, quantity, charged, paid, coop_id: coopId }).eq('id', id);
   if(error){ setStatus('edit-sale-status-' + id, error.message, true); return; }
   editingSaleId = null;
   await loadFlockData();
@@ -6564,7 +6585,7 @@ function lsSalesHistoryRowHtml(s){
         <strong>${escapeHtml(customerNameById(s.customerId))}</strong>
         <span class="${settled ? 'good-text' : 'issue-text'}">${diffLabel}</span>
       </div>
-      <div class="text-dim" style="font-size:12px;">${formatDateNice(s.date)} &middot; ${formatUnitQty(s.quantity)} ${escapeHtml(lsSaleTypeUnitLabel(s.saleType, s.quantity))} &middot; Charged ${formatMoney(s.charged)} &middot; Paid ${formatMoney(s.paid)}</div>
+      <div class="text-dim" style="font-size:12px;">${formatDateNice(s.date)} &middot; ${saleCoopLabelHtml(s.coopId, 'livestock')}${formatUnitQty(s.quantity)} ${escapeHtml(lsSaleTypeUnitLabel(s.saleType, s.quantity))} &middot; Charged ${formatMoney(s.charged)} &middot; Paid ${formatMoney(s.paid)}</div>
     </div>`;
 }
 
@@ -6624,6 +6645,7 @@ function lsSaleRowHtml(s, readOnly){
     <div class="hc-record" style="padding:12px;">
       <div class="row">
         <div><label>Date</label><input type="date" id="edit-ls-sale-date-${s.id}" value="${s.date}"></div>
+        <div><label>Flock</label>${saleCoopSelectHtml('edit-ls-sale-coop-' + s.id, s.coopId, 'livestock')}</div>
       </div>
       <div class="row">
         <div>
@@ -6652,7 +6674,7 @@ function lsSaleRowHtml(s, readOnly){
         <strong>${formatDateNice(s.date)}</strong>
         <span class="${settled ? 'good-text' : 'issue-text'}">${diffLabel}</span>
       </div>
-      <div class="text-dim" style="font-size:12px;">${formatUnitQty(s.quantity)} ${escapeHtml(lsSaleTypeUnitLabel(s.saleType, s.quantity))} &middot; Charged ${formatMoney(s.charged)} &middot; Paid ${formatMoney(s.paid)}</div>
+      <div class="text-dim" style="font-size:12px;">${saleCoopLabelHtml(s.coopId, 'livestock')}${formatUnitQty(s.quantity)} ${escapeHtml(lsSaleTypeUnitLabel(s.saleType, s.quantity))} &middot; Charged ${formatMoney(s.charged)} &middot; Paid ${formatMoney(s.paid)}</div>
       ${readOnly ? '' : `
       <div class="row" style="margin-top:4px;width:100%;">
         <div><button type="button" class="btn secondary full" onclick="startEditLsSale('${s.id}')">Edit</button></div>
@@ -6685,7 +6707,9 @@ async function saveEditedLsSale(id){
   const quantity = Number(document.getElementById('edit-ls-sale-qty-' + id).value) || 0;
   const charged = Number(document.getElementById('edit-ls-sale-charged-' + id).value) || 0;
   const paid = Number(document.getElementById('edit-ls-sale-paid-' + id).value) || 0;
-  const { error } = await sb.from('livestock_sales').update({ date, sale_type: saleType, quantity, charged, paid }).eq('id', id);
+  const coopId = document.getElementById('edit-ls-sale-coop-' + id).value || null;
+  if(!coopId && state.coops.some(c => c.category === 'livestock')){ setStatus('edit-ls-sale-status-' + id, 'Pick which flock this sale is from.', true); return; }
+  const { error } = await sb.from('livestock_sales').update({ date, sale_type: saleType, quantity, charged, paid, coop_id: coopId }).eq('id', id);
   if(error){ setStatus('edit-ls-sale-status-' + id, error.message, true); return; }
   editingLsSaleId = null;
   await loadFlockData();
