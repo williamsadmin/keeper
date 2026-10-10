@@ -192,6 +192,8 @@
   /* Sharing / Account */
   .share-note{font-size:13px;color:var(--text-dim);line-height:1.6;margin-top:0;}
   .alert-banner{background:rgba(226,87,76,.14);border:1px solid var(--danger);color:var(--danger);border-radius:8px;padding:10px 12px;font-weight:700;font-size:13px;line-height:1.5;}
+  .alert-banner.good{background:rgba(67,198,172,.14);border-color:var(--teal);color:var(--teal);}
+  .customer-flag > * + *{margin-top:8px;}
   .credit-banner{background:rgba(67,198,172,.14);border:1px solid var(--teal);color:var(--teal);border-radius:8px;padding:10px 12px;font-weight:700;font-size:13px;line-height:1.5;margin-top:8px;}
   code{background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:12px;}
 
@@ -993,12 +995,12 @@
             </select>
           </div>
         </div>
-        <p class="share-note" id="sale-customer-flag" style="display:none;margin-bottom:10px;"></p>
+        <div class="customer-flag" id="sale-customer-flag" style="display:none;margin-bottom:10px;"></div>
         <div class="row">
           <div>
-            <label>Coop (optional)</label>
+            <label>Coop</label>
             <select id="sale-coop">
-              <option value="">Not attributed</option>
+              <option value="">Select a coop…</option>
             </select>
           </div>
         </div>
@@ -1195,12 +1197,12 @@
               </select>
             </div>
           </div>
-          <p class="share-note" id="ls-sale-customer-flag" style="display:none;margin-bottom:10px;"></p>
+          <div class="customer-flag" id="ls-sale-customer-flag" style="display:none;margin-bottom:10px;"></div>
           <div class="row">
             <div>
-              <label>Flock (optional)</label>
+              <label>Flock</label>
               <select id="ls-sale-coop">
-                <option value="">Not attributed</option>
+                <option value="">Select a flock…</option>
               </select>
             </div>
           </div>
@@ -5703,27 +5705,32 @@ function onSaleCustomerSearchChange(){
   onSaleCustomerChange();
 }
 
+// Red when the customer owes you; green when you owe them (money or stock).
+function balanceFlagItems(bal){
+  if(Math.abs(bal) < 0.005) return [];
+  return bal > 0
+    ? [{ tone: 'bad', text: `This customer already owes you ${formatMoney(bal)}.` }]
+    : [{ tone: 'good', text: `You already owe this customer ${formatMoney(-bal)}.` }];
+}
+
+function renderCustomerFlag(flagEl, items){
+  flagEl.style.display = items.length ? 'block' : 'none';
+  flagEl.innerHTML = items.map(i => {
+    const cls = i.tone === 'note' ? 'share-note' : (i.tone === 'good' ? 'alert-banner good' : 'alert-banner');
+    return `<div class="${cls}">${escapeHtml(i.text)}</div>`;
+  }).join('');
+}
+
 function onSaleCustomerChange(){
   const id = document.getElementById('sale-customer').value;
-  const flagEl = document.getElementById('sale-customer-flag');
   const customer = id ? state.customers.find(c => c.id === id) : null;
-  const alerts = [];
-  const notes = [];
+  const items = [];
   if(customer){
-    const bal = customerBalance(id);
-    if(Math.abs(bal) >= 0.005){
-      alerts.push(bal > 0
-        ? `This customer already owes ${formatMoney(bal)}.`
-        : `You already owe this customer ${formatMoney(-bal)}.`);
-    }
-    const creditTotals = customerCreditTotals(id);
-    if(customerHasOwedCredit(id)) alerts.push(`They're also owed: ${formatCreditTotals(creditTotals)}.`);
-    if(customerHasCustomPricing(customer)) notes.push('This customer has custom pricing set.');
+    items.push(...balanceFlagItems(customerBalance(id)));
+    if(customerHasOwedCredit(id)) items.push({ tone: 'good', text: `You owe them stock: ${formatCreditTotals(customerCreditTotals(id))}.` });
+    if(customerHasCustomPricing(customer)) items.push({ tone: 'note', text: 'This customer has custom pricing set.' });
   }
-  const messages = alerts.concat(notes);
-  flagEl.style.display = messages.length ? 'block' : 'none';
-  flagEl.textContent = messages.join(' ');
-  flagEl.className = alerts.length ? 'alert-banner' : 'share-note';
+  renderCustomerFlag(document.getElementById('sale-customer-flag'), items);
   document.getElementById('sale-use-credit').checked = false;
   onSaleUnitOrQtyChange();
 }
@@ -5806,6 +5813,8 @@ async function saveSale(){
   const unit = document.getElementById('sale-unit').value;
   const quantity = Number(document.getElementById('sale-quantity').value) || 0;
   if(!quantity){ setStatus('sale-status', 'Enter a quantity.', true); return; }
+  const coopId = document.getElementById('sale-coop').value || null;
+  if(!coopId && state.coops.some(c => c.category === 'poultry')){ setStatus('sale-status', 'Pick which coop this sale is from.', true); return; }
   const charged = Number(document.getElementById('sale-charged').value) || 0;
   const paid = Number(document.getElementById('sale-paid').value) || 0;
 
@@ -5819,8 +5828,6 @@ async function saveSale(){
     });
     if(creditError){ setStatus('sale-status', creditError.message, true); return; }
   }
-
-  const coopId = document.getElementById('sale-coop').value || null;
 
   const { error } = await sb.from('sales').insert({
     owner_id: currentFlockOwnerId, customer_id: customerId, date, unit, quantity, charged, paid, coop_id: coopId
@@ -5852,7 +5859,7 @@ function customerCardHtml(c){
           ${customerHasCustomPricing(c) ? '<div class="chicken-meta">Custom pricing</div>' : ''}
           ${creditText !== 'None' ? `<div class="credit-badge">Owed: ${escapeHtml(creditText)}</div>` : ''}
         </div>
-        <span class="${settled ? 'ok-badge' : 'issue-badge'}">${balLabel}</span>
+        <span class="${bal > 0 && !settled ? 'issue-badge' : 'ok-badge'}">${balLabel}</span>
       </div>
     </div>`;
 }
@@ -6025,8 +6032,9 @@ function populateSaleCoopOptions(){
   if(!sel) return;
   const current = sel.value;
   const coops = state.coops.filter(c => c.category === 'poultry');
-  sel.innerHTML = '<option value="">Not attributed</option>' + coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-  sel.value = coops.some(c => c.id === current) ? current : '';
+  sel.innerHTML = (coops.length ? '<option value="">Select a coop…</option>' : '<option value="">No coops yet</option>')
+    + coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  sel.value = coops.some(c => c.id === current) ? current : (coops.length === 1 ? coops[0].id : '');
 }
 
 function renderSalesTab(){
@@ -6410,20 +6418,8 @@ function onLsSaleCustomerSearchChange(){
 
 function onLsSaleCustomerChange(){
   const id = document.getElementById('ls-sale-customer').value;
-  const flagEl = document.getElementById('ls-sale-customer-flag');
   const customer = id ? state.customers.find(c => c.id === id) : null;
-  const alerts = [];
-  if(customer){
-    const bal = customerLsBalance(id);
-    if(Math.abs(bal) >= 0.005){
-      alerts.push(bal > 0
-        ? `This customer already owes ${formatMoney(bal)}.`
-        : `You already owe this customer ${formatMoney(-bal)}.`);
-    }
-  }
-  flagEl.style.display = alerts.length ? 'block' : 'none';
-  flagEl.textContent = alerts.join(' ');
-  flagEl.className = 'alert-banner';
+  renderCustomerFlag(document.getElementById('ls-sale-customer-flag'), customer ? balanceFlagItems(customerLsBalance(id)) : []);
   onLsSaleTypeOrQtyChange();
 }
 
@@ -6463,10 +6459,10 @@ async function saveLivestockSale(){
   if(!saleType){ setStatus('ls-sale-status', 'Enable at least one type to sell in Account settings.', true); return; }
   const quantity = Number(document.getElementById('ls-sale-quantity').value) || 0;
   if(!quantity){ setStatus('ls-sale-status', 'Enter a quantity.', true); return; }
+  const coopId = document.getElementById('ls-sale-coop').value || null;
+  if(!coopId && state.coops.some(c => c.category === 'livestock')){ setStatus('ls-sale-status', 'Pick which flock this sale is from.', true); return; }
   const charged = Number(document.getElementById('ls-sale-charged').value) || 0;
   const paid = Number(document.getElementById('ls-sale-paid').value) || 0;
-
-  const coopId = document.getElementById('ls-sale-coop').value || null;
 
   const { error } = await sb.from('livestock_sales').insert({
     owner_id: currentFlockOwnerId, customer_id: customerId, date, sale_type: saleType, quantity, charged, paid, coop_id: coopId
@@ -6492,7 +6488,7 @@ function lsCustomerCardHtml(c){
           <div class="chicken-name">${escapeHtml(c.name)}</div>
           ${c.address ? `<div class="chicken-meta">${escapeHtml(c.address)}</div>` : ''}
         </div>
-        <span class="${settled ? 'ok-badge' : 'issue-badge'}">${balLabel}</span>
+        <span class="${bal > 0 && !settled ? 'issue-badge' : 'ok-badge'}">${balLabel}</span>
       </div>
     </div>`;
 }
@@ -6589,8 +6585,9 @@ function populateLsSaleCoopOptions(){
   if(!sel) return;
   const current = sel.value;
   const coops = state.coops.filter(c => c.category === 'livestock');
-  sel.innerHTML = '<option value="">Not attributed</option>' + coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-  sel.value = coops.some(c => c.id === current) ? current : '';
+  sel.innerHTML = (coops.length ? '<option value="">Select a flock…</option>' : '<option value="">No flocks yet</option>')
+    + coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  sel.value = coops.some(c => c.id === current) ? current : (coops.length === 1 ? coops[0].id : '');
 }
 
 function renderLivestockSalesTab(){
