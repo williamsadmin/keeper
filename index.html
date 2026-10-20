@@ -1756,7 +1756,7 @@ let flocks = []; // [{ ownerId, label, role: 'owner'|'editor'|'viewer' }]
 let currentFlockOwnerId = null;
 let currentRole = 'owner';
 let state = { eggs: [], chickens: [], healthChecks: [], coops: [], breeds: [], customers: [], sales: [], customerCredits: [], salesSettings: null, livestockSales: [], livestockSalesSettings: null, offspringRecords: [], headCounts: [], purchases: [], purchaseItems: [], purchasesSettings: null, purchasePresets: [], eggStockChecks: [], treatments: [], holdingMovements: [], holdingMovementsSettings: null };
-let editingEggId = null;
+let editingEggDate = null;
 let eggCoopFilter = ''; // '' = all coops, '__unassigned', or a coop id
 let editingBreedId = null;
 let currentCustomerDetailId = null;
@@ -2556,7 +2556,7 @@ function onEggCoopFilterChange(){
   renderEggs();
 }
 
-function eggCoopRowHtml(coop, good, cracked, soleUnattributed){
+function eggCoopRowHtml(coop, good, cracked, soleUnattributed, entryCount){
   const coopId = coop ? coop.id : '';
   const label = coop ? coop.name : (soleUnattributed ? 'Good eggs' : 'Unassigned');
   const totalNow = (good || 0) + (cracked || 0);
@@ -2567,7 +2567,30 @@ function eggCoopRowHtml(coop, good, cracked, soleUnattributed){
         <div><label>Cracked / deformed</label><input type="number" min="0" inputmode="numeric" class="egg-coop-cracked" value="${cracked != null ? cracked : ''}" placeholder="0" oninput="updateEggCoopRowTotal(this)"></div>
       </div>
       <p class="share-note egg-coop-row-total" style="margin:2px 0 0;">Total: ${totalNow}</p>
+      ${entryCount > 1 ? `<p class="share-note" style="margin:2px 0 0;">Combines ${entryCount} entries for this day. Changing it merges them into one.</p>` : ''}
     </div>`;
+}
+
+// Groups a set of egg entries by coop ('' = unassigned), in egg-form order.
+function eggDayGroups(entries){
+  const map = new Map();
+  entries.forEach(e => {
+    const key = e.coopId || '';
+    if(!map.has(key)) map.set(key, { key, entries: [], total: 0, cracked: 0 });
+    const g = map.get(key);
+    g.entries.push(e);
+    g.total += e.total;
+    g.cracked += e.cracked;
+  });
+  const order = poultryCoopsForEggForm().map(c => c.id);
+  const rank = k => k === '' ? Infinity : (order.includes(k) ? order.indexOf(k) : order.length);
+  return [...map.values()].sort((a, b) => rank(a.key) - rank(b.key));
+}
+
+function eggGroupLabel(key){
+  if(!key) return 'Unassigned';
+  const coop = state.coops.find(c => c.id === key);
+  return coop ? coop.name : 'Unknown coop';
 }
 
 function updateEggCoopRowTotal(inputEl){
@@ -2582,21 +2605,26 @@ function updateEggCoopRowTotal(inputEl){
 function renderEggCoopRows(){
   const el = document.getElementById('egg-coop-rows');
   if(!el) return;
-  if(editingEggId){
-    const e = state.eggs.find(x => x.id === editingEggId);
-    if(!e){ resetEggForm(); return; }
-    const coop = e.coopId ? state.coops.find(c => c.id === e.coopId) : null;
-    el.innerHTML = eggCoopRowHtml(coop, e.total - e.cracked, e.cracked, false);
+  const coops = poultryCoopsForEggForm();
+  if(editingEggDate){
+    const groups = eggDayGroups(state.eggs.filter(e => e.date === editingEggDate));
+    const keys = coops.map(c => c.id);
+    groups.forEach(g => { if(!keys.includes(g.key)) keys.push(g.key); });
+    if(!keys.length) keys.push('');
+    el.innerHTML = keys.map(key => {
+      const g = groups.find(x => x.key === key);
+      const coop = key ? state.coops.find(c => c.id === key) : null;
+      return eggCoopRowHtml(coop, g ? g.total - g.cracked : null, g ? g.cracked : null, !coops.length && !key, g ? g.entries.length : 0);
+    }).join('');
     return;
   }
-  const coops = poultryCoopsForEggForm();
   el.innerHTML = coops.length
     ? coops.map(c => eggCoopRowHtml(c)).join('')
     : eggCoopRowHtml(null, null, null, true);
 }
 
 function resetEggForm(){
-  editingEggId = null;
+  editingEggDate = null;
   document.getElementById('egg-date').value = todayStr();
   document.getElementById('egg-form-title').textContent = 'Log Eggs';
   document.getElementById('egg-cancel-btn').style.display = 'none';
@@ -2615,10 +2643,31 @@ async function saveEggEntry(){
   });
 
   let error;
-  if(editingEggId){
-    const r = rows[0];
-    if(!r || !r.total){ setStatus('egg-status', 'Enter at least one egg.', true); return; }
-    ({ error } = await sb.from('eggs').update({ date, total: r.total, cracked: r.cracked }).eq('id', editingEggId));
+  if(editingEggDate){
+    if(rows.every(r => !r.total) && !confirm(`Remove all egg entries for ${formatDateNice(editingEggDate)}?`)) return;
+    // Existing entries are updated in place, not re-created, so they keep
+    // their created_at -- stock checks use it as the "since" boundary.
+    const groups = eggDayGroups(state.eggs.filter(e => e.date === editingEggDate));
+    const ops = [];
+    rows.forEach(r => {
+      const g = groups.find(x => x.key === (r.coopId || ''));
+      const existing = g ? g.entries.slice().sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)) : [];
+      const ids = existing.map(e => e.id);
+      if(!existing.length){
+        if(r.total) ops.push(() => sb.from('eggs').insert({ owner_id: currentFlockOwnerId, date, total: r.total, cracked: r.cracked, coop_id: r.coopId }));
+      } else if(!r.total){
+        ops.push(() => sb.from('eggs').delete().in('id', ids));
+      } else if(r.total === g.total && r.cracked === g.cracked){
+        if(date !== editingEggDate) ops.push(() => sb.from('eggs').update({ date }).in('id', ids));
+      } else {
+        ops.push(() => sb.from('eggs').update({ date, total: r.total, cracked: r.cracked }).eq('id', ids[0]));
+        if(ids.length > 1) ops.push(() => sb.from('eggs').delete().in('id', ids.slice(1)));
+      }
+    });
+    for(const op of ops){
+      ({ error } = await op());
+      if(error) break;
+    }
   } else {
     const toSave = rows.filter(r => r.total > 0);
     if(!toSave.length){ setStatus('egg-status', "Enter at least one coop's eggs.", true); return; }
@@ -2633,14 +2682,13 @@ async function saveEggEntry(){
   renderEggs();
 }
 
-function editEggEntry(id){
-  const e = state.eggs.find(x => x.id === id);
-  if(!e) return;
-  editingEggId = id;
-  document.getElementById('egg-date').value = e.date;
+function editEggDay(date){
+  editingEggDate = date;
+  document.getElementById('egg-date').value = date;
   renderEggCoopRows();
-  document.getElementById('egg-form-title').textContent = 'Edit Entry';
+  document.getElementById('egg-form-title').textContent = `Edit ${formatDateNice(date)}`;
   document.getElementById('egg-cancel-btn').style.display = 'block';
+  setStatus('egg-status', '', false);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -2648,11 +2696,15 @@ function cancelEditEggEntry(){
   resetEggForm();
 }
 
-async function deleteEggEntry(id){
-  if(!confirm('Delete this entry?')) return;
-  const { error } = await sb.from('eggs').delete().eq('id', id);
+// Deletes only the entries shown for that day, i.e. respecting the coop filter.
+async function deleteEggDay(date){
+  const entries = state.eggs.filter(e => e.date === date && eggMatchesCoopFilter(e));
+  if(!entries.length) return;
+  const coopNames = eggDayGroups(entries).map(g => eggGroupLabel(g.key)).join(' and ');
+  if(!confirm(`Delete ${coopNames} eggs for ${formatDateNice(date)}?`)) return;
+  const { error } = await sb.from('eggs').delete().in('id', entries.map(e => e.id));
   if(error){ setStatus('egg-status', error.message, true); return; }
-  if(editingEggId === id) resetEggForm();
+  if(editingEggDate === date) resetEggForm();
   await loadFlockData();
   renderEggs();
 }
@@ -2797,21 +2849,28 @@ function renderEggMoreStats(){
 function renderEggLog(){
   const el = document.getElementById('egg-log');
   const filtered = state.eggs.filter(eggMatchesCoopFilter);
-  if(!filtered.length){ el.innerHTML = '<p class="empty">No entries yet.</p>'; return; }
+  const filterCoop = eggCoopFilter ? state.coops.find(c => c.id === eggCoopFilter) : null;
+  const note = filterCoop
+    ? `<p class="share-note" style="margin-bottom:10px;">Showing ${escapeHtml(filterCoop.name)} only. Set "Filter by coop" to All coops to see every coop. Editing a day always shows every coop.</p>`
+    : '';
+  if(!filtered.length){ el.innerHTML = note + '<p class="empty">No entries yet.</p>'; return; }
   const readOnly = isReadOnly();
-  el.innerHTML = filtered.slice(0, 90).map(e => {
-    const coop = e.coopId ? state.coops.find(c => c.id === e.coopId) : null;
-    const coopLabel = coop ? coop.name : 'Unassigned';
+  const dates = [...new Set(filtered.map(e => e.date))].slice(0, 60);
+  el.innerHTML = note + dates.map(date => {
+    const groups = eggDayGroups(filtered.filter(e => e.date === date));
+    const lines = groups.map(g => `<div class="text-dim" style="font-size:12px;">${escapeHtml(eggGroupLabel(g.key))}${g.entries.length > 1 ? ` (${g.entries.length} entries)` : ''} &middot; ${g.total} total &middot; ${g.cracked} cracked &middot; ${g.total - g.cracked} good</div>`).join('');
+    const dayGood = groups.reduce((s, g) => s + g.total - g.cracked, 0);
     return `
     <div class="log-item">
       <div>
-        <strong>${formatDateNice(e.date)}</strong>
-        <div class="text-dim" style="font-size:12px;">${escapeHtml(coopLabel)} &middot; ${e.total} total &middot; ${e.cracked} cracked &middot; ${e.total - e.cracked} good</div>
+        <strong>${formatDateNice(date)}</strong>
+        ${lines}
+        ${groups.length > 1 ? `<div style="font-size:12px;font-weight:600;margin-top:2px;">${dayGood} good in total</div>` : ''}
       </div>
       ${readOnly ? '' : `
       <div class="icon-row">
-        <button class="icon-btn" onclick="editEggEntry('${e.id}')" aria-label="Edit">&#9998;</button>
-        <button class="icon-btn danger" onclick="deleteEggEntry('${e.id}')" aria-label="Delete">&#10005;</button>
+        <button class="icon-btn" onclick="editEggDay('${date}')" aria-label="Edit">&#9998;</button>
+        <button class="icon-btn danger" onclick="deleteEggDay('${date}')" aria-label="Delete">&#10005;</button>
       </div>`}
     </div>`;
   }).join('');
