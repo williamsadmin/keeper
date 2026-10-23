@@ -158,6 +158,12 @@ create table if not exists coops (
 
 alter table coops add column if not exists category text not null default 'poultry' check (category in ('poultry','livestock'));
 
+-- Optional egg prices for this coop's eggs (e.g. duck eggs priced higher).
+-- Null means "use the customer's custom price, or else the standard price".
+alter table coops add column if not exists price_egg numeric;
+alter table coops add column if not exists price_half_dozen numeric;
+alter table coops add column if not exists price_dozen numeric;
+
 alter table chickens add column if not exists coop_id uuid references coops(id) on delete set null;
 
 -- Optional coop attribution per egg entry, so a day's count can be split
@@ -223,6 +229,12 @@ create table if not exists sales (
 -- Optional attribution to which coop the eggs came from, for profit/loss
 -- broken down by coop against purchases.
 alter table sales add column if not exists coop_id uuid references coops(id) on delete set null;
+
+-- One sale can cover several coops (e.g. Main Coop half dozens plus Duck
+-- Coop half dozens, paid in one payment). Each coop gets its own row so
+-- per-coop stock checks and profit stay accurate; rows sharing a
+-- sale_group are shown and edited as one sale. Null = a single-row sale.
+alter table sales add column if not exists sale_group uuid;
 
 -- Ledger of free/promotional stock owed to a customer, e.g. "2 dozen boxes
 -- from a referral". Positive quantity adds credit owed; negative quantity

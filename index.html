@@ -195,6 +195,7 @@
   .alert-banner{background:rgba(226,87,76,.14);border:1px solid var(--danger);color:var(--danger);border-radius:8px;padding:10px 12px;font-weight:700;font-size:13px;line-height:1.5;}
   .alert-banner.good{background:rgba(67,198,172,.14);border-color:var(--teal);color:var(--teal);}
   .customer-flag > * + *{margin-top:8px;}
+  .edit-sale-line + .edit-sale-line{border-top:1px solid var(--border);padding-top:10px;}
   .credit-banner{background:rgba(67,198,172,.14);border:1px solid var(--teal);color:var(--teal);border-radius:8px;padding:10px 12px;font-weight:700;font-size:13px;line-height:1.5;margin-top:8px;}
   code{background:var(--surface-alt);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:12px;}
 
@@ -997,21 +998,8 @@
           </div>
         </div>
         <div class="customer-flag" id="sale-customer-flag" style="display:none;margin-bottom:10px;"></div>
-        <div class="row">
-          <div>
-            <label>Coop</label>
-            <select id="sale-coop">
-              <option value="">Select a coop…</option>
-            </select>
-          </div>
-        </div>
-        <div class="row">
-          <div>
-            <label>Unit</label>
-            <select id="sale-unit" onchange="onSaleUnitChange()"></select>
-          </div>
-          <div><label>Quantity</label><input type="number" min="0" step="1" id="sale-quantity" oninput="onSaleUnitOrQtyChange()" placeholder="e.g. 2"></div>
-        </div>
+        <p class="share-note" style="margin-bottom:6px;">How many from each coop? Leave a coop blank if none came from it.</p>
+        <div id="sale-lines"></div>
         <div id="sale-credit-section" style="display:none;margin-bottom:10px;">
           <div class="checkbox-row">
             <input type="checkbox" id="sale-use-credit" onchange="onSaleUseCreditChange()">
@@ -1102,7 +1090,7 @@
           <div><label>Notes</label><textarea id="cust-notes" placeholder="e.g. Prefers blue eggs"></textarea></div>
         </div>
         <p class="sec-title" style="margin-top:4px;">Custom Pricing</p>
-        <p class="share-note" style="margin-bottom:10px;">Leave a price blank to charge this customer the standard price for that unit.</p>
+        <p class="share-note" style="margin-bottom:10px;">Leave a price blank to charge this customer the standard price for that unit. A coop with its own price (e.g. duck eggs) still uses that price.</p>
         <div class="row" id="cust-price-egg-row">
           <div><label id="cust-price-egg-label">Price per egg</label><input type="number" min="0" step="0.01" id="cust-price-egg" placeholder="Standard"></div>
         </div>
@@ -1614,6 +1602,11 @@
             <div class="row">
               <div><label>Price per half dozen</label><input type="number" min="0" step="0.01" id="sales-price-half-dozen" placeholder="0.00"></div>
               <div><label>Price per dozen</label><input type="number" min="0" step="0.01" id="sales-price-dozen" placeholder="0.00"></div>
+            </div>
+            <div id="sales-coop-prices-wrap" style="display:none;">
+              <p class="sec-title" style="margin:6px 0 4px;">Prices by coop</p>
+              <p class="share-note" style="margin-bottom:10px;">Set a different price for a coop's eggs, e.g. duck eggs. Leave blank to use the standard price above (or a customer's custom price).</p>
+              <div id="sales-coop-prices"></div>
             </div>
             <button class="btn full" onclick="saveSalesSettings()">Save sales settings</button>
           </div>
@@ -2369,7 +2362,13 @@ function rowToChicken(r){
   };
 }
 function rowToHealthCheck(r){ return { id: r.id, date: r.date, chickenId: r.chicken_id, items: r.items || [], category: r.category || 'poultry' }; }
-function rowToCoop(r){ return { id: r.id, name: r.name, category: r.category || 'poultry' }; }
+function rowToCoop(r){
+  const price = v => (v == null ? null : Number(v));
+  return {
+    id: r.id, name: r.name, category: r.category || 'poultry',
+    priceEgg: price(r.price_egg), priceHalfDozen: price(r.price_half_dozen), priceDozen: price(r.price_dozen)
+  };
+}
 function rowToBreed(r){
   return {
     id: r.id, name: r.name, animalType: r.animal_type,
@@ -2390,7 +2389,7 @@ function rowToSale(r){
   return {
     id: r.id, customerId: r.customer_id, date: r.date, unit: r.unit, coopId: r.coop_id || null,
     quantity: Number(r.quantity) || 0, charged: Number(r.charged) || 0, paid: Number(r.paid) || 0,
-    createdAt: r.created_at
+    createdAt: r.created_at, saleGroup: r.sale_group || null
   };
 }
 function rowToCustomerCredit(r){
@@ -5630,7 +5629,27 @@ function renderSalesSettingsForm(){
   document.getElementById('sales-price-egg').value = s.priceEgg || '';
   document.getElementById('sales-price-half-dozen').value = s.priceHalfDozen || '';
   document.getElementById('sales-price-dozen').value = s.priceDozen || '';
+  renderSalesCoopPriceFields();
   onSalesEnabledToggle();
+}
+
+function renderSalesCoopPriceFields(){
+  const wrap = document.getElementById('sales-coop-prices-wrap');
+  const el = document.getElementById('sales-coop-prices');
+  const coops = poultryCoopsForEggForm();
+  wrap.style.display = coops.length ? 'block' : 'none';
+  const allowEgg = document.getElementById('sales-allow-egg').checked;
+  const field = (coop, key, unitId, label) => {
+    const v = coop[key];
+    return `<div><label>${label}</label><input type="number" min="0" step="0.01" id="coop-price-${unitId}-${coop.id}" value="${v != null ? v : ''}" placeholder="Standard"></div>`;
+  };
+  el.innerHTML = coops.map(c => `
+    <p style="margin:0 0 4px;font-weight:600;font-size:13px;">${escapeHtml(c.name)}</p>
+    <div class="row">
+      ${allowEgg ? field(c, 'priceEgg', 'egg', 'Per egg') : ''}
+      ${field(c, 'priceHalfDozen', 'half_dozen', 'Per half dozen')}
+      ${field(c, 'priceDozen', 'dozen', 'Per dozen')}
+    </div>`).join('');
 }
 
 function populateSalesStandardUnitOptions(selected){
@@ -5644,6 +5663,7 @@ function populateSalesStandardUnitOptions(selected){
 function onSalesAllowEggToggle(){
   populateSalesStandardUnitOptions(document.getElementById('sales-standard-unit').value);
   document.getElementById('sales-price-egg-row').style.display = document.getElementById('sales-allow-egg').checked ? 'flex' : 'none';
+  renderSalesCoopPriceFields();
 }
 
 async function saveSalesSettings(){
@@ -5658,6 +5678,22 @@ async function saveSalesSettings(){
   };
   const { error } = await sb.from('sales_settings').upsert(payload, { onConflict: 'owner_id' });
   if(error){ setStatus('sales-settings-status', error.message, true); return; }
+
+  const readPrice = (unitId, coopId) => {
+    const el = document.getElementById(`coop-price-${unitId}-${coopId}`);
+    if(!el) return undefined;
+    return el.value === '' ? null : Number(el.value);
+  };
+  for(const coop of poultryCoopsForEggForm()){
+    const update = {};
+    [['egg', 'price_egg', 'priceEgg'], ['half_dozen', 'price_half_dozen', 'priceHalfDozen'], ['dozen', 'price_dozen', 'priceDozen']].forEach(([unitId, col, key]) => {
+      const v = readPrice(unitId, coop.id);
+      if(v !== undefined && v !== coop[key]) update[col] = v;
+    });
+    if(!Object.keys(update).length) continue;
+    const { error: coopError } = await sb.from('coops').update(update).eq('id', coop.id);
+    if(coopError){ setStatus('sales-settings-status', coopError.message, true); return; }
+  }
   await loadFlockData();
   refreshSectionNav();
   setStatus('sales-settings-status', 'Saved.', false);
@@ -5682,27 +5718,21 @@ function saleUnitOptionsHtml(labels, selected){
   return units.map(u => `<option value="${u}" ${u === selected ? 'selected' : ''}>${labels[u] || u}</option>`).join('');
 }
 
-function populateSaleUnitSelect(){
-  const sel = document.getElementById('sale-unit');
-  sel.innerHTML = saleUnitOptionsHtml(SALE_UNIT_DROPDOWN_LABELS, sel.value);
-}
-
 function populateCreditUnitSelect(){
   const sel = document.getElementById('credit-unit');
   if(!sel) return;
   sel.innerHTML = saleUnitOptionsHtml(SALE_UNIT_LABELS, sel.value);
 }
 
-function saleUnitPrice(unit, customerId){
+// A coop's own price (e.g. duck eggs) wins, then the customer's custom
+// price, then the standard price.
+function saleUnitPrice(unit, customerId, coopId){
+  const pick = o => (unit === 'half_dozen' ? o.priceHalfDozen : unit === 'dozen' ? o.priceDozen : o.priceEgg);
+  const coop = coopId ? state.coops.find(c => c.id === coopId) : null;
+  if(coop && pick(coop) != null) return pick(coop);
   const customer = customerId ? state.customers.find(c => c.id === customerId) : null;
-  if(customer){
-    const override = unit === 'half_dozen' ? customer.priceHalfDozen : unit === 'dozen' ? customer.priceDozen : customer.priceEgg;
-    if(override != null) return override;
-  }
-  const s = state.salesSettings || {};
-  if(unit === 'half_dozen') return s.priceHalfDozen || 0;
-  if(unit === 'dozen') return s.priceDozen || 0;
-  return s.priceEgg || 0;
+  if(customer && pick(customer) != null) return pick(customer);
+  return pick(state.salesSettings || {}) || 0;
 }
 
 function customerHasCustomPricing(c){
@@ -5792,12 +5822,7 @@ function onSaleCustomerChange(){
   }
   renderCustomerFlag(document.getElementById('sale-customer-flag'), items);
   document.getElementById('sale-use-credit').checked = false;
-  onSaleUnitOrQtyChange();
-}
-
-function onSaleUnitChange(){
-  document.getElementById('sale-use-credit').checked = false;
-  onSaleUnitOrQtyChange();
+  onSaleLinesChange();
 }
 
 function creditOwedForUnit(customerId, unit){
@@ -5806,45 +5831,115 @@ function creditOwedForUnit(customerId, unit){
 }
 
 function onSaleUseCreditChange(){
-  onSaleUnitOrQtyChange();
+  onSaleLinesChange();
 }
 
-function updateSaleCreditSection(customerId, unit, qty){
+function standardSaleUnit(){
+  return (state.salesSettings && state.salesSettings.standardUnit) || 'half_dozen';
+}
+
+function readSaleLines(){
+  return [...document.querySelectorAll('#sale-lines .sale-line')].map(el => ({
+    el,
+    coopId: el.dataset.coopId || null,
+    unit: el.querySelector('.sale-line-unit').value,
+    qty: Number(el.querySelector('.sale-line-qty').value) || 0
+  }));
+}
+
+// One line per poultry coop, each defaulting to the standard unit. Values
+// already typed are kept when the form re-renders.
+function renderSaleLines(){
+  const el = document.getElementById('sale-lines');
+  if(!el) return;
+  const previous = new Map(readSaleLines().map(l => [l.coopId || '', l]));
+  const coops = poultryCoopsForEggForm();
+  const entries = coops.length ? coops.map(c => ({ id: c.id, name: c.name })) : [{ id: '', name: 'Eggs' }];
+  el.innerHTML = entries.map(c => {
+    const prev = previous.get(c.id);
+    return `
+    <div class="sale-line" data-coop-id="${c.id}">
+      <label>${escapeHtml(c.name)}</label>
+      <div class="row" style="margin-bottom:2px;">
+        <div><select class="sale-line-unit" onchange="onSaleLinesChange()">${saleUnitOptionsHtml(SALE_UNIT_DROPDOWN_LABELS, prev ? prev.unit : standardSaleUnit())}</select></div>
+        <div><input type="number" min="0" step="1" inputmode="numeric" class="sale-line-qty" value="${prev && prev.qty ? prev.qty : ''}" placeholder="0" oninput="onSaleLinesChange()"></div>
+      </div>
+      <p class="share-note sale-line-price" style="margin:0 0 10px;"></p>
+    </div>`;
+  }).join('');
+}
+
+// Spends the customer's owed credit on lines of the matching unit, in order.
+function saleLineCreditAllocation(customerId, lines){
+  const remaining = {};
+  return lines.map(l => {
+    if(!l.qty) return 0;
+    if(!(l.unit in remaining)) remaining[l.unit] = creditOwedForUnit(customerId, l.unit);
+    const applied = Math.min(remaining[l.unit], l.qty);
+    remaining[l.unit] -= applied;
+    return applied;
+  });
+}
+
+function updateSaleCreditSection(customerId, lines){
   const section = document.getElementById('sale-credit-section');
   const checkbox = document.getElementById('sale-use-credit');
-  const owed = creditOwedForUnit(customerId, unit);
-  if(!customerId || owed <= 0 || qty <= 0){
+  const none = lines.map(() => 0);
+  const units = [...new Set(lines.filter(l => l.qty > 0).map(l => l.unit))];
+  const available = units.map(u => [u, creditOwedForUnit(customerId, u)]).filter(([, v]) => v > 0);
+  if(!customerId || !available.length){
     section.style.display = 'none';
     checkbox.checked = false;
-    return 0;
+    return none;
   }
   section.style.display = 'block';
-  const unitLabel = SALE_UNIT_PLURAL_LABELS[unit] || unit;
-  document.getElementById('sale-use-credit-label').textContent = `Use this customer's owed credit? (${owed} ${unitLabel} available)`;
+  document.getElementById('sale-use-credit-label').textContent =
+    `Use this customer's owed credit? (${available.map(([u, v]) => `${v} ${SALE_UNIT_PLURAL_LABELS[u] || u}`).join(', ')} available)`;
   const noteEl = document.getElementById('sale-credit-note');
   if(!checkbox.checked){
     noteEl.style.display = 'none';
-    return 0;
+    return none;
   }
-  const applied = Math.min(owed, qty);
-  const remainder = qty - applied;
+  const applied = saleLineCreditAllocation(customerId, lines);
+  const claimed = {};
+  lines.forEach((l, i) => { if(applied[i]) claimed[l.unit] = (claimed[l.unit] || 0) + applied[i]; });
+  const remainder = lines.reduce((s, l) => s + l.qty, 0) - applied.reduce((s, a) => s + a, 0);
   noteEl.style.display = 'block';
-  noteEl.textContent = remainder > 0.001
-    ? `Claiming ${applied} ${unitLabel} from credit. Charging for the remaining ${remainder} ${unitLabel} below.`
-    : `Claiming all ${applied} ${unitLabel} from credit. Nothing to charge for this sale.`;
+  noteEl.textContent = `Claiming ${formatCreditTotals(claimed)} from credit. `
+    + (remainder > 0.001 ? 'Charging for the rest below.' : 'Nothing to charge for this sale.');
   return applied;
 }
 
-function onSaleUnitOrQtyChange(){
-  const unit = document.getElementById('sale-unit').value;
+function onSaleLinesChange(){
   const customerId = document.getElementById('sale-customer').value;
-  const qty = Number(document.getElementById('sale-quantity').value) || 0;
-  const appliedCredit = updateSaleCreditSection(customerId, unit, qty);
-  const billableQty = Math.max(qty - appliedCredit, 0);
-  const standard = billableQty * saleUnitPrice(unit, customerId);
+  const lines = readSaleLines();
+  const applied = updateSaleCreditSection(customerId, lines);
+  let standard = 0;
+  lines.forEach((l, i) => {
+    const price = saleUnitPrice(l.unit, customerId, l.coopId);
+    const amount = Math.max(l.qty - applied[i], 0) * price;
+    standard += amount;
+    l.el.querySelector('.sale-line-price').textContent = l.qty
+      ? `${formatMoney(price)} each${applied[i] ? ` · ${applied[i]} from credit` : ''} · ${formatMoney(amount)}`
+      : `${formatMoney(price)} each`;
+  });
   document.getElementById('sale-standard-charge').textContent = formatMoney(standard);
-  document.getElementById('sale-charged').value = qty ? standard.toFixed(2) : '';
+  document.getElementById('sale-charged').value = lines.some(l => l.qty > 0) ? standard.toFixed(2) : '';
   onSaleChargedChange();
+}
+
+// Splits a total across lines in proportion to weights, in whole pence;
+// any rounding remainder goes on the last line.
+function splitAmount(total, weights){
+  const sum = weights.reduce((s, w) => s + w, 0);
+  const pence = Math.round(total * 100);
+  let used = 0;
+  return weights.map((w, i) => {
+    if(i === weights.length - 1) return (pence - used) / 100;
+    const part = sum > 0 ? Math.round(pence * w / sum) : 0;
+    used += part;
+    return part / 100;
+  });
 }
 
 function onSaleChargedChange(){
@@ -5854,7 +5949,7 @@ function onSaleChargedChange(){
 }
 
 function onSalePaidChange(){
-  const qty = Number(document.getElementById('sale-quantity').value) || 0;
+  const qty = readSaleLines().some(l => l.qty > 0);
   const charged = Number(document.getElementById('sale-charged').value) || 0;
   const paid = Number(document.getElementById('sale-paid').value) || 0;
   const diff = paid - charged;
@@ -5870,36 +5965,40 @@ async function saveSale(){
   if(!customerId){ setStatus('sale-status', 'Pick a customer.', true); return; }
   const date = document.getElementById('sale-date').value;
   if(!date){ setStatus('sale-status', 'Pick a date.', true); return; }
-  const unit = document.getElementById('sale-unit').value;
-  const quantity = Number(document.getElementById('sale-quantity').value) || 0;
-  if(!quantity){ setStatus('sale-status', 'Enter a quantity.', true); return; }
-  const coopId = document.getElementById('sale-coop').value || null;
-  if(!coopId && state.coops.some(c => c.category === 'poultry')){ setStatus('sale-status', 'Pick which coop this sale is from.', true); return; }
+  const lines = readSaleLines().filter(l => l.qty > 0);
+  if(!lines.length){ setStatus('sale-status', 'Enter how many were sold from at least one coop.', true); return; }
   const charged = Number(document.getElementById('sale-charged').value) || 0;
   const paid = Number(document.getElementById('sale-paid').value) || 0;
 
-  const useCredit = document.getElementById('sale-use-credit').checked;
-  const appliedCredit = useCredit ? Math.min(creditOwedForUnit(customerId, unit), quantity) : 0;
+  const applied = document.getElementById('sale-use-credit').checked ? saleLineCreditAllocation(customerId, lines) : lines.map(() => 0);
+  const eggs = lines.map(l => l.qty * (EGGS_PER_UNIT[l.unit] || 1));
+  const priced = lines.map((l, i) => Math.max(l.qty - applied[i], 0) * saleUnitPrice(l.unit, customerId, l.coopId));
+  const chargedParts = splitAmount(charged, priced.some(a => a > 0) ? priced : eggs);
+  const paidParts = splitAmount(paid, charged > 0 ? chargedParts : eggs);
 
-  if(appliedCredit > 0){
+  const claimed = {};
+  lines.forEach((l, i) => { if(applied[i]) claimed[l.unit] = (claimed[l.unit] || 0) + applied[i]; });
+  for(const [unit, qty] of Object.entries(claimed)){
     const { error: creditError } = await sb.from('customer_credits').insert({
       owner_id: currentFlockOwnerId, customer_id: customerId, unit,
-      quantity: -appliedCredit, date, note: 'Claimed against a sale'
+      quantity: -qty, date, note: 'Claimed against a sale'
     });
     if(creditError){ setStatus('sale-status', creditError.message, true); return; }
   }
 
-  const { error } = await sb.from('sales').insert({
-    owner_id: currentFlockOwnerId, customer_id: customerId, date, unit, quantity, charged, paid, coop_id: coopId
-  });
+  const saleGroup = lines.length > 1 ? crypto.randomUUID() : null;
+  const { error } = await sb.from('sales').insert(lines.map((l, i) => ({
+    owner_id: currentFlockOwnerId, customer_id: customerId, date, unit: l.unit, quantity: l.qty,
+    charged: chargedParts[i], paid: paidParts[i], coop_id: l.coopId, sale_group: saleGroup
+  })));
   if(error){ setStatus('sale-status', error.message, true); return; }
 
-  document.getElementById('sale-quantity').value = '';
+  document.querySelectorAll('#sale-lines .sale-line-qty').forEach(i => { i.value = ''; });
   document.getElementById('sale-charged').value = '';
   document.getElementById('sale-paid').value = '';
   document.getElementById('sale-use-credit').checked = false;
-  setStatus('sale-status', appliedCredit > 0
-    ? `Sale logged — ${appliedCredit} ${SALE_UNIT_PLURAL_LABELS[unit] || unit} claimed from credit.`
+  setStatus('sale-status', Object.keys(claimed).length
+    ? `Sale logged — ${formatCreditTotals(claimed)} claimed from credit.`
     : 'Sale logged.', false);
   await loadFlockData();
   renderSalesTab();
@@ -5956,7 +6055,7 @@ function computeSalesPeriodStats(start, end){
     const t = new Date(s.date + 'T00:00:00');
     return t >= start && t <= end;
   });
-  const count = rows.length;
+  const count = new Set(rows.map(saleGroupKey)).size;
   const charged = rows.reduce((sum, s) => sum + s.charged, 0);
   const paid = rows.reduce((sum, s) => sum + s.paid, 0);
   const totalEggs = rows.reduce((sum, s) => sum + s.quantity * (UNIT_EGG_EQUIVALENT[s.unit] || 1), 0);
@@ -6065,61 +6164,76 @@ function saleCoopLabelHtml(coopId, category){
   return `<span class="issue-text">No ${coopWordFor(category).toLowerCase()} set</span> &middot; `;
 }
 
-function saleCoopSelectHtml(selectId, coopId, category){
+function saleCoopSelectHtml(attrs, coopId, category){
   const coops = state.coops.filter(c => c.category === category);
   const word = coopWordFor(category).toLowerCase();
   const placeholder = coops.length ? `Select a ${word}…` : `No ${word}s yet`;
-  return `<select id="${selectId}"><option value="">${placeholder}</option>`
+  return `<select ${attrs}><option value="">${placeholder}</option>`
     + coops.map(c => `<option value="${c.id}" ${c.id === coopId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('')
     + '</select>';
 }
 
-function allSalesSorted(){
-  return state.sales.slice().sort((a, b) => a.date < b.date ? 1 : -1);
+function saleGroupKey(s){ return s.saleGroup || s.id; }
+
+// A sale covering several coops is stored as one row per coop sharing a
+// sale_group; this puts them back together as one sale, newest first.
+function groupSales(list){
+  const order = poultryCoopsForEggForm().map(c => c.id);
+  const rank = id => (id && order.includes(id) ? order.indexOf(id) : order.length);
+  const map = new Map();
+  list.forEach(s => {
+    const key = saleGroupKey(s);
+    if(!map.has(key)) map.set(key, { key, saleGroup: s.saleGroup, customerId: s.customerId, date: s.date, createdAt: s.createdAt, lines: [], charged: 0, paid: 0 });
+    const g = map.get(key);
+    g.lines.push(s);
+    g.charged += s.charged;
+    g.paid += s.paid;
+  });
+  const groups = [...map.values()];
+  groups.forEach(g => g.lines.sort((a, b) => rank(a.coopId) - rank(b.coopId)));
+  return groups.sort((a, b) => (a.date !== b.date ? (a.date < b.date ? 1 : -1) : (a.createdAt < b.createdAt ? 1 : -1)));
 }
 
-function salesHistoryRowHtml(s){
-  const diff = s.paid - s.charged;
+function salePaidStatusHtml(g){
+  const diff = g.paid - g.charged;
   const settled = Math.abs(diff) < 0.005;
-  const diffLabel = settled ? 'Paid in full' : (diff > 0 ? `Overpaid by ${formatMoney(diff)}` : `Underpaid by ${formatMoney(-diff)}`);
-  const clickable = !!s.customerId;
+  const label = settled ? 'Paid in full' : (diff > 0 ? `Overpaid by ${formatMoney(diff)}` : `Underpaid by ${formatMoney(-diff)}`);
+  return `<span class="${settled ? 'good-text' : 'issue-text'}">${label}</span>`;
+}
+
+function saleLinesHtml(g){
+  return g.lines.map(l => `<div class="text-dim" style="font-size:12px;">${saleCoopLabelHtml(l.coopId, 'poultry')}${formatUnitQty(l.quantity)} &times; ${escapeHtml(SALE_UNIT_LABELS[l.unit] || l.unit)}</div>`).join('');
+}
+
+function salesHistoryRowHtml(g){
+  const clickable = !!g.customerId;
   return `
-    <div class="log-item" style="align-items:flex-start;flex-direction:column;gap:6px;${clickable ? 'cursor:pointer;' : ''}" ${clickable ? `onclick="openCustomerDetail('${s.customerId}')"` : ''}>
+    <div class="log-item" style="align-items:flex-start;flex-direction:column;gap:4px;${clickable ? 'cursor:pointer;' : ''}" ${clickable ? `onclick="openCustomerDetail('${g.customerId}')"` : ''}>
       <div style="display:flex;justify-content:space-between;width:100%;">
-        <strong>${escapeHtml(customerNameById(s.customerId))}</strong>
-        <span class="${settled ? 'good-text' : 'issue-text'}">${diffLabel}</span>
+        <strong>${escapeHtml(customerNameById(g.customerId))}</strong>
+        ${salePaidStatusHtml(g)}
       </div>
-      <div class="text-dim" style="font-size:12px;">${formatDateNice(s.date)} &middot; ${saleCoopLabelHtml(s.coopId, 'poultry')}${s.quantity} &times; ${escapeHtml(SALE_UNIT_LABELS[s.unit] || s.unit)} &middot; Charged ${formatMoney(s.charged)} &middot; Paid ${formatMoney(s.paid)}</div>
+      <div class="text-dim" style="font-size:12px;">${formatDateNice(g.date)} &middot; Charged ${formatMoney(g.charged)} &middot; Paid ${formatMoney(g.paid)}</div>
+      ${saleLinesHtml(g)}
     </div>`;
 }
 
 function renderSalesHistoryList(){
   const el = document.getElementById('sales-history-list');
   if(!el) return;
-  document.getElementById('sales-history-count').textContent = state.sales.length;
+  const all = groupSales(state.sales);
+  document.getElementById('sales-history-count').textContent = all.length;
   const search = (document.getElementById('sales-history-search').value || '').trim().toLowerCase();
-  let list = allSalesSorted();
-  if(search) list = list.filter(s => customerNameById(s.customerId).toLowerCase().includes(search));
+  const list = search ? all.filter(g => customerNameById(g.customerId).toLowerCase().includes(search)) : all;
   el.innerHTML = list.length
-    ? list.map(s => salesHistoryRowHtml(s)).join('')
-    : (state.sales.length ? '<p class="empty">No sales match your search.</p>' : '<p class="empty">No sales recorded yet.</p>');
-}
-
-function populateSaleCoopOptions(){
-  const sel = document.getElementById('sale-coop');
-  if(!sel) return;
-  const current = sel.value;
-  const coops = state.coops.filter(c => c.category === 'poultry');
-  sel.innerHTML = (coops.length ? '<option value="">Select a coop…</option>' : '<option value="">No coops yet</option>')
-    + coops.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
-  sel.value = coops.some(c => c.id === current) ? current : (coops.length === 1 ? coops[0].id : '');
+    ? list.map(salesHistoryRowHtml).join('')
+    : (all.length ? '<p class="empty">No sales match your search.</p>' : '<p class="empty">No sales recorded yet.</p>');
 }
 
 function renderSalesTab(){
   if(!document.getElementById('sale-date').value) document.getElementById('sale-date').value = todayStr();
-  populateSaleUnitSelect();
+  renderSaleLines();
   populateSaleCustomerOptions();
-  populateSaleCoopOptions();
   onSaleCustomerChange();
   renderCustomersList();
   renderSalesStats();
@@ -6302,50 +6416,57 @@ async function deleteCredit(id){
   renderCustomersList();
 }
 
-function customerSalesForList(id){
-  return state.sales.filter(s => s.customerId === id).sort((a, b) => a.date < b.date ? 1 : -1);
+function editSaleLineHtml(saleId, coopId, unit, qty){
+  return `
+    <div class="edit-sale-line" data-sale-id="${saleId || ''}">
+      <div class="row">
+        <div><label>Coop</label>${saleCoopSelectHtml('class="edit-sale-line-coop"', coopId, 'poultry')}</div>
+      </div>
+      <div class="row">
+        <div><label>Unit</label><select class="edit-sale-line-unit">${saleUnitOptionsHtml(SALE_UNIT_LABELS, unit)}</select></div>
+        <div><label>Quantity</label><input type="number" min="0" class="edit-sale-line-qty" value="${qty != null ? qty : ''}" placeholder="0"></div>
+      </div>
+    </div>`;
 }
 
-function saleRowHtml(s, readOnly){
-  if(editingSaleId === s.id){
+function addEditSaleLine(){
+  document.getElementById('edit-sale-lines').insertAdjacentHTML('beforeend', editSaleLineHtml(null, '', standardSaleUnit(), null));
+}
+
+function saleRowHtml(g, readOnly){
+  if(editingSaleId === g.key){
+    const hasCoops = poultryCoopsForEggForm().length > 0;
     return `
     <div class="hc-record" style="padding:12px;">
       <div class="row">
-        <div><label>Date</label><input type="date" id="edit-sale-date-${s.id}" value="${s.date}"></div>
-        <div><label>Coop</label>${saleCoopSelectHtml('edit-sale-coop-' + s.id, s.coopId, 'poultry')}</div>
+        <div><label>Date</label><input type="date" id="edit-sale-date" value="${g.date}"></div>
       </div>
+      <div id="edit-sale-lines">${g.lines.map(l => editSaleLineHtml(l.id, l.coopId, l.unit, l.quantity)).join('')}</div>
+      ${hasCoops ? '<button type="button" class="btn secondary full" style="margin-bottom:10px;" onclick="addEditSaleLine()">+ Add another coop</button>' : ''}
       <div class="row">
-        <div>
-          <label>Unit</label>
-          <select id="edit-sale-unit-${s.id}">${saleUnitOptionsHtml(SALE_UNIT_LABELS, s.unit)}</select>
-        </div>
-        <div><label>Quantity</label><input type="number" min="0" id="edit-sale-qty-${s.id}" value="${s.quantity}"></div>
+        <div><label>Amount charged</label><input type="number" min="0" step="0.01" id="edit-sale-charged" value="${g.charged.toFixed(2)}"></div>
+        <div><label>Amount paid</label><input type="number" min="0" step="0.01" id="edit-sale-paid" value="${g.paid.toFixed(2)}"></div>
       </div>
-      <div class="row">
-        <div><label>Amount charged</label><input type="number" min="0" step="0.01" id="edit-sale-charged-${s.id}" value="${s.charged.toFixed(2)}"></div>
-        <div><label>Amount paid</label><input type="number" min="0" step="0.01" id="edit-sale-paid-${s.id}" value="${s.paid.toFixed(2)}"></div>
-      </div>
+      ${g.lines.length > 1 || hasCoops ? '<p class="share-note" style="margin-bottom:10px;">Set a quantity to 0 to take that coop off this sale.</p>' : ''}
       <div class="row">
         <div><button type="button" class="btn secondary full" onclick="cancelEditSale()">Cancel</button></div>
-        <div><button type="button" class="btn full" onclick="saveEditedSale('${s.id}')">Save changes</button></div>
+        <div><button type="button" class="btn full" onclick="saveEditedSale('${g.key}')">Save changes</button></div>
       </div>
-      <div class="status" id="edit-sale-status-${s.id}"></div>
+      <div class="status" id="edit-sale-status"></div>
     </div>`;
   }
-  const diff = s.paid - s.charged;
-  const settled = Math.abs(diff) < 0.005;
-  const diffLabel = settled ? 'Paid in full' : (diff > 0 ? `Overpaid by ${formatMoney(diff)}` : `Underpaid by ${formatMoney(-diff)}`);
   return `
-    <div class="log-item" style="align-items:flex-start;flex-direction:column;gap:6px;">
+    <div class="log-item" style="align-items:flex-start;flex-direction:column;gap:4px;">
       <div style="display:flex;justify-content:space-between;width:100%;">
-        <strong>${formatDateNice(s.date)}</strong>
-        <span class="${settled ? 'good-text' : 'issue-text'}">${diffLabel}</span>
+        <strong>${formatDateNice(g.date)}</strong>
+        ${salePaidStatusHtml(g)}
       </div>
-      <div class="text-dim" style="font-size:12px;">${saleCoopLabelHtml(s.coopId, 'poultry')}${s.quantity} &times; ${escapeHtml(SALE_UNIT_LABELS[s.unit] || s.unit)} &middot; Charged ${formatMoney(s.charged)} &middot; Paid ${formatMoney(s.paid)}</div>
+      ${saleLinesHtml(g)}
+      <div class="text-dim" style="font-size:12px;">Charged ${formatMoney(g.charged)} &middot; Paid ${formatMoney(g.paid)}</div>
       ${readOnly ? '' : `
       <div class="row" style="margin-top:4px;width:100%;">
-        <div><button type="button" class="btn secondary full" onclick="startEditSale('${s.id}')">Edit</button></div>
-        <div><button type="button" class="btn danger full" onclick="deleteSale('${s.id}')">Delete</button></div>
+        <div><button type="button" class="btn secondary full" onclick="startEditSale('${g.key}')">Edit</button></div>
+        <div><button type="button" class="btn danger full" onclick="deleteSale('${g.key}')">Delete</button></div>
       </div>`}
     </div>`;
 }
@@ -6354,8 +6475,12 @@ function renderCustomerSalesList(id){
   const el = document.getElementById('customer-sales-list');
   if(!el) return;
   const readOnly = isReadOnly();
-  const sales = customerSalesForList(id);
-  el.innerHTML = sales.length ? sales.map(s => saleRowHtml(s, readOnly)).join('') : '<p class="empty">No sales recorded yet.</p>';
+  const groups = groupSales(state.sales.filter(s => s.customerId === id));
+  el.innerHTML = groups.length ? groups.map(g => saleRowHtml(g, readOnly)).join('') : '<p class="empty">No sales recorded yet.</p>';
+}
+
+function saleGroupByKey(key){
+  return groupSales(state.sales.filter(s => saleGroupKey(s) === key))[0] || null;
 }
 
 function startEditSale(id){
@@ -6368,16 +6493,52 @@ function cancelEditSale(){
   renderCustomerSalesList(currentCustomerDetailId);
 }
 
-async function saveEditedSale(id){
-  const date = document.getElementById('edit-sale-date-' + id).value;
-  const unit = document.getElementById('edit-sale-unit-' + id).value;
-  const quantity = Number(document.getElementById('edit-sale-qty-' + id).value) || 0;
-  const charged = Number(document.getElementById('edit-sale-charged-' + id).value) || 0;
-  const paid = Number(document.getElementById('edit-sale-paid-' + id).value) || 0;
-  const coopId = document.getElementById('edit-sale-coop-' + id).value || null;
-  if(!coopId && state.coops.some(c => c.category === 'poultry')){ setStatus('edit-sale-status-' + id, 'Pick which coop this sale is from.', true); return; }
-  const { error } = await sb.from('sales').update({ date, unit, quantity, charged, paid, coop_id: coopId }).eq('id', id);
-  if(error){ setStatus('edit-sale-status-' + id, error.message, true); return; }
+async function saveEditedSale(key){
+  const group = saleGroupByKey(key);
+  if(!group) return;
+  const date = document.getElementById('edit-sale-date').value;
+  if(!date){ setStatus('edit-sale-status', 'Pick a date.', true); return; }
+  const lines = [...document.querySelectorAll('#edit-sale-lines .edit-sale-line')].map(el => ({
+    id: el.dataset.saleId || null,
+    coopId: el.querySelector('.edit-sale-line-coop').value || null,
+    unit: el.querySelector('.edit-sale-line-unit').value,
+    qty: Number(el.querySelector('.edit-sale-line-qty').value) || 0
+  }));
+  const kept = lines.filter(l => l.qty > 0);
+  const removedIds = lines.filter(l => l.id && !l.qty).map(l => l.id);
+  if(!kept.length){
+    if(!confirm('Every quantity is 0. Delete this sale?')) return;
+  } else if(poultryCoopsForEggForm().length && kept.some(l => !l.coopId)){
+    setStatus('edit-sale-status', 'Pick which coop each line is from.', true); return;
+  }
+  const charged = Number(document.getElementById('edit-sale-charged').value) || 0;
+  const paid = Number(document.getElementById('edit-sale-paid').value) || 0;
+
+  // Lines that were free (e.g. covered by credit) in an otherwise charged
+  // sale stay free when the total is re-split.
+  const previous = new Map(group.lines.map(s => [s.id, s]));
+  const eggs = kept.map(l => l.qty * (EGGS_PER_UNIT[l.unit] || 1));
+  const priced = kept.map(l => {
+    const prev = l.id ? previous.get(l.id) : null;
+    if(prev && group.charged > 0 && prev.charged === 0) return 0;
+    return l.qty * saleUnitPrice(l.unit, group.customerId, l.coopId);
+  });
+  const chargedParts = splitAmount(charged, priced.some(a => a > 0) ? priced : eggs);
+  const paidParts = splitAmount(paid, charged > 0 ? chargedParts : eggs);
+  const saleGroup = group.saleGroup || (kept.length > 1 ? crypto.randomUUID() : null);
+
+  const ops = [];
+  kept.forEach((l, i) => {
+    const row = { date, coop_id: l.coopId, unit: l.unit, quantity: l.qty, charged: chargedParts[i], paid: paidParts[i], sale_group: saleGroup };
+    ops.push(l.id
+      ? () => sb.from('sales').update(row).eq('id', l.id)
+      : () => sb.from('sales').insert({ ...row, owner_id: currentFlockOwnerId, customer_id: group.customerId }));
+  });
+  if(removedIds.length) ops.push(() => sb.from('sales').delete().in('id', removedIds));
+  for(const op of ops){
+    const { error } = await op();
+    if(error){ setStatus('edit-sale-status', error.message, true); return; }
+  }
   editingSaleId = null;
   await loadFlockData();
   renderCustomerBalance(currentCustomerDetailId);
@@ -6385,9 +6546,11 @@ async function saveEditedSale(id){
   renderCustomersList();
 }
 
-async function deleteSale(id){
-  if(!confirm('Delete this sale record?')) return;
-  const { error } = await sb.from('sales').delete().eq('id', id);
+async function deleteSale(key){
+  const group = saleGroupByKey(key);
+  if(!group) return;
+  if(!confirm(group.lines.length > 1 ? `Delete this sale? It covers ${group.lines.length} coops.` : 'Delete this sale record?')) return;
+  const { error } = await sb.from('sales').delete().in('id', group.lines.map(s => s.id));
   if(error) return;
   await loadFlockData();
   renderCustomerBalance(currentCustomerDetailId);
@@ -6705,7 +6868,7 @@ function lsSaleRowHtml(s, readOnly){
     <div class="hc-record" style="padding:12px;">
       <div class="row">
         <div><label>Date</label><input type="date" id="edit-ls-sale-date-${s.id}" value="${s.date}"></div>
-        <div><label>Flock</label>${saleCoopSelectHtml('edit-ls-sale-coop-' + s.id, s.coopId, 'livestock')}</div>
+        <div><label>Flock</label>${saleCoopSelectHtml(`id="edit-ls-sale-coop-${s.id}"`, s.coopId, 'livestock')}</div>
       </div>
       <div class="row">
         <div>
