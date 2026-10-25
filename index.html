@@ -6024,9 +6024,38 @@ function splitAmount(total, weights){
   });
 }
 
+// Money you already owe the customer (a negative balance), which a new
+// sale uses up before they need to pay anything.
+function moneyOwedToCustomer(balance){
+  return Math.max(-balance, 0);
+}
+
+function defaultPaidAmount(charged, owedToCustomer){
+  return Math.max(charged - owedToCustomer, 0);
+}
+
+function paidStatusText(charged, paid, owedToCustomer){
+  const diff = paid - charged;
+  if(Math.abs(diff) < 0.005) return 'Paying in full.';
+  if(diff > 0) return `Paying ${formatMoney(diff)} more than charged.`;
+  const short = -diff;
+  if(owedToCustomer < 0.005) return `Paying ${formatMoney(short)} less than charged.`;
+  const used = Math.min(short, owedToCustomer);
+  let text = `${formatMoney(used)} comes off the ${formatMoney(owedToCustomer)} you owe them`;
+  if(short - used >= 0.005) text += `, and they'll owe you ${formatMoney(short - used)}.`;
+  else if(owedToCustomer - used >= 0.005) text += `, leaving ${formatMoney(owedToCustomer - used)} still owed to them.`;
+  else text += '.';
+  return text;
+}
+
+function saleOwedToCustomer(){
+  const customerId = document.getElementById('sale-customer').value;
+  return customerId ? moneyOwedToCustomer(customerBalance(customerId)) : 0;
+}
+
 function onSaleChargedChange(){
   const charged = Number(document.getElementById('sale-charged').value) || 0;
-  document.getElementById('sale-paid').value = charged ? charged.toFixed(2) : '';
+  document.getElementById('sale-paid').value = charged ? defaultPaidAmount(charged, saleOwedToCustomer()).toFixed(2) : '';
   onSalePaidChange();
 }
 
@@ -6034,12 +6063,7 @@ function onSalePaidChange(){
   const qty = readSaleLines().some(l => l.qty > 0);
   const charged = Number(document.getElementById('sale-charged').value) || 0;
   const paid = Number(document.getElementById('sale-paid').value) || 0;
-  const diff = paid - charged;
-  const statusEl = document.getElementById('sale-paid-status');
-  if(!qty){ statusEl.textContent = ''; return; }
-  if(Math.abs(diff) < 0.005) statusEl.textContent = 'Paying in full.';
-  else if(diff > 0) statusEl.textContent = `Paying ${formatMoney(diff)} more than charged.`;
-  else statusEl.textContent = `Paying ${formatMoney(-diff)} less than charged.`;
+  document.getElementById('sale-paid-status').textContent = qty ? paidStatusText(charged, paid, saleOwedToCustomer()) : '';
 }
 
 async function saveSale(){
@@ -6833,9 +6857,14 @@ function onLsSaleTypeOrQtyChange(){
   onLsSaleChargedChange();
 }
 
+function lsSaleOwedToCustomer(){
+  const customerId = document.getElementById('ls-sale-customer').value;
+  return customerId ? moneyOwedToCustomer(customerLsBalance(customerId)) : 0;
+}
+
 function onLsSaleChargedChange(){
   const charged = Number(document.getElementById('ls-sale-charged').value) || 0;
-  document.getElementById('ls-sale-paid').value = charged ? charged.toFixed(2) : '';
+  document.getElementById('ls-sale-paid').value = charged ? defaultPaidAmount(charged, lsSaleOwedToCustomer()).toFixed(2) : '';
   onLsSalePaidChange();
 }
 
@@ -6843,12 +6872,7 @@ function onLsSalePaidChange(){
   const qty = Number(document.getElementById('ls-sale-quantity').value) || 0;
   const charged = Number(document.getElementById('ls-sale-charged').value) || 0;
   const paid = Number(document.getElementById('ls-sale-paid').value) || 0;
-  const diff = paid - charged;
-  const statusEl = document.getElementById('ls-sale-paid-status');
-  if(!qty){ statusEl.textContent = ''; return; }
-  if(Math.abs(diff) < 0.005) statusEl.textContent = 'Paying in full.';
-  else if(diff > 0) statusEl.textContent = `Paying ${formatMoney(diff)} more than charged.`;
-  else statusEl.textContent = `Paying ${formatMoney(-diff)} less than charged.`;
+  document.getElementById('ls-sale-paid-status').textContent = qty ? paidStatusText(charged, paid, lsSaleOwedToCustomer()) : '';
 }
 
 async function saveLivestockSale(){
