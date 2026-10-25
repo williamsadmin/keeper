@@ -1007,7 +1007,7 @@
           </div>
           <p class="credit-banner" id="sale-credit-note" style="display:none;"></p>
         </div>
-        <p class="share-note">Standard price for this sale: <strong id="sale-standard-charge">£0.00</strong></p>
+        <p class="share-note">Price for this sale: <strong id="sale-standard-charge">£0.00</strong></p>
         <div class="row">
           <div><label>Amount charged</label><input type="number" min="0" step="0.01" id="sale-charged" oninput="onSaleChargedChange()"></div>
           <div><label>Amount paid</label><input type="number" min="0" step="0.01" id="sale-paid" oninput="onSalePaidChange()"></div>
@@ -1090,7 +1090,7 @@
           <div><label>Notes</label><textarea id="cust-notes" placeholder="e.g. Prefers blue eggs"></textarea></div>
         </div>
         <p class="sec-title" style="margin-top:4px;">Custom Pricing</p>
-        <p class="share-note" style="margin-bottom:10px;">Leave a price blank to charge this customer the standard price for that unit. A coop with its own price (e.g. duck eggs) still uses that price.</p>
+        <p class="share-note" style="margin-bottom:10px;" id="cust-price-note">Leave a price blank to charge this customer the standard price for that unit.</p>
         <div class="row" id="cust-price-egg-row">
           <div><label id="cust-price-egg-label">Price per egg</label><input type="number" min="0" step="0.01" id="cust-price-egg" placeholder="Standard"></div>
         </div>
@@ -1596,16 +1596,18 @@
                 <select id="sales-standard-unit"></select>
               </div>
             </div>
-            <div class="row" id="sales-price-egg-row">
-              <div><label>Price per egg</label><input type="number" min="0" step="0.01" id="sales-price-egg" placeholder="0.00"></div>
-            </div>
-            <div class="row">
-              <div><label>Price per half dozen</label><input type="number" min="0" step="0.01" id="sales-price-half-dozen" placeholder="0.00"></div>
-              <div><label>Price per dozen</label><input type="number" min="0" step="0.01" id="sales-price-dozen" placeholder="0.00"></div>
+            <div id="sales-standard-prices">
+              <div class="row" id="sales-price-egg-row">
+                <div><label>Price per egg</label><input type="number" min="0" step="0.01" id="sales-price-egg" placeholder="0.00"></div>
+              </div>
+              <div class="row">
+                <div><label>Price per half dozen</label><input type="number" min="0" step="0.01" id="sales-price-half-dozen" data-price-group="standard" data-unit="half_dozen" oninput="onLinkedPriceInput(this)" placeholder="0.00"></div>
+                <div><label>Price per dozen</label><input type="number" min="0" step="0.01" id="sales-price-dozen" data-price-group="standard" data-unit="dozen" oninput="onLinkedPriceInput(this)" placeholder="0.00"></div>
+              </div>
             </div>
             <div id="sales-coop-prices-wrap" style="display:none;">
               <p class="sec-title" style="margin:6px 0 4px;">Prices by coop</p>
-              <p class="share-note" style="margin-bottom:10px;">Set a different price for a coop's eggs, e.g. duck eggs. Leave blank to use the standard price above (or a customer's custom price).</p>
+              <p class="share-note" style="margin-bottom:10px;">What you charge for each coop's eggs. Typing a half dozen price fills in the dozen (and the other way round), and you can change either.</p>
               <div id="sales-coop-prices"></div>
             </div>
             <button class="btn full" onclick="saveSalesSettings()">Save sales settings</button>
@@ -5629,27 +5631,74 @@ function renderSalesSettingsForm(){
   document.getElementById('sales-price-egg').value = s.priceEgg || '';
   document.getElementById('sales-price-half-dozen').value = s.priceHalfDozen || '';
   document.getElementById('sales-price-dozen').value = s.priceDozen || '';
+  initPriceLinks('standard');
   renderSalesCoopPriceFields();
   onSalesEnabledToggle();
 }
 
+// With coops, each coop's price replaces the standard price, so the
+// standard fields only show when there are no coops. A coop without its
+// own price yet starts from the standard price.
 function renderSalesCoopPriceFields(){
   const wrap = document.getElementById('sales-coop-prices-wrap');
   const el = document.getElementById('sales-coop-prices');
   const coops = poultryCoopsForEggForm();
   wrap.style.display = coops.length ? 'block' : 'none';
+  document.getElementById('sales-standard-prices').style.display = coops.length ? 'none' : 'block';
+  const s = state.salesSettings || {};
   const allowEgg = document.getElementById('sales-allow-egg').checked;
   const field = (coop, key, unitId, label) => {
-    const v = coop[key];
-    return `<div><label>${label}</label><input type="number" min="0" step="0.01" id="coop-price-${unitId}-${coop.id}" value="${v != null ? v : ''}" placeholder="Standard"></div>`;
+    const v = coop[key] != null ? coop[key] : (s[key] || '');
+    return `<div><label>${label}</label><input type="number" min="0" step="0.01" id="coop-price-${unitId}-${coop.id}" data-price-group="${coop.id}" data-unit="${unitId}" oninput="onLinkedPriceInput(this)" value="${v}" placeholder="0.00"></div>`;
   };
   el.innerHTML = coops.map(c => `
-    <p style="margin:0 0 4px;font-weight:600;font-size:13px;">${escapeHtml(c.name)}</p>
+    <div class="row" style="align-items:flex-end;margin-bottom:4px;">
+      <div><p style="margin:0;font-weight:600;font-size:13px;">${escapeHtml(c.name)}</p></div>
+      ${coops.length > 1 ? `<div><select onchange="copyCoopPrices('${c.id}', this.value); this.value = '';" aria-label="Copy prices from another coop">
+        <option value="">Copy prices from…</option>
+        ${coops.filter(o => o.id !== c.id).map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('')}
+      </select></div>` : ''}
+    </div>
     <div class="row">
       ${allowEgg ? field(c, 'priceEgg', 'egg', 'Per egg') : ''}
       ${field(c, 'priceHalfDozen', 'half_dozen', 'Per half dozen')}
       ${field(c, 'priceDozen', 'dozen', 'Per dozen')}
     </div>`).join('');
+  coops.forEach(c => initPriceLinks(c.id));
+}
+
+function priceInput(group, unit){
+  return document.querySelector(`input[data-price-group="${group}"][data-unit="${unit}"]`);
+}
+
+// Saved prices that aren't simply double/half of each other were set by
+// hand, so they stay put; otherwise they keep filling each other in.
+function initPriceLinks(group){
+  const half = priceInput(group, 'half_dozen'), dozen = priceInput(group, 'dozen');
+  if(!half || !dozen) return;
+  const unlinked = half.value !== '' && dozen.value !== '' && Math.abs(Number(dozen.value) - Number(half.value) * 2) >= 0.005;
+  half.dataset.manual = dozen.dataset.manual = unlinked ? '1' : '';
+}
+
+// Typing a half dozen price fills the dozen (x2) and vice versa (÷2),
+// unless the user has typed that one themselves.
+function onLinkedPriceInput(el){
+  el.dataset.manual = el.value === '' ? '' : '1';
+  const partnerUnit = el.dataset.unit === 'half_dozen' ? 'dozen' : (el.dataset.unit === 'dozen' ? 'half_dozen' : null);
+  const partner = partnerUnit && priceInput(el.dataset.priceGroup, partnerUnit);
+  if(!partner || partner.dataset.manual === '1') return;
+  if(el.value === ''){ partner.value = ''; return; }
+  const v = Number(el.value);
+  partner.value = String(Math.round((partnerUnit === 'dozen' ? v * 2 : v / 2) * 100) / 100);
+}
+
+function copyCoopPrices(targetId, sourceId){
+  if(!sourceId) return;
+  ['egg', 'half_dozen', 'dozen'].forEach(u => {
+    const src = priceInput(sourceId, u), dst = priceInput(targetId, u);
+    if(src && dst) dst.value = src.value;
+  });
+  initPriceLinks(targetId);
 }
 
 function populateSalesStandardUnitOptions(selected){
@@ -5663,7 +5712,16 @@ function populateSalesStandardUnitOptions(selected){
 function onSalesAllowEggToggle(){
   populateSalesStandardUnitOptions(document.getElementById('sales-standard-unit').value);
   document.getElementById('sales-price-egg-row').style.display = document.getElementById('sales-allow-egg').checked ? 'flex' : 'none';
-  renderSalesCoopPriceFields();
+  keepTypedCoopPrices(renderSalesCoopPriceFields);
+}
+
+// Re-rendering the coop fields (e.g. toggling per-egg pricing) mustn't
+// lose prices typed but not yet saved.
+function keepTypedCoopPrices(render){
+  const typed = [...document.querySelectorAll('#sales-coop-prices input[data-price-group]')]
+    .map(i => ({ group: i.dataset.priceGroup, unit: i.dataset.unit, value: i.value, manual: i.dataset.manual }));
+  render();
+  typed.forEach(t => { const el = priceInput(t.group, t.unit); if(el){ el.value = t.value; el.dataset.manual = t.manual || ''; } });
 }
 
 async function saveSalesSettings(){
@@ -5724,14 +5782,14 @@ function populateCreditUnitSelect(){
   sel.innerHTML = saleUnitOptionsHtml(SALE_UNIT_LABELS, sel.value);
 }
 
-// A coop's own price (e.g. duck eggs) wins, then the customer's custom
-// price, then the standard price.
+// A customer's custom price wins, then the coop's price, then the standard
+// price (only set directly when there are no coops).
 function saleUnitPrice(unit, customerId, coopId){
   const pick = o => (unit === 'half_dozen' ? o.priceHalfDozen : unit === 'dozen' ? o.priceDozen : o.priceEgg);
-  const coop = coopId ? state.coops.find(c => c.id === coopId) : null;
-  if(coop && pick(coop) != null) return pick(coop);
   const customer = customerId ? state.customers.find(c => c.id === customerId) : null;
   if(customer && pick(customer) != null) return pick(customer);
+  const coop = coopId ? state.coops.find(c => c.id === coopId) : null;
+  if(coop && pick(coop) != null) return pick(coop);
   return pick(state.salesSettings || {}) || 0;
 }
 
@@ -6244,10 +6302,15 @@ function renderSalesTab(){
 
 function populateCustomerPriceLabels(){
   const s = state.salesSettings || {};
+  const byCoop = poultryCoopsForEggForm().length > 0;
+  const label = (text, std) => (byCoop ? text : `${text} (standard ${formatMoney(std || 0)})`);
   document.getElementById('cust-price-egg-row').style.display = allowEggSales() ? 'flex' : 'none';
-  document.getElementById('cust-price-egg-label').textContent = `Price per egg (standard ${formatMoney(s.priceEgg || 0)})`;
-  document.getElementById('cust-price-half-dozen-label').textContent = `Price per half dozen (standard ${formatMoney(s.priceHalfDozen || 0)})`;
-  document.getElementById('cust-price-dozen-label').textContent = `Price per dozen (standard ${formatMoney(s.priceDozen || 0)})`;
+  document.getElementById('cust-price-egg-label').textContent = label('Price per egg', s.priceEgg);
+  document.getElementById('cust-price-half-dozen-label').textContent = label('Price per half dozen', s.priceHalfDozen);
+  document.getElementById('cust-price-dozen-label').textContent = label('Price per dozen', s.priceDozen);
+  document.getElementById('cust-price-note').textContent = byCoop
+    ? "Leave a price blank to charge this customer each coop's normal price. A price set here is used for eggs from every coop."
+    : 'Leave a price blank to charge this customer the standard price for that unit.';
 }
 
 function openCustomerDetail(id, returnTab){
