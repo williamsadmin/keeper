@@ -1091,13 +1091,16 @@
         </div>
         <p class="sec-title" style="margin-top:4px;">Custom Pricing</p>
         <p class="share-note" style="margin-bottom:10px;" id="cust-price-note">Leave a price blank to charge this customer the standard price for that unit.</p>
-        <div class="row" id="cust-price-egg-row">
-          <div><label id="cust-price-egg-label">Price per egg</label><input type="number" min="0" step="0.01" id="cust-price-egg" placeholder="Standard"></div>
+        <div id="cust-flat-prices">
+          <div class="row" id="cust-price-egg-row">
+            <div><label id="cust-price-egg-label">Price per egg</label><input type="number" min="0" step="0.01" id="cust-price-egg" placeholder="Standard"></div>
+          </div>
+          <div class="row">
+            <div><label id="cust-price-half-dozen-label">Price per half dozen</label><input type="number" min="0" step="0.01" id="cust-price-half-dozen" data-price-group="cust-flat" data-unit="half_dozen" oninput="onLinkedPriceInput(this)" placeholder="Standard"></div>
+            <div><label id="cust-price-dozen-label">Price per dozen</label><input type="number" min="0" step="0.01" id="cust-price-dozen" data-price-group="cust-flat" data-unit="dozen" oninput="onLinkedPriceInput(this)" placeholder="Standard"></div>
+          </div>
         </div>
-        <div class="row">
-          <div><label id="cust-price-half-dozen-label">Price per half dozen</label><input type="number" min="0" step="0.01" id="cust-price-half-dozen" placeholder="Standard"></div>
-          <div><label id="cust-price-dozen-label">Price per dozen</label><input type="number" min="0" step="0.01" id="cust-price-dozen" placeholder="Standard"></div>
-        </div>
+        <div id="cust-coop-prices"></div>
         <button class="btn full" onclick="saveCustomer()">Save customer</button>
         <button class="btn secondary full" id="cust-cancel-btn" style="display:none;margin-top:8px;" onclick="closeCustomerDetail()">Cancel edit</button>
         <div class="status" id="customer-status"></div>
@@ -2384,7 +2387,8 @@ function rowToCustomer(r){
     id: r.id, name: r.name, notes: r.notes || '', address: r.address || '',
     priceEgg: r.price_egg != null ? Number(r.price_egg) : null,
     priceHalfDozen: r.price_half_dozen != null ? Number(r.price_half_dozen) : null,
-    priceDozen: r.price_dozen != null ? Number(r.price_dozen) : null
+    priceDozen: r.price_dozen != null ? Number(r.price_dozen) : null,
+    coopPrices: r.coop_prices || {}
   };
 }
 function rowToSale(r){
@@ -5782,11 +5786,14 @@ function populateCreditUnitSelect(){
   sel.innerHTML = saleUnitOptionsHtml(SALE_UNIT_LABELS, sel.value);
 }
 
-// A customer's custom price wins, then the coop's price, then the standard
-// price (only set directly when there are no coops).
+// Most specific first: the customer's price for that coop, the customer's
+// flat price (only set when there are no coops, or from before per-coop
+// pricing), the coop's price, then the standard price.
 function saleUnitPrice(unit, customerId, coopId){
   const pick = o => (unit === 'half_dozen' ? o.priceHalfDozen : unit === 'dozen' ? o.priceDozen : o.priceEgg);
   const customer = customerId ? state.customers.find(c => c.id === customerId) : null;
+  const customerCoopPrice = customer && coopId && customer.coopPrices[coopId] ? customer.coopPrices[coopId][unit] : null;
+  if(customerCoopPrice != null) return Number(customerCoopPrice);
   if(customer && pick(customer) != null) return pick(customer);
   const coop = coopId ? state.coops.find(c => c.id === coopId) : null;
   if(coop && pick(coop) != null) return pick(coop);
@@ -5794,7 +5801,8 @@ function saleUnitPrice(unit, customerId, coopId){
 }
 
 function customerHasCustomPricing(c){
-  return c.priceEgg != null || c.priceHalfDozen != null || c.priceDozen != null;
+  return c.priceEgg != null || c.priceHalfDozen != null || c.priceDozen != null
+    || Object.values(c.coopPrices).some(p => Object.values(p).some(v => v != null));
 }
 
 function formatMoney(n){
@@ -6309,8 +6317,72 @@ function populateCustomerPriceLabels(){
   document.getElementById('cust-price-half-dozen-label').textContent = label('Price per half dozen', s.priceHalfDozen);
   document.getElementById('cust-price-dozen-label').textContent = label('Price per dozen', s.priceDozen);
   document.getElementById('cust-price-note').textContent = byCoop
-    ? "Leave a price blank to charge this customer each coop's normal price. A price set here is used for eggs from every coop."
+    ? "Set this customer's prices for each coop. Leave a box blank to charge them that coop's normal price (shown in grey)."
     : 'Leave a price blank to charge this customer the standard price for that unit.';
+}
+
+const UNIT_PRICE_KEYS = { egg: 'priceEgg', half_dozen: 'priceHalfDozen', dozen: 'priceDozen' };
+
+function coopNormalPrice(coop, unit){
+  const key = UNIT_PRICE_KEYS[unit];
+  return coop[key] != null ? coop[key] : ((state.salesSettings || {})[key] || 0);
+}
+
+// A customer's own price for a coop, falling back to their flat price
+// from before per-coop pricing (which applied to every coop).
+function customerCoopPriceValue(c, coopId, unit){
+  if(!c) return null;
+  const own = c.coopPrices[coopId] ? c.coopPrices[coopId][unit] : null;
+  if(own != null) return own;
+  return c[UNIT_PRICE_KEYS[unit]];
+}
+
+function customerPriceUnits(){
+  return allowEggSales() ? ['egg', 'half_dozen', 'dozen'] : ['half_dozen', 'dozen'];
+}
+
+function renderCustomerCoopPriceFields(c){
+  const el = document.getElementById('cust-coop-prices');
+  const coops = poultryCoopsForEggForm();
+  document.getElementById('cust-flat-prices').style.display = coops.length ? 'none' : 'block';
+  if(!coops.length){ el.innerHTML = ''; initPriceLinks('cust-flat'); return; }
+  const labels = { egg: 'Per egg', half_dozen: 'Per half dozen', dozen: 'Per dozen' };
+  el.innerHTML = coops.map(coop => `
+    <div class="row" style="align-items:flex-end;margin-bottom:4px;">
+      <div><p style="margin:0;font-weight:600;font-size:13px;">${escapeHtml(coop.name)}</p></div>
+      ${coops.length > 1 ? `<div><select onchange="copyCoopPrices('cust-${coop.id}', this.value ? 'cust-' + this.value : ''); this.value = '';" aria-label="Copy prices from another coop">
+        <option value="">Copy prices from…</option>
+        ${coops.filter(o => o.id !== coop.id).map(o => `<option value="${o.id}">${escapeHtml(o.name)}</option>`).join('')}
+      </select></div>` : ''}
+    </div>
+    <div class="row">
+      ${customerPriceUnits().map(u => {
+        const v = customerCoopPriceValue(c, coop.id, u);
+        return `<div><label>${labels[u]}</label><input type="number" min="0" step="0.01" data-price-group="cust-${coop.id}" data-unit="${u}" oninput="onLinkedPriceInput(this)" value="${v != null ? v : ''}" placeholder="${formatMoney(coopNormalPrice(coop, u))}"></div>`;
+      }).join('')}
+    </div>`).join('');
+  coops.forEach(coop => initPriceLinks('cust-' + coop.id));
+}
+
+// Hidden units (e.g. per egg while single-egg sales are off) keep whatever
+// price they already had.
+function readCustomerCoopPrices(c){
+  const shown = customerPriceUnits();
+  const result = {};
+  poultryCoopsForEggForm().forEach(coop => {
+    const p = {};
+    ['egg', 'half_dozen', 'dozen'].forEach(u => {
+      if(shown.includes(u)){
+        const input = priceInput('cust-' + coop.id, u);
+        if(input && input.value !== '') p[u] = Number(input.value);
+      } else {
+        const v = customerCoopPriceValue(c, coop.id, u);
+        if(v != null) p[u] = v;
+      }
+    });
+    if(Object.keys(p).length) result[coop.id] = p;
+  });
+  return result;
 }
 
 function openCustomerDetail(id, returnTab){
@@ -6332,6 +6404,7 @@ function openCustomerDetail(id, returnTab){
     document.getElementById('cust-price-egg').value = c && c.priceEgg != null ? c.priceEgg : '';
     document.getElementById('cust-price-half-dozen').value = c && c.priceHalfDozen != null ? c.priceHalfDozen : '';
     document.getElementById('cust-price-dozen').value = c && c.priceDozen != null ? c.priceDozen : '';
+    renderCustomerCoopPriceFields(c);
     document.getElementById('cust-cancel-btn').style.display = 'block';
     document.getElementById('customer-balance-section').style.display = 'block';
     document.getElementById('customer-credits-section').style.display = 'block';
@@ -6356,6 +6429,7 @@ function openCustomerDetail(id, returnTab){
     document.getElementById('cust-price-egg').value = '';
     document.getElementById('cust-price-half-dozen').value = '';
     document.getElementById('cust-price-dozen').value = '';
+    renderCustomerCoopPriceFields(null);
     document.getElementById('cust-cancel-btn').style.display = 'none';
     document.getElementById('customer-balance-section').style.display = 'none';
     document.getElementById('customer-credits-section').style.display = 'none';
@@ -6394,6 +6468,10 @@ async function saveCustomer(){
     price_half_dozen: customerPriceFieldValue('cust-price-half-dozen'),
     price_dozen: customerPriceFieldValue('cust-price-dozen')
   };
+  if(poultryCoopsForEggForm().length){
+    payload.coop_prices = readCustomerCoopPrices(editingCustomerId ? state.customers.find(x => x.id === editingCustomerId) : null);
+    payload.price_egg = payload.price_half_dozen = payload.price_dozen = null;
+  }
   let error;
   if(editingCustomerId){
     ({ error } = await sb.from('customers').update(payload).eq('id', editingCustomerId));

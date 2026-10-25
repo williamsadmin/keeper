@@ -211,6 +211,12 @@ alter table customers add column if not exists price_egg numeric;
 alter table customers add column if not exists price_half_dozen numeric;
 alter table customers add column if not exists price_dozen numeric;
 
+-- Per-coop custom prices for this customer, keyed by coop id then unit:
+-- {"<coop id>": {"half_dozen": 1.8, "dozen": 3.5}}. A missing price means
+-- "charge this customer the coop's normal price". The flat price_* columns
+-- above are only used when there are no coops.
+alter table customers add column if not exists coop_prices jsonb not null default '{}';
+
 -- Free-text address, searchable alongside name when picking a customer.
 alter table customers add column if not exists address text;
 
