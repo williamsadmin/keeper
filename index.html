@@ -1815,28 +1815,30 @@ const POULTRY_TABS = [
   { id: 'chickens', label: 'My Flock' },
   { id: 'health', label: 'Health Checks' },
   { id: 'breeds', label: 'Breeds' },
-  { id: 'sales', label: 'Sales' },
   { id: 'movements', label: 'Movements' }
 ];
 const LIVESTOCK_TABS = [
   { id: 'chickens', label: 'My Flock' },
   { id: 'health', label: 'Health Checks' },
   { id: 'breeds', label: 'Breeds' },
-  { id: 'livestock-sales', label: 'Sales' },
   { id: 'movements', label: 'Movements' }
 ];
+// The Purchases section holds the money side: sales and purchases.
 const PURCHASES_TABS = [
-  { id: 'purchases', label: 'Log Purchase' },
+  { id: 'sales', label: 'Sales' },
+  { id: 'livestock-sales', label: 'Livestock Sales' },
+  { id: 'purchases', label: 'Purchases' },
   { id: 'purchase-presets', label: 'Presets' }
 ];
-const PURCHASES_TAB_IDS = PURCHASES_TABS.map(t => t.id);
+// customer-detail is opened from Sales, so it belongs to this section too.
+const PURCHASES_TAB_IDS = [...PURCHASES_TABS.map(t => t.id), 'customer-detail'];
 const CATEGORY_TAB_IDS = ['eggs', 'chickens', 'health', 'breeds', 'sales', 'livestock-sales'];
 const SECTIONLESS_TABS = ['overall', 'account'];
 const POULTRY_CUSTOMIZABLE_TAB_IDS = ['eggs', 'chickens', 'health', 'breeds'];
 const LIVESTOCK_CUSTOMIZABLE_TAB_IDS = ['chickens', 'health', 'breeds'];
 let lastPoultryTab = 'eggs';
 let lastLivestockTab = 'chickens';
-let lastPurchasesTab = 'purchases';
+let lastPurchasesTab = null;
 let showPoultrySection = true;
 let showLivestockSection = true;
 let hiddenPoultryTabIds = [];
@@ -1880,11 +1882,29 @@ function applyMainTabsVisibility(){
   const purchasesBtn = document.querySelector('.section-btn[data-section="purchases"]');
   if(poultryBtn) poultryBtn.style.display = showPoultrySection ? 'flex' : 'none';
   if(livestockBtn) livestockBtn.style.display = showLivestockSection ? 'flex' : 'none';
-  if(purchasesBtn) purchasesBtn.style.display = purchasesEnabled() ? 'flex' : 'none';
+  updatePurchasesSectionButton();
   if(currentSection === 'poultry' && !showPoultrySection) switchSection('overall');
   if(currentSection === 'livestock' && !showLivestockSection) switchSection('overall');
-  if(currentSection === 'purchases' && !purchasesEnabled()) switchSection('overall');
+  if(currentSection === 'purchases' && !purchasesSectionTabs().length) switchSection('overall');
   renderOverallEggReminder();
+}
+
+function eggSalesEnabled(){
+  return !!(state.salesSettings && state.salesSettings.enabled);
+}
+
+function purchasesSectionTabs(){
+  const lsOn = enabledLsSaleTypes().length > 0;
+  const on = { 'sales': eggSalesEnabled(), 'livestock-sales': lsOn, 'purchases': purchasesEnabled(), 'purchase-presets': purchasesEnabled() };
+  return PURCHASES_TABS.filter(t => on[t.id]);
+}
+
+// Shown whenever sales or purchases are on; called "Sales" if purchases are off.
+function updatePurchasesSectionButton(){
+  const btn = document.querySelector('.section-btn[data-section="purchases"]');
+  if(!btn) return;
+  btn.style.display = purchasesSectionTabs().length ? 'flex' : 'none';
+  btn.querySelector('.section-label').textContent = purchasesEnabled() ? 'Purchases' : 'Sales';
 }
 
 // ---------- HOME QUICK LINKS ----------
@@ -1974,18 +1994,20 @@ function saveHomeQuickLinks(){
 function currentSectionTabs(){
   const movementsOn = holdingMovementsEnabled();
   if(currentSection === 'poultry'){
-    const salesOn = !!(state.salesSettings && state.salesSettings.enabled);
-    const tabs = POULTRY_TABS.filter(t => (t.id !== 'sales' || salesOn) && (t.id !== 'movements' || movementsOn));
-    const filtered = tabs.filter(t => t.id === 'sales' || t.id === 'movements' || !hiddenPoultryTabIds.includes(t.id));
+    const tabs = POULTRY_TABS.filter(t => t.id !== 'movements' || movementsOn);
+    const filtered = tabs.filter(t => t.id === 'movements' || !hiddenPoultryTabIds.includes(t.id));
     return filtered.length ? filtered : tabs;
   }
   if(currentSection === 'livestock'){
-    const lsOn = enabledLsSaleTypes().length > 0;
-    const tabs = LIVESTOCK_TABS.filter(t => (t.id !== 'livestock-sales' || lsOn) && (t.id !== 'movements' || movementsOn));
-    const filtered = tabs.filter(t => t.id === 'livestock-sales' || t.id === 'movements' || !hiddenLivestockTabIds.includes(t.id));
+    const tabs = LIVESTOCK_TABS.filter(t => t.id !== 'movements' || movementsOn);
+    const filtered = tabs.filter(t => t.id === 'movements' || !hiddenLivestockTabIds.includes(t.id));
     return filtered.length ? filtered : tabs;
   }
-  if(currentSection === 'purchases') return PURCHASES_TABS;
+  if(currentSection === 'purchases'){
+    const tabs = purchasesSectionTabs();
+    const both = tabs.some(t => t.id === 'livestock-sales') && tabs.some(t => t.id === 'sales');
+    return tabs.map(t => (t.id === 'sales' && both ? { ...t, label: 'Egg Sales' } : t));
+  }
   return [];
 }
 
@@ -2008,6 +2030,8 @@ function switchSection(section){
 }
 
 function refreshSectionNav(){
+  updatePurchasesSectionButton();
+  if(currentSection === 'purchases' && !purchasesSectionTabs().length){ switchSection('overall'); return; }
   document.querySelectorAll('.section-btn').forEach(b => b.classList.toggle('active', b.dataset.section === currentSection));
   const subtabWrap = document.getElementById('subtabbar-wrap');
   const sectionless = SECTIONLESS_TABS.includes(currentSection);
@@ -2017,7 +2041,8 @@ function refreshSectionNav(){
   const tabs = currentSectionTabs();
   const activeEl = document.querySelector('.tab-panel.active');
   const activeTab = activeEl ? activeEl.id.replace('tab-', '') : null;
-  if(!tabs.some(t => t.id === activeTab)) switchTab(tabs[0] ? tabs[0].id : 'chickens');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === activeTab));
+  if(!tabs.some(t => t.id === activeTab) && activeTab !== 'customer-detail') switchTab(tabs[0] ? tabs[0].id : 'chickens');
 }
 
 function switchTab(tab){
@@ -2032,7 +2057,7 @@ function switchTab(tab){
   if(!sectionless){
     if(currentSection === 'poultry') lastPoultryTab = tab;
     else if(currentSection === 'livestock') lastLivestockTab = tab;
-    else if(currentSection === 'purchases') lastPurchasesTab = tab;
+    else if(currentSection === 'purchases' && tab !== 'customer-detail') lastPurchasesTab = tab;
   }
   if(tab === 'eggs'){ renderEggCoopRows(); renderEggCoopFilterOptions(); renderEggs(); }
   if(tab === 'chickens'){ refreshFlockViews(); populateCoopSelectOptions(); }
@@ -2331,7 +2356,7 @@ function renderAll(){
   refreshSectionNav();
   if(document.getElementById('tab-chicken-detail').classList.contains('active')) switchSection(currentCategory);
   if(document.getElementById('tab-coop-detail').classList.contains('active')) switchSection(currentCategory);
-  if(document.getElementById('tab-customer-detail').classList.contains('active')) switchSection(currentCustomerDetailReturnTab === 'livestock-sales' ? 'livestock' : 'poultry');
+  if(document.getElementById('tab-customer-detail').classList.contains('active')) switchSection('purchases');
   currentDetailChickenId = null;
   currentCoopDetailId = null;
   currentCustomerDetailId = null;
@@ -2535,6 +2560,7 @@ async function loadFlockData(){
   state.treatments = (treatmentsRes.data || []).map(rowToTreatment);
   state.holdingMovements = (holdingMovementsRes.data || []).map(rowToHoldingMovement);
   state.holdingMovementsSettings = rowToHoldingMovementsSettings(holdingMovementsSettingsRes.data);
+  updatePurchasesSectionButton();
 }
 
 // ---------- EGG COUNT ----------
