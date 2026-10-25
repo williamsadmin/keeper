@@ -182,7 +182,7 @@
   .match-badge{background:var(--green);color:#203143;}
   .issue-badge{background:var(--danger);color:#203143;}
   .ok-badge{background:var(--teal);color:#203143;}
-  .credit-badge{display:inline-block;margin-top:4px;background:var(--amber-dim);color:var(--amber);border:1px solid var(--amber);}
+  .credit-badge{display:inline-block;margin-top:4px;background:rgba(67,198,172,.14);color:var(--teal);border:1px solid var(--teal);}
   .hc-record-body{padding:0 12px 12px;border-top:1px solid var(--border);}
   .hc-record-row{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;gap:8px;}
   .hc-record-note{font-size:11px;color:var(--text-dim);font-style:italic;padding:0 0 6px;}
@@ -1018,10 +1018,6 @@
       </section>
 
       <section>
-        <button class="btn secondary full" id="add-customer-btn" onclick="openCustomerDetail(null)">+ Add Customer</button>
-      </section>
-
-      <section>
         <p class="sec-title">Sales Totals</p>
         <div class="stat-grid" id="sales-stats"></div>
       </section>
@@ -1060,15 +1056,21 @@
           <div id="sales-history-list"></div>
         </details>
       </section>
+    </div>
+
+    <!-- CUSTOMERS TAB -->
+    <div id="tab-customers" class="tab-panel">
+      <p class="eyebrow">Sales</p>
+      <h1>Customers</h1>
+      <p class="sub">Everyone you sell to. Tap a customer to see what they owe, their sales and their prices.</p>
 
       <section>
-        <details id="customers-section">
-          <summary class="sec-title">Customers (<span id="customers-count">0</span>)</summary>
-          <div class="row">
-            <div><label>Search</label><input type="text" id="customers-search" oninput="renderCustomersList()" placeholder="Search by name or address…"></div>
-          </div>
-          <div id="customers-list"></div>
-        </details>
+        <button class="btn secondary full" id="add-customer-btn" style="margin-bottom:12px;" onclick="openCustomerDetail(null, 'customers')">+ Add Customer</button>
+        <div class="row">
+          <div><label>Search</label><input type="text" id="customers-search" oninput="renderCustomersList()" placeholder="Search by name or address…"></div>
+        </div>
+        <p class="share-note" id="customers-count" style="margin-bottom:8px;"></p>
+        <div id="customers-list"></div>
       </section>
     </div>
 
@@ -1216,10 +1218,6 @@
         </section>
 
         <section>
-          <button class="btn secondary full" id="ls-add-customer-btn" onclick="openCustomerDetail(null, 'livestock-sales')">+ Add Customer</button>
-        </section>
-
-        <section>
           <p class="sec-title">Sales Totals</p>
           <div class="stat-grid" id="ls-sales-stats"></div>
         </section>
@@ -1231,16 +1229,6 @@
               <div><label>Search</label><input type="text" id="ls-sales-history-search" oninput="renderLsSalesHistoryList()" placeholder="Search by customer…"></div>
             </div>
             <div id="ls-sales-history-list"></div>
-          </details>
-        </section>
-
-        <section>
-          <details id="ls-customers-section">
-            <summary class="sec-title">Customers (<span id="ls-customers-count">0</span>)</summary>
-            <div class="row">
-              <div><label>Search</label><input type="text" id="ls-customers-search" oninput="renderLsCustomersList()" placeholder="Search by name or address…"></div>
-            </div>
-            <div id="ls-customers-list"></div>
           </details>
         </section>
       </div>
@@ -1827,6 +1815,7 @@ const LIVESTOCK_TABS = [
 const PURCHASES_TABS = [
   { id: 'sales', label: 'Sales' },
   { id: 'livestock-sales', label: 'Livestock Sales' },
+  { id: 'customers', label: 'Customers' },
   { id: 'purchases', label: 'Purchases' },
   { id: 'purchase-presets', label: 'Presets' }
 ];
@@ -1895,7 +1884,7 @@ function eggSalesEnabled(){
 
 function purchasesSectionTabs(){
   const lsOn = enabledLsSaleTypes().length > 0;
-  const on = { 'sales': eggSalesEnabled(), 'livestock-sales': lsOn, 'purchases': purchasesEnabled(), 'purchase-presets': purchasesEnabled() };
+  const on = { 'sales': eggSalesEnabled(), 'livestock-sales': lsOn, 'customers': eggSalesEnabled() || lsOn, 'purchases': purchasesEnabled(), 'purchase-presets': purchasesEnabled() };
   return PURCHASES_TABS.filter(t => on[t.id]);
 }
 
@@ -2065,6 +2054,7 @@ function switchTab(tab){
   if(tab === 'breeds'){ if(!editingBreedId) resetBreedForm(); renderBreedsList(); }
   if(tab === 'sales') renderSalesTab();
   if(tab === 'livestock-sales') renderLivestockSalesTab();
+  if(tab === 'customers') renderCustomersList();
   if(tab === 'purchases') renderPurchasesTab();
   if(tab === 'purchase-presets') renderPurchasePresetsTab();
   if(tab === 'movements') renderMovementsTab();
@@ -6096,19 +6086,21 @@ async function saveSale(){
   renderSalesTab();
 }
 
+// Balance covers egg and livestock sales together; the customer page
+// splits them out.
 function customerCardHtml(c){
-  const bal = customerBalance(c.id);
+  const bal = customerBalance(c.id) + customerLsBalance(c.id);
   const settled = Math.abs(bal) < 0.005;
   const balLabel = settled ? 'Settled' : (bal > 0 ? `Owes ${formatMoney(bal)}` : `You owe ${formatMoney(-bal)}`);
   const creditText = formatCreditTotals(customerCreditTotals(c.id));
   return `
-    <div class="chicken-card" onclick="openCustomerDetail('${c.id}')">
+    <div class="chicken-card" onclick="openCustomerDetail('${c.id}', 'customers')">
       <div class="chicken-card-head">
         <div>
           <div class="chicken-name">${escapeHtml(c.name)}</div>
           ${c.address ? `<div class="chicken-meta">${escapeHtml(c.address)}</div>` : ''}
           ${customerHasCustomPricing(c) ? '<div class="chicken-meta">Custom pricing</div>' : ''}
-          ${creditText !== 'None' ? `<div class="credit-badge">Owed: ${escapeHtml(creditText)}</div>` : ''}
+          ${creditText !== 'None' ? `<div class="credit-badge">You owe them: ${escapeHtml(creditText)}</div>` : ''}
         </div>
         <span class="${bal > 0 && !settled ? 'issue-badge' : 'ok-badge'}">${balLabel}</span>
       </div>
@@ -6118,12 +6110,13 @@ function customerCardHtml(c){
 function renderCustomersList(){
   const el = document.getElementById('customers-list');
   if(!el) return;
-  document.getElementById('customers-count').textContent = state.customers.length;
+  const n = state.customers.length;
+  document.getElementById('customers-count').textContent = n ? `${n} customer${n === 1 ? '' : 's'}` : '';
   const search = document.getElementById('customers-search').value;
   const filtered = filterCustomersByName(state.customers, search);
   el.innerHTML = filtered.length
     ? filtered.map(c => customerCardHtml(c)).join('')
-    : (state.customers.length ? '<p class="empty">No customers match your search.</p>' : '<p class="empty">No customers yet.</p>');
+    : (n ? '<p class="empty">No customers match your search.</p>' : '<p class="empty">No customers yet.</p>');
 }
 
 // ---------- SALES HISTORY ----------
@@ -6327,7 +6320,6 @@ function renderSalesTab(){
   renderSaleLines();
   populateSaleCustomerOptions();
   onSaleCustomerChange();
-  renderCustomersList();
   renderSalesStats();
   initSalesHistoryDefaults();
   renderSalesHistoryPeriodStats();
@@ -6417,7 +6409,8 @@ function openCustomerDetail(id, returnTab){
   editingCustomerId = id;
   editingSaleId = null;
   editingLsSaleId = null;
-  document.getElementById('customer-detail-back-label').textContent = currentCustomerDetailReturnTab === 'livestock-sales' ? '← Back to Livestock Sales' : '← Back to Sales';
+  const backTo = { 'livestock-sales': 'Livestock Sales', 'customers': 'Customers' }[currentCustomerDetailReturnTab] || 'Sales';
+  document.getElementById('customer-detail-back-label').textContent = `← Back to ${backTo}`;
   populateCustomerPriceLabels();
   populateCreditUnitSelect();
   if(id){
@@ -6473,10 +6466,7 @@ function closeCustomerDetail(){
   editingCustomerId = null;
   editingSaleId = null;
   editingLsSaleId = null;
-  const returnTab = currentCustomerDetailReturnTab || 'sales';
-  switchTab(returnTab);
-  if(returnTab === 'livestock-sales') renderLivestockSalesTab();
-  else renderSalesTab();
+  switchTab(currentCustomerDetailReturnTab || 'sales');
 }
 
 function customerPriceFieldValue(id){
@@ -6888,33 +6878,6 @@ async function saveLivestockSale(){
   renderLivestockSalesTab();
 }
 
-function lsCustomerCardHtml(c){
-  const bal = customerLsBalance(c.id);
-  const settled = Math.abs(bal) < 0.005;
-  const balLabel = settled ? 'Settled' : (bal > 0 ? `Owes ${formatMoney(bal)}` : `You owe ${formatMoney(-bal)}`);
-  return `
-    <div class="chicken-card" onclick="openCustomerDetail('${c.id}', 'livestock-sales')">
-      <div class="chicken-card-head">
-        <div>
-          <div class="chicken-name">${escapeHtml(c.name)}</div>
-          ${c.address ? `<div class="chicken-meta">${escapeHtml(c.address)}</div>` : ''}
-        </div>
-        <span class="${bal > 0 && !settled ? 'issue-badge' : 'ok-badge'}">${balLabel}</span>
-      </div>
-    </div>`;
-}
-
-function renderLsCustomersList(){
-  const el = document.getElementById('ls-customers-list');
-  if(!el) return;
-  document.getElementById('ls-customers-count').textContent = state.customers.length;
-  const search = document.getElementById('ls-customers-search').value;
-  const filtered = filterCustomersByName(state.customers, search);
-  el.innerHTML = filtered.length
-    ? filtered.map(c => lsCustomerCardHtml(c)).join('')
-    : (state.customers.length ? '<p class="empty">No customers match your search.</p>' : '<p class="empty">No customers yet.</p>');
-}
-
 // ---------- LIVESTOCK SALES HISTORY ----------
 function computeLsSalesPeriodStats(start, end){
   const rows = state.livestockSales.filter(s => {
@@ -7011,7 +6974,6 @@ function renderLivestockSalesTab(){
   populateLsSaleCustomerOptions();
   populateLsSaleCoopOptions();
   onLsSaleCustomerChange();
-  renderLsCustomersList();
   renderLsSalesStats();
   renderLsSalesHistoryList();
 }
@@ -7105,7 +7067,7 @@ async function saveEditedLsSale(id){
   await loadFlockData();
   renderCustomerLsBalance(currentCustomerDetailId);
   renderCustomerLsSalesList(currentCustomerDetailId);
-  renderLsCustomersList();
+  renderCustomersList();
 }
 
 async function deleteLsSale(id){
@@ -7115,7 +7077,7 @@ async function deleteLsSale(id){
   await loadFlockData();
   renderCustomerLsBalance(currentCustomerDetailId);
   renderCustomerLsSalesList(currentCustomerDetailId);
-  renderLsCustomersList();
+  renderCustomersList();
 }
 
 // ---------- PURCHASES ----------
